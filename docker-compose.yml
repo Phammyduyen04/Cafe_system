@@ -1,0 +1,243 @@
+version: '3.8'
+
+services:
+  # ========================
+  # INFRASTRUCTURE
+  # ========================
+  mysql:
+    image: mysql:8.0
+    container_name: coffee_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: auth_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init-databases.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot123"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  mongodb:
+    image: mongo:7.0
+    container_name: coffee_mongodb
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root123
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')", "-u", "root", "-p", "root123"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: coffee_rabbitmq
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ========================
+  # API GATEWAY
+  # ========================
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: coffee_api_gateway
+    restart: on-failure
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      AUTH_SERVICE_URL: http://auth-service:3001
+      CUSTOMER_SERVICE_URL: http://customer-service:3002
+      ORDER_SERVICE_URL: http://order-service:3003
+      PAYMENT_SERVICE_URL: http://payment-service:3004
+      PRODUCT_SERVICE_URL: http://product-service:3005
+      PROMOTION_SERVICE_URL: http://promotion-service:3006
+      STAFF_SERVICE_URL: http://staff-service:3007
+    depends_on:
+      auth-service:
+        condition: service_started
+      customer-service:
+        condition: service_started
+      order-service:
+        condition: service_started
+      payment-service:
+        condition: service_started
+      product-service:
+        condition: service_started
+      promotion-service:
+        condition: service_started
+      staff-service:
+        condition: service_started
+
+  # ========================
+  # MYSQL SERVICES
+  # ========================
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
+    container_name: coffee_auth_service
+    restart: on-failure
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      SERVICE_NAME: auth-service
+      DATABASE_URL: mysql://root:root123@mysql:3306/auth_db
+      JWT_SECRET: coffee_shop_secret_key_2026
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  customer-service:
+    build:
+      context: .
+      dockerfile: customer-service/Dockerfile
+    container_name: coffee_customer_service
+    restart: on-failure
+    ports:
+      - "3002:3002"
+    environment:
+      PORT: 3002
+      SERVICE_NAME: customer-service
+      DATABASE_URL: mysql://root:root123@mysql:3306/customer_db
+      JWT_SECRET: coffee_shop_secret_key_2026
+      RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  order-service:
+    build:
+      context: .
+      dockerfile: order-service/Dockerfile
+    container_name: coffee_order_service
+    restart: on-failure
+    ports:
+      - "3003:3003"
+    environment:
+      PORT: 3003
+      SERVICE_NAME: order-service
+      DATABASE_URL: mysql://root:root123@mysql:3306/order_db
+      JWT_SECRET: coffee_shop_secret_key_2026
+      RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
+      PRODUCT_SERVICE_URL: http://product-service:3005
+      PROMOTION_SERVICE_URL: http://promotion-service:3006
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
+    container_name: coffee_payment_service
+    restart: on-failure
+    ports:
+      - "3004:3004"
+    environment:
+      PORT: 3004
+      SERVICE_NAME: payment-service
+      DATABASE_URL: mysql://root:root123@mysql:3306/payment_db
+      JWT_SECRET: coffee_shop_secret_key_2026
+      RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  # ========================
+  # MONGODB SERVICES
+  # ========================
+  product-service:
+    build:
+      context: .
+      dockerfile: product-service/Dockerfile
+    container_name: coffee_product_service
+    restart: on-failure
+    ports:
+      - "3005:3005"
+    environment:
+      PORT: 3005
+      SERVICE_NAME: product-service
+      MONGODB_URI: mongodb://root:root123@mongodb:27017/product_db?authSource=admin
+      JWT_SECRET: coffee_shop_secret_key_2026
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  promotion-service:
+    build:
+      context: .
+      dockerfile: promotion-service/Dockerfile
+    container_name: coffee_promotion_service
+    restart: on-failure
+    ports:
+      - "3006:3006"
+    environment:
+      PORT: 3006
+      SERVICE_NAME: promotion-service
+      MONGODB_URI: mongodb://root:root123@mongodb:27017/promotion_db?authSource=admin
+      JWT_SECRET: coffee_shop_secret_key_2026
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  staff-service:
+    build:
+      context: .
+      dockerfile: staff-service/Dockerfile
+    container_name: coffee_staff_service
+    restart: on-failure
+    ports:
+      - "3007:3007"
+    environment:
+      PORT: 3007
+      SERVICE_NAME: staff-service
+      MONGODB_URI: mongodb://root:root123@mongodb:27017/staff_db?authSource=admin
+      JWT_SECRET: coffee_shop_secret_key_2026
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
+  mongo_data:
+  rabbitmq_data:

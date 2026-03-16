@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Payment {
+  payment_id       String    @id @default(uuid()) @db.VarChar(36)
+  order_id         String    @unique @db.VarChar(36)
+  total_amount     Decimal   @db.Decimal(12, 2)
+  paid_amount      Decimal   @default(0) @db.Decimal(12, 2)
+  remaining_amount Decimal   @db.Decimal(12, 2)
+  payment_status   String    @default("PENDING") @db.VarChar(20)
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  sessions PaymentSession[]
+
+  @@map("payments")
+}
+
+model PaymentSession {
+  payment_session_id String    @id @default(uuid()) @db.VarChar(36)
+  payment_id         String
+  session_code       String    @unique @db.VarChar(50)
+  started_at         DateTime  @default(now())
+  expired_at         DateTime
+  ended_at           DateTime?
+  session_status     String    @default("ACTIVE") @db.VarChar(20)
+  initiated_by       String?   @db.VarChar(100)
+  device_info        String?   @db.VarChar(255)
+  note               String?   @db.Text
+
+  payment      Payment              @relation(fields: [payment_id], references: [payment_id], onDelete: Cascade)
+  transactions PaymentTransaction[]
+
+  @@map("payment_sessions")
+}
+
+model PaymentTransaction {
+  transaction_id     String    @id @default(uuid()) @db.VarChar(36)
+  payment_session_id String
+  payment_method_id  String
+  transaction_code   String    @unique @db.VarChar(100)
+  amount             Decimal   @db.Decimal(12, 2)
+  transaction_status String    @default("PENDING") @db.VarChar(20)
+  gateway_response   String?   @db.Text
+  paid_at            DateTime?
+  created_at         DateTime  @default(now())
+
+  session        PaymentSession @relation(fields: [payment_session_id], references: [payment_session_id], onDelete: Cascade)
+  payment_method PaymentMethod  @relation(fields: [payment_method_id], references: [payment_method_id])
+
+  @@map("payment_transactions")
+}
+
+model PaymentMethod {
+  payment_method_id String  @id @default(uuid()) @db.VarChar(36)
+  method_code       String  @unique @db.VarChar(20)
+  method_name       String  @db.VarChar(100)
+  is_active         Boolean @default(true)
+  description       String? @db.VarChar(255)
+
+  transactions PaymentTransaction[]
+
+  @@map("payment_methods")
+}
