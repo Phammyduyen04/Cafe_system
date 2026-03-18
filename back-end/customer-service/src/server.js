@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
-const { errorHandler, subscriber } = require('../../../shared');
+const { errorHandler, subscriber } = require('../../shared');
 const customerRoutes = require('./routes/customer.routes');
 const customerService = require('./services/customer.service');
 
