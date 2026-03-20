@@ -7,6 +7,7 @@ const { errorHandler } = require('../../shared');
 const productRoutes = require('./routes/product.routes');
 const categoryRoutes = require('./routes/category.routes');
 const ingredientRoutes = require('./routes/ingredient.routes');
+const toppingRoutes = require('./routes/topping.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3005;
@@ -25,9 +26,10 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'Product Service is running', timestamp: new Date().toISOString() });
 });
 
-app.use('/api/products', productRoutes);
-app.use('/api/categories', categoryRoutes);
-app.use('/api/ingredients', ingredientRoutes);
+app.use('/categories', categoryRoutes);
+app.use('/ingredients', ingredientRoutes);
+app.use('/toppings', toppingRoutes);
+app.use('/', productRoutes);
 
 app.use(errorHandler);
 
