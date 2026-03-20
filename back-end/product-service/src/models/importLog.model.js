@@ -3,8 +3,9 @@ const mongoose = require('mongoose');
 const importLogSchema = new mongoose.Schema(
   {
     ingredientId: { type: String, required: true },
-    importedQuantity: { type: Number, required: true },
-    supplier: { type: String },
+    quantityImported: { type: Number, required: true },
+    unitPrice: { type: Number, default: 0 },
+    supplier: { type: String, default: '' },
     importedAt: { type: Date, default: Date.now },
     note: { type: String, default: '' },
   },

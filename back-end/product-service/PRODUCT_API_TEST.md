@@ -1,8 +1,8 @@
 # Product Service - Postman Test Guide
 
-> **Base URL (qua Gateway):** `http://localhost:3000`  
-> **Base URL (trực tiếp):** `http://localhost:3005`  
-> **Content-Type:** `application/json`  
+> **Base URL (qua Gateway):** `http://localhost:3000`
+> **Base URL (trực tiếp):** `http://localhost:3005`
+> **Content-Type:** `application/json`
 > **⚠️ Các route POST/PUT/DELETE yêu cầu:** `Authorization: Bearer {{accessToken}}` (role ADMIN hoặc MANAGER)
 
 ---
@@ -29,14 +29,8 @@ POST {{base}}/api/products/categories
 
 **Body:**
 ```json
-{
-  "categoryId": "CAT-001",
-  "categoryName": "Cà phê",
-  "description": "Các loại đồ uống từ cà phê"
-}
+{ "categoryId": "CAT-001", "categoryName": "Cà phê", "description": "Các loại đồ uống từ cà phê" }
 ```
-
-Tạo thêm các category khác để test:
 ```json
 { "categoryId": "CAT-002", "categoryName": "Trà", "description": "Các loại trà" }
 ```
@@ -91,7 +85,7 @@ GET {{base}}/api/products/{{productId}}
 POST {{base}}/api/products
 ```
 
-**Body (cơ bản - không topping):**
+**Body:**
 ```json
 {
   "productId": "PROD-001",
@@ -101,8 +95,6 @@ POST {{base}}/api/products
   "productCategoryId": "CAT-001"
 }
 ```
-
-**Body (đầy đủ):**
 ```json
 {
   "productId": "PROD-002",
@@ -145,23 +137,115 @@ DELETE {{base}}/api/products/{{productId}}
 
 ---
 
-## 3. INGREDIENTS (Nguyên liệu)
+## 3. TOPPINGS (Topping)
+
+> GET là public. POST/PUT/DELETE yêu cầu ADMIN/MANAGER.
+
+### 3.1 Lấy tất cả topping *(không cần token)*
+
+```
+GET {{base}}/api/products/toppings
+```
+
+**Chỉ lấy topping đang khả dụng:**
+```
+GET {{base}}/api/products/toppings?available=true
+```
+
+### 3.2 Lấy topping theo ID *(không cần token)*
+
+```
+GET {{base}}/api/products/toppings/{{toppingId}}
+```
+
+> `toppingId` là giá trị trả về khi tạo topping, dạng `TOP-XXXXXXXX`
+
+### 3.3 Tạo topping *(yêu cầu ADMIN/MANAGER)*
+
+```
+POST {{base}}/api/products/toppings
+```
+
+**Body:**
+```json
+{
+  "toppingName": "Trân châu đen",
+  "price": 5000
+}
+```
+```json
+{
+  "toppingName": "Pudding trứng",
+  "price": 8000
+}
+```
+```json
+{
+  "toppingName": "Thạch trái cây",
+  "price": 6000
+}
+```
+```json
+{
+  "toppingName": "Kem cheese",
+  "price": 10000
+}
+```
+
+> **Response trả về `toppingId`** dạng `TOP-XXXXXXXX` — lưu lại để dùng khi đặt hàng.
+
+### 3.4 Cập nhật topping *(yêu cầu ADMIN/MANAGER)*
+
+```
+PUT {{base}}/api/products/toppings/{{toppingId}}
+```
+
+**Body (cập nhật giá):**
+```json
+{
+  "price": 6000
+}
+```
+
+**Body (tạm ngừng bán):**
+```json
+{
+  "isAvailable": false
+}
+```
+
+**Body (ngừng hoạt động):**
+```json
+{
+  "status": "INACTIVE"
+}
+```
+
+### 3.5 Xóa topping *(yêu cầu ADMIN/MANAGER)*
+
+```
+DELETE {{base}}/api/products/toppings/{{toppingId}}
+```
+
+---
+
+## 4. INGREDIENTS (Nguyên liệu)
 
 > ⚠️ **Tất cả ingredient routes yêu cầu token**
 
-### 3.1 Lấy tất cả nguyên liệu
+### 4.1 Lấy tất cả nguyên liệu
 
 ```
 GET {{base}}/api/products/ingredients
 ```
 
-### 3.2 Lấy nguyên liệu theo ID
+### 4.2 Lấy nguyên liệu theo ID
 
 ```
 GET {{base}}/api/products/ingredients/{{ingredientId}}
 ```
 
-### 3.3 Tạo nguyên liệu *(yêu cầu ADMIN/MANAGER)*
+### 4.3 Tạo nguyên liệu *(yêu cầu ADMIN/MANAGER)*
 
 ```
 POST {{base}}/api/products/ingredients
@@ -187,7 +271,7 @@ POST {{base}}/api/products/ingredients
 }
 ```
 
-### 3.4 Nhập kho nguyên liệu
+### 4.4 Nhập kho nguyên liệu
 
 ```
 POST {{base}}/api/products/ingredients/{{ingredientId}}/import
@@ -203,7 +287,7 @@ POST {{base}}/api/products/ingredients/{{ingredientId}}/import
 }
 ```
 
-### 3.5 Xem lịch sử nhập kho
+### 4.5 Xem lịch sử nhập kho
 
 ```
 GET {{base}}/api/products/ingredients/{{ingredientId}}/import-logs
@@ -211,17 +295,18 @@ GET {{base}}/api/products/ingredients/{{ingredientId}}/import-logs
 
 ---
 
-## 4. THỨ TỰ TEST ĐỀ XUẤT
+## 5. THỨ TỰ TEST ĐỀ XUẤT
 
 | # | Action | Endpoint | Ghi chú |
 |---|--------|----------|---------|
 | 1 | Tạo category | POST /api/products/categories | Tạo CAT-001, CAT-002, CAT-003 |
 | 2 | Lấy tất cả category | GET /api/products/categories | Verify |
 | 3 | Tạo sản phẩm | POST /api/products | Tạo PROD-001, PROD-002, PROD-003 |
-| 4 | Lấy tất cả sản phẩm | GET /api/products | Verify paginated |
-| 5 | Search sản phẩm | GET /api/products?search=cà phê | Verify filter |
-| 6 | Tạo nguyên liệu | POST /api/products/ingredients | Tạo ING-001, ING-002 |
-| 7 | Nhập kho | POST /api/products/ingredients/ING-001/import | Verify stock tăng |
-| 8 | Xem import logs | GET /api/products/ingredients/ING-001/import-logs | |
-| 9 | Update sản phẩm | PUT /api/products/PROD-001 | |
-| 10 | Delete sản phẩm | DELETE /api/products/PROD-003 | Verify status = INACTIVE |
+| 4 | Lấy tất cả sản phẩm | GET /api/products | Verify |
+| 5 | Tạo topping | POST /api/products/toppings | Tạo ít nhất 2-3 topping, lưu toppingId |
+| 6 | Lấy tất cả topping | GET /api/products/toppings | Verify |
+| 7 | Lấy topping khả dụng | GET /api/products/toppings?available=true | Verify filter |
+| 8 | Cập nhật topping | PUT /api/products/toppings/{{toppingId}} | Đổi giá |
+| 9 | Tạo nguyên liệu | POST /api/products/ingredients | Tạo ING-001, ING-002 |
+| 10 | Nhập kho | POST /api/products/ingredients/ING-001/import | Verify stock tăng |
+| 11 | Xem import logs | GET /api/products/ingredients/ING-001/import-logs | |
