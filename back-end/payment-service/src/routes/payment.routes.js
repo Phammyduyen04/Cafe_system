@@ -10,14 +10,14 @@ router.get('/methods', paymentController.getPaymentMethods);
 router.post('/methods', authorizeMiddleware('ADMIN', 'MANAGER'), paymentController.createPaymentMethod);
 
 // Payments
-router.get('/', authorizeMiddleware('ADMIN', 'MANAGER', 'CASHIER'), paymentController.getAllPayments);
+router.get('/', authorizeMiddleware('MANAGER', 'EMPLOYEE', 'CUSTOMER'), paymentController.getAllPayments);
 router.get('/:id', paymentController.getPaymentById);
 router.get('/order/:orderId', paymentController.getPaymentByOrderId);
 
 // Sessions
-router.post('/:id/sessions', authorizeMiddleware('ADMIN', 'MANAGER', 'CASHIER'), paymentController.createSession);
+router.post('/:id/sessions', authorizeMiddleware('MANAGER', 'EMPLOYEE', 'CUSTOMER'), paymentController.createSession);
 
 // Transactions
-router.post('/sessions/:sessionId/transactions', authorizeMiddleware('ADMIN', 'MANAGER', 'CASHIER'), paymentController.processTransaction);
+router.post('/sessions/:sessionId/transactions', authorizeMiddleware('MANAGER', 'EMPLOYEE', 'CUSTOMER'), paymentController.processTransaction);
 
 module.exports = router;

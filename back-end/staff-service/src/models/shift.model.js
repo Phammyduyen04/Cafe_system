@@ -12,7 +12,7 @@ const shiftSchema = new mongoose.Schema(
   },
   {
     timestamps: { createdAt: 'createdAt', updatedAt: 'updatedAt' },
-    collection: 'work_shifts',
+    collection: 'work_shift',
   }
 );
 

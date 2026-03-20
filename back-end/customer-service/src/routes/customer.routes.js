@@ -5,8 +5,8 @@ const { authMiddleware, authorizeMiddleware } = require('../../../shared');
 
 router.use(authMiddleware);
 
-router.post('/', authorizeMiddleware('ADMIN', 'MANAGER', 'CASHIER'), customerController.createCustomer);
-router.get('/', authorizeMiddleware('ADMIN', 'MANAGER', 'CASHIER'), customerController.getAllCustomers);
+router.post('/', authorizeMiddleware('ADMIN', 'MANAGER', 'EMPLOYEE', 'CUSTOMER'), customerController.createCustomer);
+router.get('/', authorizeMiddleware('ADMIN', 'MANAGER', 'EMPLOYEE'), customerController.getAllCustomers);
 router.get('/:id', customerController.getCustomerById);
 router.put('/:id', authorizeMiddleware('ADMIN', 'MANAGER'), customerController.updateCustomer);
 router.delete('/:id', authorizeMiddleware('ADMIN', 'MANAGER'), customerController.deleteCustomer);
