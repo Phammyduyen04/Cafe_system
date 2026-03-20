@@ -30,19 +30,20 @@ const importIngredient = async (id, data) => {
   const ingredient = await ingredientRepo.findByIngredientId(id);
   if (!ingredient) throw new AppError('Ingredient not found', 404);
 
-  const { importedQuantity, supplier, note } = data;
-  if (!importedQuantity || importedQuantity <= 0) {
+  const { quantityImported, unitPrice, supplier, note } = data;
+  if (!quantityImported || quantityImported <= 0) {
     throw new AppError('Imported quantity must be a positive number', 400);
   }
 
   // Update current quantity
-  const newQuantity = ingredient.currentQuantity + importedQuantity;
+  const newQuantity = ingredient.currentQuantity + quantityImported;
   await ingredientRepo.update(id, { currentQuantity: newQuantity });
 
   // Create import log
   const log = await importLogRepo.create({
     ingredientId: id,
-    importedQuantity,
+    quantityImported,
+    unitPrice: unitPrice || 0,
     supplier: supplier || '',
     note: note || '',
   });

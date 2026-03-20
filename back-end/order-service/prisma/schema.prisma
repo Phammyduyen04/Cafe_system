@@ -13,6 +13,7 @@ model Order {
   order_code       String    @unique @db.VarChar(50)
   order_time       DateTime  @default(now())
   order_type       String    @db.VarChar(20) // DINE_IN, TAKE_AWAY
+  order_channel    String    @default("IN_STORE") @db.VarChar(20) // ONLINE, IN_STORE
   status           String    @default("PENDING") @db.VarChar(20)
   subtotal_amount  Decimal   @default(0) @db.Decimal(12, 2)
   discount_amount  Decimal   @default(0) @db.Decimal(12, 2)
@@ -36,6 +37,9 @@ model OrderDetail {
   order_id        String
   product_id      String   @db.VarChar(50)
   product_name    String   @db.VarChar(200)
+  size            String?  @db.VarChar(20) // S, M, L
+  sugar_level     String?  @db.VarChar(20) // 0%, 30%, 50%, 70%, 100%
+  ice_level       String?  @db.VarChar(20) // 0%, 30%, 50%, 70%, 100%
   unit_price      Decimal  @db.Decimal(12, 2)
   quantity        Int
   item_note       String?  @db.VarChar(255)
@@ -50,6 +54,7 @@ model OrderDetail {
 model OrderItemTopping {
   order_item_topping_id String  @id @default(uuid()) @db.VarChar(36)
   order_item_id         String
+  topping_id            String? @db.VarChar(50)
   topping_name          String  @db.VarChar(200)
   topping_price         Decimal @db.Decimal(12, 2)
   quantity              Int     @default(1)
@@ -99,4 +104,47 @@ model OrderPromotion {
   order Order @relation(fields: [order_id], references: [order_id], onDelete: Cascade)
 
   @@map("order_promotions")
+}
+
+model Cart {
+  cart_id     String    @id @default(uuid()) @db.VarChar(36)
+  customer_id String   @unique @db.VarChar(36)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  items       CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  cart_item_id  String   @id @default(uuid()) @db.VarChar(36)
+  cart_id       String
+  product_id    String   @db.VarChar(50)
+  product_name  String   @db.VarChar(200)
+  size          String?  @db.VarChar(20)
+  sugar_level   String?  @db.VarChar(20)
+  ice_level     String?  @db.VarChar(20)
+  unit_price    Decimal  @db.Decimal(12, 2)
+  quantity      Int      @default(1)
+  item_note     String?  @db.VarChar(255)
+  created_at    DateTime @default(now())
+
+  cart          Cart     @relation(fields: [cart_id], references: [cart_id], onDelete: Cascade)
+  toppings      CartItemTopping[]
+
+  @@map("cart_items")
+}
+
+model CartItemTopping {
+  cart_item_topping_id String  @id @default(uuid()) @db.VarChar(36)
+  cart_item_id         String
+  topping_id           String? @db.VarChar(50)
+  topping_name         String  @db.VarChar(200)
+  topping_price        Decimal @db.Decimal(12, 2)
+  quantity             Int     @default(1)
+
+  cart_item CartItem @relation(fields: [cart_item_id], references: [cart_item_id], onDelete: Cascade)
+
+  @@map("cart_item_toppings")
 }
