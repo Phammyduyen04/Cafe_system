@@ -29,19 +29,10 @@ const getCustomerById = async (req, res, next) => {
   }
 };
 
-const updateCustomer = async (req, res, next) => {
+const updateOwnProfile = async (req, res, next) => {
   try {
-    const customer = await customerService.updateCustomer(req.params.id, req.body);
-    return responseHelper.success(res, customer, 'Customer updated successfully');
-  } catch (error) {
-    next(error);
-  }
-};
-
-const deleteCustomer = async (req, res, next) => {
-  try {
-    await customerService.deleteCustomer(req.params.id);
-    return responseHelper.success(res, null, 'Customer deleted successfully');
+    const customer = await customerService.updateOwnProfile(req.user.accountId, req.body);
+    return responseHelper.success(res, customer, 'Profile updated successfully');
   } catch (error) {
     next(error);
   }
@@ -68,6 +59,9 @@ const getCustomerPointLogs = async (req, res, next) => {
 const adjustPoints = async (req, res, next) => {
   try {
     const { points, reason } = req.body;
+    if (points === undefined || points === null) {
+      return next(new Error('points is required'));
+    }
     const result = await customerService.addPoints(
       req.params.id,
       points,
@@ -80,13 +74,44 @@ const adjustPoints = async (req, res, next) => {
   }
 };
 
+const redeemPoints = async (req, res, next) => {
+  try {
+    const { points, reason } = req.body;
+    const result = await customerService.redeemPoints(req.params.id, points, reason);
+    return responseHelper.success(res, result, 'Points redeemed successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getCustomerByAccountId = async (req, res, next) => {
+  try {
+    const customer = await customerService.getCustomerByAccountId(req.params.accountId);
+    return responseHelper.success(res, customer);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteOwnAccount = async (req, res, next) => {
+  try {
+    const { confirm } = req.body;
+    await customerService.deleteOwnAccount(req.user.accountId, confirm);
+    return responseHelper.success(res, null, 'Tài khoản đã được vô hiệu hóa thành công');
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createCustomer,
   getAllCustomers,
   getCustomerById,
-  updateCustomer,
-  deleteCustomer,
+  getCustomerByAccountId,
+  updateOwnProfile,
+  deleteOwnAccount,
   getCustomerPoints,
   getCustomerPointLogs,
   adjustPoints,
+  redeemPoints,
 };
