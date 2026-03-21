@@ -8,11 +8,11 @@ router.get('/check', discountController.checkApplicableDiscounts);
 router.get('/:id', discountController.getDiscountById);
 
 router.use(authMiddleware);
-router.post('/', authorizeMiddleware('ADMIN', 'MANAGER'), discountController.createDiscount);
-router.put('/:id', authorizeMiddleware('ADMIN', 'MANAGER'), discountController.updateDiscount);
-router.delete('/:id', authorizeMiddleware('ADMIN', 'MANAGER'), discountController.deleteDiscount);
+router.post('/', authorizeMiddleware('MANAGER'), discountController.createDiscount);
+router.put('/:id', authorizeMiddleware('MANAGER'), discountController.updateDiscount);
+router.delete('/:id', authorizeMiddleware('MANAGER'), discountController.deleteDiscount);
 
 // Conditions
-router.put('/:id/conditions', authorizeMiddleware('ADMIN', 'MANAGER'), discountController.updateConditions);
+router.put('/:id/conditions', authorizeMiddleware('MANAGER'), discountController.updateConditions);
 
 module.exports = router;
