@@ -16,7 +16,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'Order Service is running', timestamp: new Date().toISOString() });
 });
 
-app.use('/', orderRoutes);
+app.use('/api/orders', orderRoutes);
 
 app.use(errorHandler);
 

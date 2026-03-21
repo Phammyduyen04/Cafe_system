@@ -8,14 +8,17 @@ datasource db {
 }
 
 model Payment {
-  payment_id       String    @id @default(uuid()) @db.VarChar(36)
-  order_id         String    @unique @db.VarChar(36)
-  total_amount     Decimal   @db.Decimal(12, 2)
-  paid_amount      Decimal   @default(0) @db.Decimal(12, 2)
-  remaining_amount Decimal   @db.Decimal(12, 2)
-  payment_status   String    @default("PENDING") @db.VarChar(20)
-  created_at       DateTime  @default(now())
-  updated_at       DateTime  @updatedAt
+  payment_id        String    @id @default(uuid()) @db.VarChar(36)
+  order_id          String    @unique @db.VarChar(36)
+  total_amount      Decimal   @db.Decimal(12, 2)
+  paid_amount       Decimal   @default(0) @db.Decimal(12, 2)
+  remaining_amount  Decimal   @db.Decimal(12, 2)
+  payment_status    String    @default("PENDING") @db.VarChar(20)
+  payment_method    String    @default("CASH") @db.VarChar(20) // CASH, MOMO, QR
+  payment_url       String?   @db.Text                         // MoMo payUrl hoặc VietQR URL
+  provider_order_id String?   @db.VarChar(100)                 // MoMo requestId để xác thực IPN
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
 
   sessions PaymentSession[]
 
@@ -48,6 +51,7 @@ model PaymentTransaction {
   amount             Decimal   @db.Decimal(12, 2)
   transaction_status String    @default("PENDING") @db.VarChar(20)
   gateway_response   String?   @db.Text
+  note               String?   @db.VarChar(255)
   paid_at            DateTime?
   created_at         DateTime  @default(now())
 

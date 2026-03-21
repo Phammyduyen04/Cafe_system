@@ -31,7 +31,7 @@ router.put('/my-orders/:id/cancel', orderController.cancelMyOrder);
 // =============================================
 
 // Tạo đơn tại quầy (nhân viên)
-router.post('/', authorizeMiddleware('ADMIN', 'MANAGER', 'CASHIER'), orderController.createOrder);
+router.post('/', authorizeMiddleware('ADMIN', 'MANAGER', 'STAFF'), orderController.createOrder);
 
 // Xem tất cả đơn hàng (filter theo status, customerId, orderChannel)
 router.get('/', orderController.getAllOrders);
@@ -40,7 +40,7 @@ router.get('/', orderController.getAllOrders);
 router.get('/:id', orderController.getOrderById);
 
 // Cập nhật trạng thái đơn (nhân viên tiếp nhận, pha chế, hoàn thành, hủy)
-router.put('/:id/status', authorizeMiddleware('ADMIN', 'MANAGER', 'CASHIER', 'BARISTA'), orderController.updateOrderStatus);
+router.put('/:id/status', authorizeMiddleware('ADMIN', 'MANAGER', 'STAFF'), orderController.updateOrderStatus);
 
 // Xem lịch sử trạng thái đơn
 router.get('/:id/status-logs', orderController.getOrderStatusLogs);

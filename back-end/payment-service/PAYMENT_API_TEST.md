@@ -1,223 +1,494 @@
 # Payment Service - Postman Test Guide
 
-> **Base URL (qua Gateway):** `http://localhost:3000`  
-> **Base URL (trực tiếp):** `http://localhost:3004`  
-> **Content-Type:** `application/json`  
-> **⚠️ Tất cả route đều yêu cầu:** `Authorization: Bearer {{accessToken}}`
+> **Base URL (qua Gateway):** `http://localhost:3000`
+> **Base URL (trực tiếp):** `http://localhost:3004`
+> **Content-Type:** `application/json`
+> **Tất cả route yêu cầu:** `Authorization: Bearer {{accessToken}}` (trừ MoMo IPN)
 
 ---
 
-## Luồng thanh toán
+## Tổng quan luồng thanh toán
 
 ```
-1. Tạo Order (order-service)
-       ↓ [RabbitMQ: order.created]
-2. Payment record tự động được tạo (PENDING)
-       ↓
-3. Tạo Payment Session (ACTIVE, hết hạn sau 30 phút)
-       ↓
-4. Xử lý Transaction (gắn payment method + amount)
-       ↓
-5. Payment status → PARTIAL (nếu chưa đủ) | COMPLETED (nếu đủ)
+         Client tạo Order (kèm paymentMethod)
+                      ↓
+         order-service lưu đơn hàng
+                      ↓
+         order-service gọi HTTP → payment-service /initiate
+                      ↓
+    ┌─────────────────┼─────────────────┐
+    ↓                 ↓                 ↓
+  CASH              MOMO               QR
+    ↓                 ↓                 ↓
+ Payment          Gọi MoMo API    Tạo VietQR URL
+ PENDING          trả về payUrl    trả về qrUrl
+    ↓                 ↓                 ↓
+ Nhân viên        Khách mở link    Khách quét QR
+ thu tiền →       thanh toán →     chuyển khoản →
+ cash-confirm     MoMo IPN tự     NV xác nhận →
+    ↓             động callback    qr-confirm
+    ↓                 ↓                 ↓
+ COMPLETED        COMPLETED        COMPLETED
 ```
+
+**3 phương thức thanh toán:**
+
+| Phương thức | Giá trị `paymentMethod` | Xác nhận bởi |
+|---|---|---|
+| Tiền mặt | `CASH` | Nhân viên gọi `cash-confirm` |
+| Ví MoMo | `MOMO` | Tự động qua MoMo IPN callback |
+| Chuyển khoản QR | `QR` | Nhân viên gọi `qr-confirm` |
 
 ---
 
-## 1. PAYMENT METHODS (Phương thức thanh toán)
+## 0. CHUẨN BỊ TRƯỚC KHI TEST
 
-> ⚠️ **Phải tạo payment method TRƯỚC khi xử lý transaction**
+### 0.1 Tạo Payment Methods (chỉ cần làm 1 lần)
 
-### 1.1 Lấy tất cả payment methods *(chỉ cần token)*
-
-```
-GET {{base}}/api/payments/methods
-```
-
-### 1.2 Tạo payment method *(ADMIN/MANAGER)*
+> ADMIN/MANAGER mới được tạo payment method
 
 ```
 POST {{base}}/api/payments/methods
 ```
 
-**Body (tạo lần lượt):**
+Tạo lần lượt 3 method:
+
 ```json
-{
-  "methodCode": "CASH",
-  "methodName": "Tiền mặt",
-  "description": "Thanh toán tiền mặt tại quầy"
-}
+{ "methodCode": "CASH", "methodName": "Tiền mặt", "description": "Thanh toán tiền mặt tại quầy" }
 ```
 ```json
-{
-  "methodCode": "MOMO",
-  "methodName": "Ví MoMo",
-  "description": "Thanh toán qua ví MoMo"
-}
+{ "methodCode": "MOMO", "methodName": "Ví MoMo", "description": "Thanh toán qua ví MoMo" }
 ```
 ```json
-{
-  "methodCode": "VNPAY",
-  "methodName": "VNPay",
-  "description": "Thanh toán qua VNPay"
-}
-```
-```json
-{
-  "methodCode": "BANK_TRANSFER",
-  "methodName": "Chuyển khoản ngân hàng",
-  "description": "Chuyển khoản qua tài khoản ngân hàng"
-}
+{ "methodCode": "BANK_TRANSFER", "methodName": "Chuyển khoản QR", "description": "Chuyển khoản qua mã QR ngân hàng" }
 ```
 
-> 💡 Lưu lại `payment_method_id` của phương thức CASH để dùng ở bước xử lý transaction.
+> Lưu lại các `payment_method_id` trả về.
+
+### 0.2 Kiểm tra payment methods đã tạo
+
+```
+GET {{base}}/api/payments/methods
+```
 
 ---
 
-## 2. PAYMENTS (Hồ sơ thanh toán)
+## 1. KỊCH BẢN 1: THANH TOÁN TIỀN MẶT (CASH)
 
-> 💡 Payment record được **tự động tạo** khi order được tạo (qua RabbitMQ).  
-> Bạn cần tạo order ở order-service trước, sau đó mới có payment record ở đây.
+> Dùng cho đơn tại quầy (IN_STORE). Nhân viên thu tiền mặt rồi xác nhận.
 
-### 2.1 Lấy tất cả payments *(ADMIN/MANAGER/CASHIER)*
+### Bước 1: Tạo đơn hàng tại quầy (order-service)
 
 ```
-GET {{base}}/api/payments
+POST {{base}}/api/orders
 ```
 
-**Query params:**
-```
-GET {{base}}/api/payments?page=1&limit=10&status=PENDING
-GET {{base}}/api/payments?status=COMPLETED
+```json
+{
+  "orderType": "DINE_IN",
+  "orderChannel": "IN_STORE",
+  "paymentMethod": "CASH",
+  "items": [
+    {
+      "productId": "prod-001",
+      "productName": "Cà phê sữa đá",
+      "unitPrice": 35000,
+      "quantity": 2
+    }
+  ],
+  "note": "Bàn 5"
+}
 ```
 
-### 2.2 Lấy payment theo payment ID
+**Response chú ý:**
+```json
+{
+  "data": {
+    "order_id": "{{orderId}}",
+    "order_code": "ORD-XXXXXX",
+    "payment_method": "CASH",
+    "total_amount": 70000,
+    "paymentInfo": {
+      "payment": {
+        "payment_id": "{{paymentId}}",
+        "payment_status": "PENDING",
+        "payment_method": "CASH"
+      }
+    }
+  }
+}
+```
+
+> Lưu lại `paymentId` từ `paymentInfo.payment.payment_id`
+
+### Bước 2: Xem chi tiết payment
 
 ```
 GET {{base}}/api/payments/{{paymentId}}
 ```
 
-### 2.3 Lấy payment theo order ID *(tiện dùng nhất)*
+> Kiểm tra: `payment_status = "PENDING"`, `total_amount = 70000`
+
+### Bước 3: Nhân viên xác nhận thu tiền mặt
 
 ```
-GET {{base}}/api/payments/order/{{orderId}}
+POST {{base}}/api/payments/{{paymentId}}/cash-confirm
 ```
 
-> 💡 Nếu bạn đã tạo order và biết `orderId`, dùng endpoint này để tìm `paymentId` và xem `total_amount`.
-
----
-
-## 3. PAYMENT SESSIONS (Phiên thanh toán)
-
-### 3.1 Tạo payment session *(ADMIN/MANAGER/CASHIER)*
-
-```
-POST {{base}}/api/payments/{{paymentId}}/sessions
-```
-
-**Body:**
 ```json
 {
-  "deviceInfo": "Quầy thu ngân 1",
-  "note": "Thanh toán cho đơn hàng bàn 5"
+  "amountReceived": 100000,
+  "change": 30000
 }
 ```
 
-Kết quả:
+| Field | Ý nghĩa |
+|---|---|
+| `amountReceived` | Số tiền khách đưa |
+| `change` | Tiền thừa trả lại (phải = amountReceived - total_amount) |
+
+**Response:**
 ```json
 {
+  "message": "Cash payment confirmed",
   "data": {
-    "payment_session_id": "uuid-string",
-    "session_code": "SS-XXXXXX-YYYYYY",
-    "session_status": "ACTIVE",
-    "expired_at": "...",
-    "initiated_by": "admin01"
+    "payment_status": "COMPLETED",
+    "paid_amount": 70000,
+    "remaining_amount": 0
   }
 }
 ```
 
-> 💡 Lưu lại `payment_session_id` để xử lý transaction.  
-> ⚠️ Session hết hạn sau **30 phút**, cần xử lý transaction trong thời gian này.
+### Bước 4: Verify kết quả
+
+```
+GET {{base}}/api/payments/{{paymentId}}
+```
+
+> Kiểm tra:
+> - `payment_status` = `COMPLETED`
+> - `paid_amount` = `70000`
+> - `remaining_amount` = `0`
+> - `sessions[0].transactions[0].note` = `"Thu: 100000 | Thoi: 30000"`
 
 ---
 
-## 4. TRANSACTIONS (Giao dịch)
+## 2. KỊCH BẢN 2: THANH TOÁN MOMO
 
-### 4.1 Xử lý transaction — Thanh toán đủ 1 lần
+> Dùng cho cả online và tại quầy. MoMo tự động xác nhận qua IPN callback.
 
-```
-POST {{base}}/api/payments/sessions/{{sessionId}}/transactions
-```
+### Yêu cầu trước khi test MoMo
 
-**Body (thanh toán đủ):**
-```json
-{
-  "paymentMethodId": "{{paymentMethodId_CASH}}",
-  "amount": 50000
-}
-```
-> Nhớ dùng `amount` = `total_amount` của payment để thanh toán đủ → status = `COMPLETED`
+1. **Bật ngrok** (MoMo cần URL công khai để gửi IPN):
+   ```bash
+   ngrok http 3004
+   ```
+2. **Cập nhật `.env`** với URL ngrok:
+   ```
+   MOMO_IPN_URL=https://xxxx.ngrok-free.app/api/payments/momo/ipn
+   MOMO_REDIRECT_URL=https://xxxx.ngrok-free.app/payment/result
+   ```
+3. **Restart payment-service**
 
-**Body (thanh toán một phần - partial):**
-```json
-{
-  "paymentMethodId": "{{paymentMethodId_CASH}}",
-  "amount": 25000
-}
-```
-> Nếu `amount` < `total_amount` → status = `PARTIAL` (chưa đủ tiền)
-
-### 4.2 Thanh toán phần còn lại (sau partial payment)
+### Bước 1: Tạo đơn hàng với MoMo (order-service)
 
 ```
-POST {{base}}/api/payments/sessions/{{sessionId}}/transactions
+POST {{base}}/api/orders
 ```
 
 ```json
 {
-  "paymentMethodId": "{{paymentMethodId_MOMO}}",
-  "amount": 25000
+  "orderType": "TAKE_AWAY",
+  "orderChannel": "IN_STORE",
+  "paymentMethod": "MOMO",
+  "items": [
+    {
+      "productId": "prod-001",
+      "productName": "Trà sữa trân châu",
+      "unitPrice": 45000,
+      "quantity": 1
+    }
+  ]
 }
 ```
-> Lần 2 thanh toán đủ → status = `COMPLETED`, session tự động `COMPLETED`
+
+**Response chú ý:**
+```json
+{
+  "data": {
+    "order_id": "{{orderId}}",
+    "total_amount": 45000,
+    "payment_method": "MOMO",
+    "paymentInfo": {
+      "payment": {
+        "payment_id": "{{paymentId}}",
+        "payment_status": "PENDING",
+        "payment_method": "MOMO",
+        "payment_url": "https://test-payment.momo.vn/...",
+        "provider_order_id": "MOMO-XXXXXX-YYYYYY"
+      },
+      "payUrl": "https://test-payment.momo.vn/...",
+      "deeplink": "momo://...",
+      "qrCodeUrl": "https://test-payment.momo.vn/..."
+    }
+  }
+}
+```
+
+> Lưu lại:
+> - `paymentId` = `paymentInfo.payment.payment_id`
+> - `payUrl` = URL thanh toán MoMo (mở trên trình duyệt)
+
+### Bước 2: Khách thanh toán trên MoMo
+
+1. Mở `payUrl` trên trình duyệt
+2. Trang MoMo test hiển thị → quét bằng app MoMo
+3. Xác nhận thanh toán trên app MoMo
+
+> Sau khi thanh toán xong, MoMo tự động gọi IPN về:
+> `POST {{ngrokUrl}}/api/payments/momo/ipn`
+> Payment-service nhận callback → verify chữ ký → cập nhật `COMPLETED`
+
+### Bước 3: Verify kết quả
+
+```
+GET {{base}}/api/payments/{{paymentId}}
+```
+
+> Kiểm tra:
+> - `payment_status` = `COMPLETED`
+> - `paid_amount` = `45000`
+> - `sessions[0].transactions[0].gateway_response` chứa MoMo `transId`
+
+### (Tùy chọn) Test MoMo IPN thủ công bằng Postman
+
+> Nếu không muốn thanh toán qua app MoMo, bạn có thể giả lập IPN callback:
+
+```
+POST {{base}}/api/payments/momo/ipn
+```
+
+> Endpoint này **KHÔNG cần Authorization header** (public endpoint).
+
+```json
+{
+  "partnerCode": "MOMO",
+  "orderId": "{{provider_order_id}}",
+  "requestId": "{{provider_order_id}}",
+  "amount": 45000,
+  "orderInfo": "Thanh toan don hang ORD-XXXXXX",
+  "orderType": "momo_wallet",
+  "transId": 123456789,
+  "resultCode": 0,
+  "message": "Successful.",
+  "payType": "qr",
+  "responseTime": 1700000000000,
+  "extraData": "",
+  "signature": "{{tính_bằng_hmac_sha256}}"
+}
+```
+
+> Lưu ý: `signature` phải được tính đúng bằng HMAC-SHA256 với `secretKey`.
+> Nếu chỉ test flow, có thể tạm comment dòng `verifyMomoCallback` trong `payment.service.js`.
 
 ---
 
-## 5. KỊCH BẢN TEST ĐẦY ĐỦ
+## 3. KỊCH BẢN 3: THANH TOÁN CHUYỂN KHOẢN QR
 
-### Kịch bản 1: Thanh toán tiền mặt đủ 1 lần
+> Dùng cho cả online và tại quầy. Hệ thống tạo mã QR VietQR, khách quét để chuyển khoản, nhân viên xác nhận.
 
-| # | Action | Endpoint | Ghi chú |
-|---|--------|----------|---------|
-| 1 | Tạo payment methods | POST /api/payments/methods | CASH, MOMO, VNPAY |
-| 2 | Tạo order | (order-service) POST /api/orders | Lưu `orderId` |
-| 3 | Tìm payment | GET /api/payments/order/{{orderId}} | Lưu `paymentId`, `total_amount` |
-| 4 | Tạo session | POST /api/payments/{{paymentId}}/sessions | Lưu `sessionId` |
-| 5 | Thanh toán đủ | POST /api/payments/sessions/{{sessionId}}/transactions | amount = total_amount |
-| 6 | Verify | GET /api/payments/{{paymentId}} | payment_status = COMPLETED |
+### Bước 1: Tạo đơn hàng với QR (order-service)
+
+```
+POST {{base}}/api/orders
+```
+
+```json
+{
+  "orderType": "TAKE_AWAY",
+  "orderChannel": "IN_STORE",
+  "paymentMethod": "QR",
+  "items": [
+    {
+      "productId": "prod-002",
+      "productName": "Matcha Latte",
+      "unitPrice": 55000,
+      "quantity": 1
+    }
+  ]
+}
+```
+
+**Response chú ý:**
+```json
+{
+  "data": {
+    "order_id": "{{orderId}}",
+    "total_amount": 55000,
+    "payment_method": "QR",
+    "paymentInfo": {
+      "payment": {
+        "payment_id": "{{paymentId}}",
+        "payment_status": "PENDING",
+        "payment_method": "QR",
+        "payment_url": "https://img.vietqr.io/image/MB-0123456789-compact2.jpg?amount=55000&addInfo=..."
+      },
+      "qrUrl": "https://img.vietqr.io/image/MB-0123456789-compact2.jpg?amount=55000&addInfo=..."
+    }
+  }
+}
+```
+
+> Lưu lại:
+> - `paymentId` = `paymentInfo.payment.payment_id`
+> - `qrUrl` = URL ảnh QR (mở trên trình duyệt hoặc hiển thị cho khách quét)
+
+### Bước 2: Khách quét mã QR
+
+1. Mở `qrUrl` trên trình duyệt → hiển thị ảnh mã QR
+2. Khách mở app ngân hàng → quét mã QR
+3. App ngân hàng tự điền: số tài khoản, số tiền, nội dung chuyển khoản
+4. Khách xác nhận chuyển khoản
+
+> Khi test, **không cần chuyển tiền thật** — chỉ cần kiểm tra QR hiển thị đúng thông tin rồi bỏ qua bước chuyển khoản.
+
+### Bước 3: Nhân viên xác nhận đã nhận chuyển khoản
+
+> Nhân viên kiểm tra app ngân hàng, thấy tiền về → bấm xác nhận.
+
+```
+POST {{base}}/api/payments/{{paymentId}}/qr-confirm
+```
+
+> Không cần body. Chỉ cần token của nhân viên (ADMIN/MANAGER/STAFF).
+
+**Response:**
+```json
+{
+  "message": "QR payment confirmed",
+  "data": {
+    "payment_status": "COMPLETED",
+    "paid_amount": 55000,
+    "remaining_amount": 0
+  }
+}
+```
+
+### Bước 4: Verify kết quả
+
+```
+GET {{base}}/api/payments/{{paymentId}}
+```
+
+> Kiểm tra:
+> - `payment_status` = `COMPLETED`
+> - `paid_amount` = `55000`
+> - `sessions[0].transactions[0].note` chứa tên nhân viên xác nhận
 
 ---
 
-### Kịch bản 2: Thanh toán chia đôi (2 phương thức)
+## 4. CHECKOUT TỪ GIỎ HÀNG (Khách hàng online)
 
-| # | Action | Endpoint | Ghi chú |
-|---|--------|----------|---------|
-| 1 | Tạo order mới | (order-service) POST /api/orders | |
-| 2 | Tìm payment | GET /api/payments/order/{{orderId}} | |
-| 3 | Tạo session | POST /api/payments/{{paymentId}}/sessions | |
-| 4 | Thanh toán một nửa | POST /api/payments/sessions/{{sessionId}}/transactions | amount = total/2 |
-| 5 | Verify PARTIAL | GET /api/payments/{{paymentId}} | payment_status = PARTIAL |
-| 6 | Thanh toán nửa còn lại | POST /api/payments/sessions/{{sessionId}}/transactions | amount = remaining_amount |
-| 7 | Verify COMPLETED | GET /api/payments/{{paymentId}} | payment_status = COMPLETED |
+> Khách hàng online đặt đơn từ giỏ hàng, chọn phương thức thanh toán.
+
+### Bước 1: Thêm sản phẩm vào giỏ hàng (order-service)
+
+```
+POST {{base}}/api/orders/cart/items
+```
+
+```json
+{
+  "productId": "prod-001",
+  "productName": "Cà phê sữa đá",
+  "unitPrice": 35000,
+  "quantity": 2
+}
+```
+
+### Bước 2: Checkout với phương thức thanh toán
+
+```
+POST {{base}}/api/orders/checkout
+```
+
+```json
+{
+  "orderType": "TAKE_AWAY",
+  "paymentMethod": "MOMO",
+  "note": "Giao nhanh"
+}
+```
+
+> `paymentMethod` có thể là `"CASH"`, `"MOMO"`, hoặc `"QR"`.
+> Response giống kịch bản tương ứng ở trên (có `paymentInfo.payUrl` nếu MOMO, `paymentInfo.qrUrl` nếu QR).
+
+### Bước 3: Hoàn tất thanh toán
+
+- Nếu `MOMO`: khách mở `payUrl` thanh toán → tự động `COMPLETED`
+- Nếu `QR`: khách quét `qrUrl` chuyển khoản → nhân viên gọi `qr-confirm`
+- Nếu `CASH`: nhân viên thu tiền → gọi `cash-confirm`
+
+---
+
+## 5. API THAM KHẢO
+
+### Payments
+
+| Method | Endpoint | Auth | Mô tả |
+|---|---|---|---|
+| GET | `/api/payments` | ADMIN/MANAGER/STAFF | Danh sách payments (hỗ trợ `?page=&limit=&status=`) |
+| GET | `/api/payments/:id` | Token | Chi tiết payment theo ID |
+| GET | `/api/payments/order/:orderId` | Token | Tìm payment theo order ID |
+| POST | `/api/payments/initiate` | Token | Khởi tạo payment (gọi từ order-service) |
+| POST | `/api/payments/:id/cash-confirm` | ADMIN/MANAGER/STAFF | Xác nhận thu tiền mặt |
+| POST | `/api/payments/:id/qr-confirm` | ADMIN/MANAGER/STAFF | Xác nhận nhận chuyển khoản QR |
+| POST | `/api/payments/momo/ipn` | Không cần | MoMo IPN callback (public) |
+
+### Payment Methods
+
+| Method | Endpoint | Auth | Mô tả |
+|---|---|---|---|
+| GET | `/api/payments/methods` | Token | Danh sách phương thức thanh toán |
+| POST | `/api/payments/methods` | ADMIN/MANAGER | Tạo phương thức thanh toán mới |
 
 ---
 
 ## 6. ERROR CASES
 
 | Test Case | Expected |
-|-----------|----------|
-| Tạo transaction với session hết hạn | 400 - Session has expired |
-| Tạo transaction với session không ACTIVE | 400 - Session is not active |
-| Tạo session cho payment COMPLETED | 400 - Payment already completed |
-| Thiếu `paymentMethodId` hoặc `amount` | 400 - Payment method and amount are required |
+|---|---|
+| `cash-confirm` nhưng payment không phải CASH | 400 - This payment is not a cash payment |
+| `cash-confirm` với `amountReceived` < `total_amount` | 400 - Amount received is less than total amount |
+| `cash-confirm` với `change` sai | 400 - Change should be ... |
+| `cash-confirm` cho payment đã COMPLETED | 400 - Payment already completed |
+| `qr-confirm` nhưng payment không phải QR | 400 - This payment is not a QR payment |
+| `qr-confirm` cho payment đã COMPLETED | 400 - Payment already completed |
+| MoMo IPN với chữ ký sai | 400 - Invalid MoMo signature |
+| Tạo đơn với MOMO nhưng MoMo API lỗi | 400 - MoMo: ... |
+| CASH method chưa tạo trong DB | 500 - CASH payment method not configured |
+| BANK_TRANSFER method chưa tạo trong DB | 500 - BANK_TRANSFER payment method not configured |
 | Lấy payment không tồn tại | 404 - Payment not found |
 | Tạo payment method thiếu `methodCode` | 400 - Method code and name are required |
+
+---
+
+## 7. CẤU HÌNH MÔI TRƯỜNG (.env)
+
+```env
+# MoMo Test Sandbox
+MOMO_PARTNER_CODE=MOMO
+MOMO_ACCESS_KEY=F8BBA842ECF85
+MOMO_SECRET_KEY=K951B6PE1waDMi640xX08PD3vg6EkVlz
+MOMO_API_URL=https://test-payment.momo.vn/v2/gateway/api/create
+MOMO_IPN_URL=https://xxxx.ngrok-free.app/api/payments/momo/ipn
+MOMO_REDIRECT_URL=https://xxxx.ngrok-free.app/payment/result
+
+# VietQR
+VIETQR_BANK_ID=MB
+VIETQR_ACCOUNT_NUMBER=0123456789
+VIETQR_ACCOUNT_NAME=NGUYEN VAN A
+```
+
+> MoMo IPN cần URL công khai → dùng `ngrok http 3004` rồi cập nhật `MOMO_IPN_URL`.
+> VietQR không cần API key. Thay thông tin ngân hàng bằng tài khoản thật của quán.
