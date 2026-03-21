@@ -23,6 +23,22 @@ app.get('/api/health', (req, res) => {
 app.use('/', authRoutes);
 app.use('/roles', roleRoutes);
 
+// Internal API (không cần auth, chỉ dùng giữa các service)
+const accountRepo = require('./repositories/account.repo');
+app.put('/internal/deactivate-account/:accountId', async (req, res) => {
+  try {
+    const prisma = require('./models/prisma');
+    await prisma.account.update({
+      where: { account_id: req.params.accountId },
+      data: { account_status: 'INACTIVE' },
+    });
+    res.json({ success: true, message: 'Account deactivated' });
+  } catch (error) {
+    console.error('Internal deactivate-account error:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Global error handler
 app.use(errorHandler);
 

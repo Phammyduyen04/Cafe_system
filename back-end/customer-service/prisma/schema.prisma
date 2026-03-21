@@ -13,6 +13,7 @@ model Customer {
   email           String?   @unique @db.VarChar(150)
   phone_number    String?   @unique @db.VarChar(20)
   points          Int       @default(0)
+  customer_type   String    @default("REGULAR") @db.VarChar(20)
   account_id      String?   @unique @db.VarChar(36)
   customer_status String    @default("ACTIVE") @db.VarChar(20)
   created_at      DateTime  @default(now())

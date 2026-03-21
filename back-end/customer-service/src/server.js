@@ -19,18 +19,34 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/customers', customerRoutes);
 
+// Internal API (không cần auth, chỉ dùng giữa các service)
+app.post('/internal/create-from-account', async (req, res) => {
+  try {
+    const customer = await customerService.createCustomerFromAccount(req.body);
+    res.status(201).json({ success: true, data: customer });
+  } catch (error) {
+    console.error('Internal create-from-account error:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 app.use(errorHandler);
 
-// Subscribe to order events
+// Subscribe to events
 const setupEventSubscribers = async () => {
   try {
+    // Cộng điểm khi đơn hàng hoàn thành
     await subscriber.subscribe('order_exchange', 'customer_order_completed', 'order.completed', async (message) => {
       const { customerId, orderId, totalAmount } = message;
-      // Cộng điểm: 1 điểm cho mỗi 10,000 VND
       const pointsEarned = Math.floor(totalAmount / 10000);
       if (pointsEarned > 0 && customerId) {
         await customerService.addPoints(customerId, pointsEarned, 'EARN', `Order #${orderId} completed`, orderId);
       }
+    });
+
+    // Tự động tạo customer profile khi tài khoản CUSTOMER được đăng ký
+    await subscriber.subscribe('auth_exchange', 'customer_account_created', 'account.created', async (message) => {
+      await customerService.createCustomerFromAccount(message);
     });
   } catch (error) {
     console.error('Failed to setup event subscribers:', error.message);

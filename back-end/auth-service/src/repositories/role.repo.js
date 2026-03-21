@@ -12,6 +12,10 @@ const findById = async (id) => {
   return await prisma.role.findUnique({ where: { role_id: id } });
 };
 
+const findByName = async (name) => {
+  return await prisma.role.findUnique({ where: { role_name: name } });
+};
+
 const update = async (id, data) => {
   return await prisma.role.update({ where: { role_id: id }, data });
 };
@@ -24,6 +28,7 @@ module.exports = {
   create,
   findAll,
   findById,
+  findByName,
   update,
   delete: deleteRole,
 };

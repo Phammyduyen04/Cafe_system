@@ -5,15 +5,18 @@ const { authMiddleware, authorizeMiddleware } = require('../../../shared');
 
 router.use(authMiddleware);
 
-router.post('/', authorizeMiddleware('ADMIN', 'MANAGER', 'EMPLOYEE', 'CUSTOMER'), customerController.createCustomer);
-router.get('/', authorizeMiddleware('ADMIN', 'MANAGER', 'EMPLOYEE'), customerController.getAllCustomers);
+router.post('/', authorizeMiddleware('MANAGER', 'STAFF', 'CUSTOMER'), customerController.createCustomer);
+router.get('/', authorizeMiddleware('MANAGER', 'STAFF'), customerController.getAllCustomers);
+router.get('/by-account/:accountId', customerController.getCustomerByAccountId);
+// /me phải đặt trước /:id để Express không khớp "me" như một id
+router.put('/me', authorizeMiddleware('CUSTOMER'), customerController.updateOwnProfile);
+router.delete('/me', authorizeMiddleware('CUSTOMER'), customerController.deleteOwnAccount);
 router.get('/:id', customerController.getCustomerById);
-router.put('/:id', authorizeMiddleware('ADMIN', 'MANAGER'), customerController.updateCustomer);
-router.delete('/:id', authorizeMiddleware('ADMIN', 'MANAGER'), customerController.deleteCustomer);
 
 // Points
 router.get('/:id/points', customerController.getCustomerPoints);
 router.get('/:id/point-logs', customerController.getCustomerPointLogs);
-router.post('/:id/points', authorizeMiddleware('ADMIN', 'MANAGER'), customerController.adjustPoints);
+router.post('/:id/points/adjust', authorizeMiddleware('MANAGER'), customerController.adjustPoints);
+router.post('/:id/points/redeem', authorizeMiddleware('MANAGER', 'STAFF', 'CUSTOMER'), customerController.redeemPoints);
 
 module.exports = router;

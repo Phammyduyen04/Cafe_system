@@ -24,4 +24,12 @@ const update = async (id, data) => {
   return await prisma.customer.update({ where: { customer_id: id }, data });
 };
 
-module.exports = { create, findMany, count, findById, findByAccountId, update };
+const findByPhoneNumber = async (phoneNumber) => {
+  return await prisma.customer.findUnique({ where: { phone_number: phoneNumber } });
+};
+
+const findByEmail = async (email) => {
+  return await prisma.customer.findUnique({ where: { email } });
+};
+
+module.exports = { create, findMany, count, findById, findByAccountId, findByPhoneNumber, findByEmail, update };
