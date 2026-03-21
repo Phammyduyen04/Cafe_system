@@ -66,8 +66,18 @@ const findAllMethods = async () => {
   return await prisma.paymentMethod.findMany({ where: { is_active: true } });
 };
 
+const findMethodByCode = async (code) => {
+  return await prisma.paymentMethod.findFirst({ where: { method_code: code, is_active: true } });
+};
+
 const createMethod = async (data) => {
   return await prisma.paymentMethod.create({ data });
+};
+
+const findByProviderOrderId = async (providerOrderId) => {
+  return await prisma.payment.findFirst({
+    where: { provider_order_id: providerOrderId },
+  });
 };
 
 module.exports = {
@@ -76,11 +86,13 @@ module.exports = {
   count,
   findById,
   findByOrderId,
+  findByProviderOrderId,
   updatePayment,
   createSession,
   findSessionById,
   updateSession,
   createTransaction,
   findAllMethods,
+  findMethodByCode,
   createMethod,
 };

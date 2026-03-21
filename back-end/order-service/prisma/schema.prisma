@@ -14,6 +14,7 @@ model Order {
   order_time       DateTime  @default(now())
   order_type       String    @db.VarChar(20) // DINE_IN, TAKE_AWAY
   order_channel    String    @default("IN_STORE") @db.VarChar(20) // ONLINE, IN_STORE
+  payment_method   String    @default("CASH") @db.VarChar(20) // CASH, MOMO, QR
   status           String    @default("PENDING") @db.VarChar(20)
   subtotal_amount  Decimal   @default(0) @db.Decimal(12, 2)
   discount_amount  Decimal   @default(0) @db.Decimal(12, 2)

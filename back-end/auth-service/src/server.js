@@ -20,8 +20,8 @@ app.get('/api/health', (req, res) => {
 });
 
 // Routes
-app.use('/', authRoutes);
-app.use('/roles', roleRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/auth/roles', roleRoutes);
 
 // Global error handler
 app.use(errorHandler);

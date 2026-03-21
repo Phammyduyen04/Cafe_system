@@ -24,8 +24,11 @@ const PRODUCT_URL   = process.env.PRODUCT_SERVICE_URL   || 'http://localhost:300
 const PROMOTION_URL = process.env.PROMOTION_SERVICE_URL || 'http://localhost:3006';
 const STAFF_URL     = process.env.STAFF_SERVICE_URL      || 'http://localhost:3007';
 
-// Proxy options: forward Authorization header
+// Proxy options: forward Authorization header + preserve full path
 const proxyOptions = {
+  proxyReqPathResolver(req) {
+    return req.originalUrl;
+  },
   proxyReqOptDecorator(proxyReqOpts, srcReq) {
     if (srcReq.headers.authorization) {
       proxyReqOpts.headers['Authorization'] = srcReq.headers.authorization;
@@ -38,7 +41,7 @@ const proxyOptions = {
   },
 };
 
-// Routes — path is forwarded as-is (không bị rewrite)
+// Routes — proxyReqPathResolver giữ nguyên path gốc (vd: /api/payments/:id)
 app.use('/api/auth',       proxy(AUTH_URL,      proxyOptions));
 app.use('/api/customers',  proxy(CUSTOMER_URL,  proxyOptions));
 app.use('/api/orders',     proxy(ORDER_URL,     proxyOptions));

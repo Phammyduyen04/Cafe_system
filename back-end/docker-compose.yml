@@ -141,6 +141,7 @@ services:
       RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
       PRODUCT_SERVICE_URL: http://product-service:3005
       PROMOTION_SERVICE_URL: http://promotion-service:3006
+      PAYMENT_SERVICE_URL: http://payment-service:3004
     depends_on:
       mysql:
         condition: service_healthy
@@ -161,6 +162,18 @@ services:
       DATABASE_URL: mysql://root:root123@mysql:3306/payment_db
       JWT_SECRET: coffee_shop_secret_key_2026
       RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
+      # MoMo Test Sandbox
+      MOMO_PARTNER_CODE: MOMO
+      MOMO_ACCESS_KEY: F8BBA842ECF85
+      MOMO_SECRET_KEY: K951B6PE1waDMi640xX08PD3vg6EkVlz
+      MOMO_API_URL: https://test-payment.momo.vn/v2/gateway/api/create
+      # Thay bằng URL ngrok thực khi chạy: ngrok http 3004
+      MOMO_IPN_URL: https://unitively-dustless-delcie.ngrok-free.dev/api/payments/momo/ipn
+      MOMO_REDIRECT_URL: https://unitively-dustless-delcie.ngrok-free.dev/payment/result
+      # VietQR - thay bằng thông tin tài khoản thật của quán
+      VIETQR_BANK_ID: MB
+      VIETQR_ACCOUNT_NUMBER: "0123456789"
+      VIETQR_ACCOUNT_NAME: NGUYEN VAN A
     depends_on:
       mysql:
         condition: service_healthy
