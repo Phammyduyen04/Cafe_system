@@ -6,7 +6,7 @@ const { responseHelper } = require('../../../shared');
  */
 const createOrder = async (req, res, next) => {
   try {
-    const order = await orderService.createOrder(req.body, req.user);
+    const order = await orderService.createOrder(req.body, req.user, req.headers.authorization);
     return responseHelper.created(res, order, 'Tạo đơn thành công!');
   } catch (error) {
     next(error);
@@ -18,7 +18,7 @@ const createOrder = async (req, res, next) => {
  */
 const createOrderFromCart = async (req, res, next) => {
   try {
-    const order = await orderService.createOrderFromCart(req.body, req.user);
+    const order = await orderService.createOrderFromCart(req.body, req.user, req.headers.authorization);
     return responseHelper.created(res, order, 'Tạo đơn thành công!');
   } catch (error) {
     next(error);

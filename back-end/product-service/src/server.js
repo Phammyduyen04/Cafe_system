@@ -26,10 +26,10 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'Product Service is running', timestamp: new Date().toISOString() });
 });
 
-app.use('/categories', categoryRoutes);
-app.use('/ingredients', ingredientRoutes);
-app.use('/toppings', toppingRoutes);
-app.use('/', productRoutes);
+app.use('/api/products/categories', categoryRoutes);
+app.use('/api/products/ingredients', ingredientRoutes);
+app.use('/api/products/toppings', toppingRoutes);
+app.use('/api/products', productRoutes);
 
 app.use(errorHandler);
 

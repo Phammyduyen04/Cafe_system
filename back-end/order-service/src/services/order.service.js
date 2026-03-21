@@ -2,6 +2,9 @@ const { AppError, publisher } = require('../../../shared');
 const orderRepo = require('../repositories/order.repo');
 const cartRepo = require('../repositories/cart.repo');
 const crypto = require('crypto');
+const axios = require('axios');
+
+const PAYMENT_SERVICE_URL = process.env.PAYMENT_SERVICE_URL || 'http://payment-service:3004';
 
 /**
  * Tạo mã đơn hàng duy nhất
@@ -55,11 +58,12 @@ const buildOrderDetails = (items) => {
  * @param {object} data - Dữ liệu đơn hàng
  * @param {object} user - User từ JWT
  */
-const createOrder = async (data, user) => {
+const createOrder = async (data, user, authToken) => {
   const {
     customerId,
     orderType = 'DINE_IN',
     orderChannel = 'IN_STORE',
+    paymentMethod = 'CASH',
     items,
     note,
     discounts = [],
@@ -107,15 +111,18 @@ const createOrder = async (data, user) => {
     ? 'Khách hàng đặt đơn online'
     : 'Nhân viên tạo đơn tại quầy';
 
+  const finalTotalAmount = totalAmount > 0 ? totalAmount : 0;
+
   const order = await orderRepo.create({
     customer_id: customerId || null,
     order_code: generateOrderCode(),
     order_type: orderType,
     order_channel: orderChannel,
+    payment_method: paymentMethod.toUpperCase(),
     subtotal_amount: subtotalAmount,
     discount_amount: discountAmount,
     promotion_amount: promotionAmount,
-    total_amount: totalAmount > 0 ? totalAmount : 0,
+    total_amount: finalTotalAmount,
     note: note || null,
     created_by: user.username,
     order_details: { create: orderDetails },
@@ -131,24 +138,48 @@ const createOrder = async (data, user) => {
     },
   });
 
-  // Publish event
+  // Publish event (RabbitMQ fallback cho payment-service)
   await publisher.publish('order_exchange', 'order.created', {
     orderId: order.order_id,
     orderCode: order.order_code,
     orderChannel: order.order_channel,
     customerId: order.customer_id,
     totalAmount: Number(order.total_amount),
+    paymentMethod: order.payment_method,
     createdBy: user.username,
   });
 
-  return order;
+  // Gọi payment-service HTTP để khởi tạo payment và lấy payUrl/qrUrl ngay lập tức
+  let paymentInfo = null;
+  try {
+    const response = await axios.post(
+      `${PAYMENT_SERVICE_URL}/api/payments/initiate`,
+      {
+        orderId: order.order_id,
+        totalAmount: Number(order.total_amount),
+        paymentMethod: order.payment_method,
+        orderCode: order.order_code,
+      },
+      {
+        headers: { Authorization: authToken },
+        timeout: 8000,
+      },
+    );
+    paymentInfo = response.data.data;
+  } catch (err) {
+    // Không fail đơn hàng nếu payment-service không phản hồi
+    // RabbitMQ event sẽ tạo payment record làm fallback
+    console.warn(`[order-service] Payment initiation failed for order ${order.order_code}: ${err.message}`, err.response?.data || '');
+  }
+
+  return { ...order, paymentInfo };
 };
 
 /**
  * Khách hàng đặt đơn online từ giỏ hàng
  * Lấy items từ cart, tạo order với channel = ONLINE, sau đó xóa cart
  */
-const createOrderFromCart = async (data, user) => {
+const createOrderFromCart = async (data, user, authToken) => {
   const customerId = user.userId || user.accountId;
   const cart = await cartRepo.findByCustomerId(customerId);
   if (!cart || cart.items.length === 0) {
@@ -176,13 +207,14 @@ const createOrderFromCart = async (data, user) => {
     customerId: customerId,
     orderType: data.orderType || 'TAKE_AWAY',
     orderChannel: 'ONLINE',
+    paymentMethod: data.paymentMethod || 'MOMO',
     items,
     note: data.note || null,
     discounts: data.discounts || [],
     promotions: data.promotions || [],
   };
 
-  const order = await createOrder(orderData, user);
+  const order = await createOrder(orderData, user, authToken);
 
   // Xóa giỏ hàng sau khi đặt đơn thành công
   await cartRepo.clearCart(cart.cart_id);
@@ -227,7 +259,7 @@ const updateOrderStatus = async (id, newStatus, user, note) => {
 
   const validTransitions = {
     PENDING: ['CONFIRMED', 'CANCELLED'],
-    CONFIRMED: ['PREPARING', 'CANCELLED'],
+    CONFIRMED: ['READY', 'CANCELLED'],
     PREPARING: ['READY', 'CANCELLED'],
     READY: ['COMPLETED', 'CANCELLED'],
     COMPLETED: [],

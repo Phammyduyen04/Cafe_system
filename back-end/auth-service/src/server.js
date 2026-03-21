@@ -20,8 +20,8 @@ app.get('/api/health', (req, res) => {
 });
 
 // Routes
-app.use('/', authRoutes);
-app.use('/roles', roleRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/auth/roles', roleRoutes);
 
 // Internal API (không cần auth, chỉ dùng giữa các service)
 const accountRepo = require('./repositories/account.repo');
