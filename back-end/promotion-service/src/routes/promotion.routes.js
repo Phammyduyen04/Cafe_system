@@ -8,11 +8,11 @@ router.get('/check', promotionController.checkApplicablePromotions);
 router.get('/:id', promotionController.getPromotionById);
 
 router.use(authMiddleware);
-router.post('/', authorizeMiddleware('ADMIN', 'MANAGER'), promotionController.createPromotion);
-router.put('/:id', authorizeMiddleware('ADMIN', 'MANAGER'), promotionController.updatePromotion);
-router.delete('/:id', authorizeMiddleware('ADMIN', 'MANAGER'), promotionController.deletePromotion);
+router.post('/', authorizeMiddleware('MANAGER'), promotionController.createPromotion);
+router.put('/:id', authorizeMiddleware('MANAGER'), promotionController.updatePromotion);
+router.delete('/:id', authorizeMiddleware('MANAGER'), promotionController.deletePromotion);
 
 // Conditions
-router.put('/:id/conditions', authorizeMiddleware('ADMIN', 'MANAGER'), promotionController.updateConditions);
+router.put('/:id/conditions', authorizeMiddleware('MANAGER'), promotionController.updateConditions);
 
 module.exports = router;

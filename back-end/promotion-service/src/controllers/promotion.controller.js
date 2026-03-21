@@ -10,9 +10,9 @@ const createPromotion = async (req, res, next) => {
 
 const getAllPromotions = async (req, res, next) => {
   try {
-    const { status } = req.query;
-    const promotions = await promotionService.getAllPromotions(status);
-    return responseHelper.success(res, promotions);
+    const { status, page = 1, limit = 10 } = req.query;
+    const result = await promotionService.getAllPromotions(status, parseInt(page), parseInt(limit));
+    return responseHelper.paginated(res, result.promotions, result.pagination);
   } catch (error) { next(error); }
 };
 

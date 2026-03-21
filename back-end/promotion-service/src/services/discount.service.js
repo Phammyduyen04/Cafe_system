@@ -22,9 +22,17 @@ const createDiscount = async (data, user) => {
   return discount;
 };
 
-const getAllDiscounts = async (status) => {
+const getAllDiscounts = async (status, page = 1, limit = 10) => {
+  const skip = (page - 1) * limit;
   const query = status ? { status } : {};
-  return await discountRepo.findAll(query);
+  const [discounts, total] = await Promise.all([
+    discountRepo.findMany(query, skip, limit),
+    discountRepo.count(query),
+  ]);
+  return {
+    discounts,
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
 };
 
 const getDiscountById = async (id) => {
@@ -56,8 +64,10 @@ const checkApplicableDiscounts = async ({ orderAmount, productIds, categoryIds, 
   const now = new Date();
   const activeDiscounts = await discountRepo.findAll({
     status: 'ACTIVE',
-    $or: [{ endDate: null }, { endDate: { $gte: now } }],
-    $or: [{ startDate: null }, { startDate: { $lte: now } }],
+    $and: [
+      { $or: [{ endDate: null }, { endDate: { $gte: now } }] },
+      { $or: [{ startDate: null }, { startDate: { $lte: now } }] },
+    ],
   });
 
   const applicable = [];
@@ -70,6 +80,12 @@ const checkApplicableDiscounts = async ({ orderAmount, productIds, categoryIds, 
     if (condition.applicableCustomerTypes?.length > 0 && !condition.applicableCustomerTypes.includes(customerType)) passes = false;
     if (condition.applicableProductIds?.length > 0 && !productIds.some((p) => condition.applicableProductIds.includes(p))) passes = false;
     if (condition.applicableCategoryIds?.length > 0 && !categoryIds.some((c) => condition.applicableCategoryIds.includes(c))) passes = false;
+
+    if (condition.timeFrames?.length > 0) {
+      const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const inFrame = condition.timeFrames.some((tf) => currentTime >= tf.from && currentTime <= tf.to);
+      if (!inFrame) passes = false;
+    }
 
     if (passes) applicable.push({ ...discount.toObject(), conditions: condition });
   }
