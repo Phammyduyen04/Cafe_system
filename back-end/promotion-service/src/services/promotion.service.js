@@ -21,9 +21,17 @@ const createPromotion = async (data, user) => {
   return promotion;
 };
 
-const getAllPromotions = async (status) => {
+const getAllPromotions = async (status, page = 1, limit = 10) => {
+  const skip = (page - 1) * limit;
   const query = status ? { status } : {};
-  return await promotionRepo.findAll(query);
+  const [promotions, total] = await Promise.all([
+    promotionRepo.findMany(query, skip, limit),
+    promotionRepo.count(query),
+  ]);
+  return {
+    promotions,
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
 };
 
 const getPromotionById = async (id) => {

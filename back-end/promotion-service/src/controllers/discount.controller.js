@@ -10,9 +10,9 @@ const createDiscount = async (req, res, next) => {
 
 const getAllDiscounts = async (req, res, next) => {
   try {
-    const { status } = req.query;
-    const discounts = await discountService.getAllDiscounts(status);
-    return responseHelper.success(res, discounts);
+    const { status, page = 1, limit = 10 } = req.query;
+    const result = await discountService.getAllDiscounts(status, parseInt(page), parseInt(limit));
+    return responseHelper.paginated(res, result.discounts, result.pagination);
   } catch (error) { next(error); }
 };
 
