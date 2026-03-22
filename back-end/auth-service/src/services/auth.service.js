@@ -98,6 +98,8 @@ const register = async (data) => {
   const account = await accountRepo.create({
     username,
     password_hash: passwordHash,
+    full_name: fullName || null,
+    email: email || null,
     user_type: 'CUSTOMER',
     user_id: userId || null,
   });
@@ -132,6 +134,8 @@ const register = async (data) => {
   return {
     accountId: account.account_id,
     username: account.username,
+    fullName: account.full_name,
+    email: account.email,
     userType: account.user_type,
   };
 };
@@ -181,6 +185,8 @@ const login = async (username, password) => {
     account: {
       accountId: account.account_id,
       username: account.username,
+      fullName: account.full_name,
+      email: account.email,
       userType: account.user_type,
       userId: account.user_id,
       roles: accountRoles.map((r) => r.role.role_name),
@@ -257,6 +263,8 @@ const getAccountById = async (accountId) => {
   return {
     accountId: account.account_id,
     username: account.username,
+    fullName: account.full_name,
+    email: account.email,
     userType: account.user_type,
     userId: account.user_id,
     status: account.account_status,
