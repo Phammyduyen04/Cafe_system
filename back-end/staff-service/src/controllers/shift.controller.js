@@ -10,9 +10,9 @@ const createShift = async (req, res, next) => {
 
 const getAllShifts = async (req, res, next) => {
   try {
-    const { date, status } = req.query;
-    const shifts = await shiftService.getAllShifts({ date, status });
-    return responseHelper.success(res, shifts);
+    const { date, status, page = 1, limit = 10 } = req.query;
+    const result = await shiftService.getAllShifts({ date, status }, parseInt(page), parseInt(limit));
+    return responseHelper.paginated(res, result.shifts, result.pagination);
   } catch (error) { next(error); }
 };
 
@@ -32,8 +32,8 @@ const updateShift = async (req, res, next) => {
 
 const deleteShift = async (req, res, next) => {
   try {
-    await shiftService.deleteShift(req.params.id);
-    return responseHelper.success(res, null, 'Shift deleted successfully');
+    const shift = await shiftService.deleteShift(req.params.id);
+    return responseHelper.success(res, shift, 'Shift cancelled successfully');
   } catch (error) { next(error); }
 };
 

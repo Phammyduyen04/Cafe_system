@@ -23,8 +23,8 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'Staff Service is running', timestamp: new Date().toISOString() });
 });
 
-app.use('/api/employees', employeeRoutes);
-app.use('/api/shifts', shiftRoutes);
+app.use('/api/staff/employees', employeeRoutes);
+app.use('/api/staff/shifts', shiftRoutes);
 
 app.use(errorHandler);
 
