@@ -7,6 +7,7 @@ import { useAuth } from "../../contexts/AuthContext";
 export default function RegisterPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const [username, setUsername] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -23,8 +24,8 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       const fullName = `${firstName} ${lastName}`.trim();
-      const res = await authService.register({ fullName, email, password });
-      // Auto-login if the server returns tokens
+      const res = await authService.register({ username, fullName, email, password });
+      // If server returns tokens, auto-login; otherwise go to login page
       if (res.accessToken && res.refreshToken && res.user) {
         login(res.accessToken, res.refreshToken, res.user);
         navigate("/");
@@ -72,6 +73,22 @@ export default function RegisterPage() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            {/* Username */}
+            <div className="flex flex-col gap-1.5">
+              <label className="font-body text-cafe-primary" style={{ fontSize: 11, fontWeight: 500, letterSpacing: "1.5px", textTransform: "uppercase" }}>
+                Tên đăng nhập
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                placeholder="username"
+                required
+                className="font-body w-full border border-cafe-border bg-white px-4 py-3 outline-none focus:border-cafe-primary transition-colors placeholder:text-[rgba(48,38,28,0.3)] text-cafe-primary"
+                style={{ fontSize: 13, borderRadius: 0 }}
+              />
+            </div>
+
             {/* Name row */}
             <div className="flex gap-3">
               <div className="flex flex-col gap-1.5 flex-1">

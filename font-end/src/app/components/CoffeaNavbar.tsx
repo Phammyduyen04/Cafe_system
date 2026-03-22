@@ -257,7 +257,7 @@ export default function CoffeaNavbar() {
               >
                 <div className="w-8 h-8 rounded-full bg-cafe-accent flex items-center justify-center">
                   <span className="font-body text-cafe-primary" style={{ fontSize: 12, fontWeight: 700 }}>
-                    {user?.fullName?.charAt(0) ?? user?.email?.charAt(0) ?? "U"}
+                    {user?.username?.charAt(0)?.toUpperCase() ?? "U"}
                   </span>
                 </div>
               </button>
@@ -265,10 +265,10 @@ export default function CoffeaNavbar() {
                 <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-xl overflow-hidden z-50 border border-cafe-accent">
                   <div className="px-4 py-3 border-b border-cafe-accent">
                     <p className="font-body text-cafe-primary" style={{ fontWeight: 600, fontSize: 13 }}>
-                      {user?.fullName ?? user?.email}
+                      {user?.username}
                     </p>
                     <p className="font-body" style={{ fontSize: 11, color: "rgba(48,38,28,0.5)" }}>
-                      {user?.email}
+                      {user?.userType}
                     </p>
                   </div>
                   <button

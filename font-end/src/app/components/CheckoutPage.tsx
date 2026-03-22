@@ -29,7 +29,7 @@ export default function CheckoutPage() {
   const [error, setError] = useState("");
 
   // form state
-  const [email, setEmail] = useState(user?.email ?? "");
+  const [email, setEmail] = useState(user?.username ?? "");
   const [phone, setPhone] = useState("");
   const [firstName, setFirst] = useState("");
   const [lastName, setLast] = useState("");
@@ -81,7 +81,7 @@ export default function CheckoutPage() {
     try {
       const res = await orderService.checkout({
         customerInfo: {
-          fullName: `${firstName} ${lastName}`.trim() || user?.fullName || "Khách",
+          fullName: `${firstName} ${lastName}`.trim() || user?.username || "Khách",
           email,
           phone,
           address,
