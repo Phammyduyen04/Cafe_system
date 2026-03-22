@@ -5,14 +5,16 @@ const { authMiddleware, authorizeMiddleware } = require('../../../shared');
 
 router.use(authMiddleware);
 
+// /by-account phải đặt trước /:id
+router.get('/by-account/:accountId', employeeController.getEmployeeByAccountId);
 router.get('/', employeeController.getAllEmployees);
 router.get('/:id', employeeController.getEmployeeById);
-router.post('/', authorizeMiddleware('ADMIN', 'MANAGER'), employeeController.createEmployee);
-router.put('/:id', authorizeMiddleware('ADMIN', 'MANAGER'), employeeController.updateEmployee);
-router.delete('/:id', authorizeMiddleware('ADMIN', 'MANAGER'), employeeController.deleteEmployee);
+router.post('/', authorizeMiddleware('MANAGER'), employeeController.createEmployee);
+router.put('/:id', authorizeMiddleware('MANAGER'), employeeController.updateEmployee);
+router.delete('/:id', authorizeMiddleware('MANAGER'), employeeController.deleteEmployee);
 
 // Availability
 router.get('/:id/availability', employeeController.getAvailability);
-router.put('/:id/availability', employeeController.updateAvailability);
+router.put('/:id/availability', authorizeMiddleware('STAFF'), employeeController.updateAvailability);
 
 module.exports = router;

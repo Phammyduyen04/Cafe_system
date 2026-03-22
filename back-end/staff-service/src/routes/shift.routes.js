@@ -7,13 +7,13 @@ router.use(authMiddleware);
 
 router.get('/', shiftController.getAllShifts);
 router.get('/:id', shiftController.getShiftById);
-router.post('/', authorizeMiddleware('ADMIN', 'MANAGER'), shiftController.createShift);
-router.put('/:id', authorizeMiddleware('ADMIN', 'MANAGER'), shiftController.updateShift);
-router.delete('/:id', authorizeMiddleware('ADMIN', 'MANAGER'), shiftController.deleteShift);
+router.post('/', authorizeMiddleware('MANAGER'), shiftController.createShift);
+router.put('/:id', authorizeMiddleware('MANAGER'), shiftController.updateShift);
+router.delete('/:id', authorizeMiddleware('MANAGER'), shiftController.deleteShift);
 
 // Assignments
-router.post('/:id/assignments', authorizeMiddleware('ADMIN', 'MANAGER'), shiftController.assignEmployee);
-router.delete('/:id/assignments/:employeeId', authorizeMiddleware('ADMIN', 'MANAGER'), shiftController.removeAssignment);
+router.post('/:id/assignments', authorizeMiddleware('MANAGER'), shiftController.assignEmployee);
+router.delete('/:id/assignments/:employeeId', authorizeMiddleware('MANAGER'), shiftController.removeAssignment);
 router.get('/:id/assignments', shiftController.getShiftAssignments);
 
 module.exports = router;

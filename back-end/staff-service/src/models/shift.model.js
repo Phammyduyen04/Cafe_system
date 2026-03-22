@@ -1,8 +1,9 @@
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 
 const shiftSchema = new mongoose.Schema(
   {
-    shiftId: { type: String, required: true, unique: true },
+    shiftId: { type: String, unique: true, default: () => crypto.randomUUID() },
     shiftName: { type: String, required: true },
     startTime: { type: String, required: true },
     endTime: { type: String, required: true },

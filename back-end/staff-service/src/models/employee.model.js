@@ -3,7 +3,7 @@ const crypto = require('crypto');
 
 const employeeSchema = new mongoose.Schema(
   {
-    employeeId: { type: String, required: true, unique: true, default: () => crypto.randomUUID() },
+    employeeId: { type: String, unique: true, default: () => crypto.randomUUID() },
     fullName: { type: String, required: true },
     position: { type: String, required: true },
     employeeType: { type: String, enum: ['FULL_TIME', 'PART_TIME'], required: true },
