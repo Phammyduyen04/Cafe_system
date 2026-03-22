@@ -234,6 +234,18 @@ services:
       mongodb:
         condition: service_healthy
 
+  # ========================
+  # FRONTEND
+  # ========================
+  frontend:
+    build:
+      context: ../font-end
+      dockerfile: Dockerfile
+    container_name: coffee_frontend
+    restart: on-failure
+    ports:
+      - "5173:5173"
+
 volumes:
   mysql_data:
   mongo_data:
