@@ -5,6 +5,7 @@ import HomeContent from "./components/HomeContent";
 import ProductDetailPage from "./components/ProductDetailPage";
 import LoginPage from "./components/LoginPage";
 import RegisterPage from "./components/RegisterPage";
+import ForgotPasswordPage from "./components/ForgotPasswordPage";
 import AboutPage from "./components/AboutPage";
 import ContactPage from "./components/ContactPage";
 import CheckoutPage from "./components/CheckoutPage";
@@ -24,4 +25,5 @@ export const router = createBrowserRouter([
   },
   { path: "/login", Component: LoginPage },
   { path: "/register", Component: RegisterPage },
+  { path: "/forgot-password", Component: ForgotPasswordPage },
 ]);

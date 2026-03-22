@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { LOGIN_BG, GOOGLE_LOGO } from "../../constants/images";
+import { GoogleLogin, type CredentialResponse } from "@react-oauth/google";
+import { LOGIN_BG } from "../../constants/images";
 import { authService } from "../../services/auth.service";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -16,6 +17,7 @@ export default function RegisterPage() {
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +41,21 @@ export default function RegisterPage() {
     }
   };
 
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
+    if (!credentialResponse.credential) return;
+    setError("");
+    setGoogleLoading(true);
+    try {
+      const res = await authService.googleLogin(credentialResponse.credential);
+      login(res.accessToken, res.refreshToken, res.user);
+      navigate("/");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Đăng ký bằng Google thất bại");
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex bg-cafe-bg">
       {/* ── Left image panel ── */}
@@ -56,7 +73,18 @@ export default function RegisterPage() {
       </div>
 
       {/* ── Right form panel ── */}
-      <div className="flex-1 flex items-center justify-center px-6 py-16">
+      <div className="flex-1 flex items-center justify-center px-6 py-16 relative">
+        {/* Back to home */}
+        <Link
+          to="/"
+          className="absolute top-6 right-6 flex items-center gap-2 text-cafe-primary hover:opacity-70 transition-opacity"
+          aria-label="Về trang chủ"
+        >
+          <span className="font-body" style={{ fontSize: 13, fontWeight: 500 }}>Trang chủ</span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12h14" /><path d="M12 5l7 7-7 7" />
+          </svg>
+        </Link>
         <div className="w-full max-w-[420px]">
           {/* Header */}
           <div className="mb-8">
@@ -244,16 +272,18 @@ export default function RegisterPage() {
 
           {/* Social */}
           <div className="flex items-center justify-center">
-            <button
-              className="flex items-center gap-3 px-6 py-3 border border-cafe-border bg-white hover:border-cafe-primary transition-colors"
-              aria-label="Google"
-              style={{ borderRadius: 0 }}
-            >
-              <img src={GOOGLE_LOGO} alt="Google" className="w-5 h-5 object-contain" />
-              <span className="font-body text-cafe-primary" style={{ fontSize: 13, fontWeight: 500 }}>
-                Tiếp tục với Google
-              </span>
-            </button>
+            {googleLoading ? (
+              <span className="font-body text-cafe-primary" style={{ fontSize: 13 }}>Đang xử lý...</span>
+            ) : (
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => setError("Đăng ký bằng Google thất bại")}
+                theme="outline"
+                size="large"
+                text="signup_with"
+                width="300"
+              />
+            )}
           </div>
         </div>
       </div>

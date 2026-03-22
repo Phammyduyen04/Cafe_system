@@ -9,7 +9,7 @@ services:
     container_name: coffee_mysql
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: auth_db
     ports:
       - "3306:3306"
@@ -17,7 +17,7 @@ services:
       - mysql_data:/var/lib/mysql
       - ./init-databases.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot123"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -28,14 +28,14 @@ services:
     container_name: coffee_mongodb
     restart: always
     environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: root123
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
     ports:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')", "-u", "root", "-p", "root123"]
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')", "-u", "${MONGO_ROOT_USERNAME}", "-p", "${MONGO_ROOT_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -46,8 +46,8 @@ services:
     container_name: coffee_rabbitmq
     restart: always
     environment:
-      RABBITMQ_DEFAULT_USER: admin
-      RABBITMQ_DEFAULT_PASS: admin123
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -94,11 +94,15 @@ services:
     environment:
       PORT: 3001
       SERVICE_NAME: auth-service
-      DATABASE_URL: mysql://root:root123@mysql:3306/auth_db
-      JWT_SECRET: coffee_shop_secret_key_2026
+      DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD}@mysql:3306/auth_db
+      JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
-      RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      SMTP_EMAIL: ${SMTP_EMAIL}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      CUSTOMER_SERVICE_URL: http://customer-service:3002
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672
     depends_on:
       mysql:
         condition: service_healthy
@@ -116,9 +120,9 @@ services:
     environment:
       PORT: 3002
       SERVICE_NAME: customer-service
-      DATABASE_URL: mysql://root:root123@mysql:3306/customer_db
-      JWT_SECRET: coffee_shop_secret_key_2026
-      RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
+      DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD}@mysql:3306/customer_db
+      JWT_SECRET: ${JWT_SECRET}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672
     depends_on:
       mysql:
         condition: service_healthy
@@ -136,9 +140,9 @@ services:
     environment:
       PORT: 3003
       SERVICE_NAME: order-service
-      DATABASE_URL: mysql://root:root123@mysql:3306/order_db
-      JWT_SECRET: coffee_shop_secret_key_2026
-      RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
+      DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD}@mysql:3306/order_db
+      JWT_SECRET: ${JWT_SECRET}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672
       PRODUCT_SERVICE_URL: http://product-service:3005
       PROMOTION_SERVICE_URL: http://promotion-service:3006
       PAYMENT_SERVICE_URL: http://payment-service:3004
@@ -159,21 +163,20 @@ services:
     environment:
       PORT: 3004
       SERVICE_NAME: payment-service
-      DATABASE_URL: mysql://root:root123@mysql:3306/payment_db
-      JWT_SECRET: coffee_shop_secret_key_2026
-      RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
+      DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD}@mysql:3306/payment_db
+      JWT_SECRET: ${JWT_SECRET}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672
       # MoMo Test Sandbox
-      MOMO_PARTNER_CODE: MOMO
-      MOMO_ACCESS_KEY: F8BBA842ECF85
-      MOMO_SECRET_KEY: K951B6PE1waDMi640xX08PD3vg6EkVlz
-      MOMO_API_URL: https://test-payment.momo.vn/v2/gateway/api/create
-      # Thay bằng URL ngrok thực khi chạy: ngrok http 3004
-      MOMO_IPN_URL: https://unitively-dustless-delcie.ngrok-free.dev/api/payments/momo/ipn
-      MOMO_REDIRECT_URL: https://unitively-dustless-delcie.ngrok-free.dev/payment/result
-      # VietQR - thay bằng thông tin tài khoản thật của quán
-      VIETQR_BANK_ID: MB
-      VIETQR_ACCOUNT_NUMBER: "0123456789"
-      VIETQR_ACCOUNT_NAME: NGUYEN VAN A
+      MOMO_PARTNER_CODE: ${MOMO_PARTNER_CODE}
+      MOMO_ACCESS_KEY: ${MOMO_ACCESS_KEY}
+      MOMO_SECRET_KEY: ${MOMO_SECRET_KEY}
+      MOMO_API_URL: ${MOMO_API_URL}
+      MOMO_IPN_URL: ${MOMO_IPN_URL}
+      MOMO_REDIRECT_URL: ${MOMO_REDIRECT_URL}
+      # VietQR
+      VIETQR_BANK_ID: ${VIETQR_BANK_ID}
+      VIETQR_ACCOUNT_NUMBER: ${VIETQR_ACCOUNT_NUMBER}
+      VIETQR_ACCOUNT_NAME: ${VIETQR_ACCOUNT_NAME}
     depends_on:
       mysql:
         condition: service_healthy
@@ -194,8 +197,8 @@ services:
     environment:
       PORT: 3005
       SERVICE_NAME: product-service
-      MONGODB_URI: mongodb://root:root123@mongodb:27017/product_db?authSource=admin
-      JWT_SECRET: coffee_shop_secret_key_2026
+      MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/product_db?authSource=admin
+      JWT_SECRET: ${JWT_SECRET}
     depends_on:
       mongodb:
         condition: service_healthy
@@ -211,8 +214,8 @@ services:
     environment:
       PORT: 3006
       SERVICE_NAME: promotion-service
-      MONGODB_URI: mongodb://root:root123@mongodb:27017/promotion_db?authSource=admin
-      JWT_SECRET: coffee_shop_secret_key_2026
+      MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/promotion_db?authSource=admin
+      JWT_SECRET: ${JWT_SECRET}
     depends_on:
       mongodb:
         condition: service_healthy
@@ -228,8 +231,8 @@ services:
     environment:
       PORT: 3007
       SERVICE_NAME: staff-service
-      MONGODB_URI: mongodb://root:root123@mongodb:27017/staff_db?authSource=admin
-      JWT_SECRET: coffee_shop_secret_key_2026
+      MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/staff_db?authSource=admin
+      JWT_SECRET: ${JWT_SECRET}
     depends_on:
       mongodb:
         condition: service_healthy
