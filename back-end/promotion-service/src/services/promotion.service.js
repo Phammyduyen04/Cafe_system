@@ -29,6 +29,9 @@ const createPromotion = async (data, user) => {
   if (!promotionName || !benefitType) {
     throw new AppError('Promotion name and benefit type are required', 400);
   }
+  if (!startDate || !endDate) {
+    throw new AppError('Ngày bắt đầu và kết thúc là bắt buộc', 400);
+  }
 
   const promotionId = await generateNextPromotionId();
 
@@ -72,6 +75,14 @@ const updatePromotion = async (id, data) => {
   if (['EXPIRED', 'CANCELLED'].includes(promotion.status)) {
     throw new AppError('Không thể sửa chương trình khuyến mãi đã hết hạn hoặc đã hủy', 400);
   }
+  if (promotion.status === 'ACTIVE' && ('startDate' in data || 'endDate' in data)) {
+    throw new AppError('Không thể sửa ngày khi khuyến mãi đang hoạt động', 400);
+  }
+  if (promotion.status === 'PLANNED') {
+    const newStartDate = 'startDate' in data ? data.startDate : promotion.startDate;
+    const newEndDate   = 'endDate'   in data ? data.endDate   : promotion.endDate;
+    data.status = computeStatus(newStartDate, newEndDate);
+  }
   return await promotionRepo.update(id, data);
 };
 
@@ -91,7 +102,7 @@ const updateConditions = async (promotionId, data) => {
   return await conditionRepo.createOrUpdate(promotionId, { ...data, promotionId });
 };
 
-const checkApplicablePromotions = async ({ productIds, orderAmount }) => {
+const checkApplicablePromotions = async ({ productIds, orderAmount, customerType }) => {
   const activePromotions = await promotionRepo.findAll({ status: 'ACTIVE' });
 
   const applicable = [];
@@ -101,6 +112,8 @@ const checkApplicablePromotions = async ({ productIds, orderAmount }) => {
 
     let passes = true;
     if (condition.minimumOrderAmount && orderAmount < condition.minimumOrderAmount) passes = false;
+    if (condition.applicableCustomerTypes?.length > 0 && customerType &&
+        !condition.applicableCustomerTypes.includes(customerType)) passes = false;
     if (condition.triggerProducts?.length > 0) {
       const hasTrigger = condition.triggerProducts.some((t) => productIds.includes(t.productId));
       if (!hasTrigger) passes = false;

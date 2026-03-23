@@ -29,6 +29,9 @@ const createDiscount = async (data, user) => {
   if (!discountName || !discountType || discountValue == null) {
     throw new AppError('Discount name, type, and value are required', 400);
   }
+  if (!startDate || !endDate) {
+    throw new AppError('Ngày bắt đầu và kết thúc là bắt buộc', 400);
+  }
 
   const discountId = await generateNextDiscountId();
 
@@ -72,6 +75,14 @@ const updateDiscount = async (id, data) => {
   if (!discount) throw new AppError('Discount not found', 404);
   if (['EXPIRED', 'CANCELLED'].includes(discount.status)) {
     throw new AppError('Không thể sửa chương trình giảm giá đã hết hạn hoặc đã hủy', 400);
+  }
+  if (discount.status === 'ACTIVE' && ('startDate' in data || 'endDate' in data)) {
+    throw new AppError('Không thể sửa ngày khi giảm giá đang hoạt động', 400);
+  }
+  if (discount.status === 'PLANNED') {
+    const newStartDate = 'startDate' in data ? data.startDate : discount.startDate;
+    const newEndDate   = 'endDate'   in data ? data.endDate   : discount.endDate;
+    data.status = computeStatus(newStartDate, newEndDate);
   }
   return await discountRepo.update(id, data);
 };

@@ -26,7 +26,7 @@ const createEmployee = async (data) => {
 
 const getAllEmployees = async (filters, page = 1, limit = 10) => {
   const skip = (page - 1) * limit;
-  const query = { status: 'ACTIVE' };
+  const query = {};
   if (filters.status) query.status = filters.status;
   if (filters.position) query.position = filters.position;
   const [employees, total] = await Promise.all([

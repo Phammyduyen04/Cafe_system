@@ -48,7 +48,7 @@ mongoose
       } catch (err) {
         console.error('[Cron] Status update error:', err.message);
       }
-    });
+    }, { runOnInit: true });
   })
   .catch((err) => console.error('MongoDB connection error:', err.message));
 
@@ -56,7 +56,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'Promotion Service is running', timestamp: new Date().toISOString() });
 });
 
-app.use('/api/discounts', discountRoutes);
+app.use('/api/promotions/discounts', discountRoutes);
 app.use('/api/promotions', promotionRoutes);
 
 app.use(errorHandler);

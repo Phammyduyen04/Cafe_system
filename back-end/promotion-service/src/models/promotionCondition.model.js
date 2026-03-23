@@ -16,6 +16,7 @@ const promotionConditionSchema = new mongoose.Schema(
       },
     ],
     minimumOrderAmount: { type: Number, default: null },
+    applicableCustomerTypes: [{ type: String }],
   },
   {
     collection: 'promotion_conditions',
