@@ -28,8 +28,9 @@ export default function RegisterPage() {
       const fullName = `${firstName} ${lastName}`.trim();
       const res = await authService.register({ username, fullName, email, password });
       // If server returns tokens, auto-login; otherwise go to login page
-      if (res.accessToken && res.refreshToken && res.user) {
-        login(res.accessToken, res.refreshToken, res.user);
+      const r = res as any;
+      if (r.accessToken && r.refreshToken && r.user) {
+        login(r.accessToken, r.refreshToken, r.user);
         navigate("/");
       } else {
         navigate("/login");

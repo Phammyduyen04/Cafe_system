@@ -134,7 +134,7 @@ export default function ManagerDiscountsPage() {
     setEditingId(disc.discountId);
     setFormDiscountId(disc.discountId);
     setFormName(disc.discountName);
-    setFormType(disc.discountType);
+    setFormType(disc.discountType as "PERCENT" | "FIXED");
     setFormValue(String(disc.discountValue));
     setFormDesc(disc.description || "");
     setFormStart(disc.startDate?.split("T")[0] || "");

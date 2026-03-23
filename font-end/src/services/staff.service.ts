@@ -73,11 +73,12 @@ export const staffService = {
   },
 
   // ── Shifts ──
-  getShifts: async (params: { page?: number; limit?: number; date?: string } = {}) => {
+  getShifts: async (params: { page?: number; limit?: number; date?: string; status?: string } = {}) => {
     const qs = new URLSearchParams();
     if (params.page) qs.set("page", String(params.page));
     if (params.limit) qs.set("limit", String(params.limit));
     if (params.date) qs.set("date", params.date);
+    if (params.status) qs.set("status", params.status);
     return await api.getRaw<PaginatedResponse<Shift>>(`/api/staff/shifts?${qs}`);
   },
 
@@ -104,5 +105,24 @@ export const staffService = {
 
   removeAssignment: async (shiftId: string, employeeId: string) => {
     return await api.delete(`/api/staff/shifts/${shiftId}/assignments/${employeeId}`);
+  },
+
+  getEmployeeByAccountId: async (accountId: string) => {
+    return await api.get<Employee>(`/api/staff/employees/account/${accountId}`);
+  },
+
+  getEmployeeShifts: async (employeeId: string, params: { page?: number; limit?: number } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.page) qs.set("page", String(params.page));
+    if (params.limit) qs.set("limit", String(params.limit));
+    return await api.getRaw<PaginatedResponse<Shift>>(`/api/staff/employees/${employeeId}/shifts?${qs}`);
+  },
+
+  getShiftById: async (shiftId: string) => {
+    return await api.get<Shift & { assignments?: Assignment[] }>(`/api/staff/shifts/${shiftId}`);
+  },
+
+  updateAvailability: async (employeeId: string, data: { availableDays: string[]; availableTimeRanges: { start: string; end: string }[] }) => {
+    return await api.put<Availability>(`/api/staff/employees/${employeeId}/availability`, data);
   },
 };
