@@ -6,7 +6,7 @@ export interface Promotion {
   promotionName: string;
   benefitType: string;
   description: string;
-  status: "ACTIVE" | "INACTIVE";
+  status: "PLANNED" | "ACTIVE" | "EXPIRED" | "CANCELLED";
   startDate: string | null;
   endDate: string | null;
   createdBy: string;
@@ -18,6 +18,7 @@ export interface PromotionCondition {
   triggerProducts: { productId: string; quantity: number }[];
   rewardProducts: { productId: string; quantity: number }[];
   minimumOrderAmount: number | null;
+  applicableCustomerTypes?: string[];
 }
 
 export interface Discount {
@@ -27,7 +28,7 @@ export interface Discount {
   discountType: "PERCENT" | "FIXED";
   discountValue: number;
   description: string;
-  status: "ACTIVE" | "INACTIVE";
+  status: "PLANNED" | "ACTIVE" | "EXPIRED" | "CANCELLED";
   startDate: string | null;
   endDate: string | null;
   createdBy: string;
@@ -61,7 +62,6 @@ export const promotionService = {
   getPromotionById: (id: string) => api.get<Promotion>(`/api/promotions/${id}`),
 
   createPromotion: (data: {
-    promotionId: string;
     promotionName: string;
     benefitType: string;
     description?: string;
@@ -84,34 +84,33 @@ export const promotionService = {
     return api.get<Promotion[]>(`/api/promotions/check?${qs}`);
   },
 
-  // Discounts
+  // Discounts — nằm trong /api/promotions/discounts
   getDiscounts: (params?: { page?: number; limit?: number; status?: string }) => {
     const qs = new URLSearchParams();
     if (params?.page) qs.set("page", String(params.page));
     if (params?.limit) qs.set("limit", String(params.limit));
     if (params?.status) qs.set("status", params.status);
-    return api.get<Paginated<Discount>>(`/api/discounts?${qs}`);
+    return api.get<Paginated<Discount>>(`/api/promotions/discounts?${qs}`);
   },
 
-  getDiscountById: (id: string) => api.get<Discount>(`/api/discounts/${id}`),
+  getDiscountById: (id: string) => api.get<Discount>(`/api/promotions/discounts/${id}`),
 
   createDiscount: (data: {
-    discountId: string;
     discountName: string;
     discountType: "PERCENT" | "FIXED";
     discountValue: number;
     description?: string;
     startDate?: string;
     endDate?: string;
-  }) => api.post<Discount>("/api/discounts", data),
+  }) => api.post<Discount>("/api/promotions/discounts", data),
 
   updateDiscount: (id: string, data: Partial<Discount>) =>
-    api.put<Discount>(`/api/discounts/${id}`, data),
+    api.put<Discount>(`/api/promotions/discounts/${id}`, data),
 
-  deleteDiscount: (id: string) => api.delete<void>(`/api/discounts/${id}`),
+  deleteDiscount: (id: string) => api.delete<void>(`/api/promotions/discounts/${id}`),
 
   updateDiscountConditions: (id: string, data: Partial<DiscountCondition>) =>
-    api.put<DiscountCondition>(`/api/discounts/${id}/conditions`, data),
+    api.put<DiscountCondition>(`/api/promotions/discounts/${id}/conditions`, data),
 
   checkDiscounts: (params?: { orderAmount?: number; productIds?: string; categoryIds?: string; customerType?: string }) => {
     const qs = new URLSearchParams();
@@ -119,6 +118,6 @@ export const promotionService = {
     if (params?.productIds) qs.set("productIds", params.productIds);
     if (params?.categoryIds) qs.set("categoryIds", params.categoryIds);
     if (params?.customerType) qs.set("customerType", params.customerType);
-    return api.get<Discount[]>(`/api/discounts/check?${qs}`);
+    return api.get<Discount[]>(`/api/promotions/discounts/check?${qs}`);
   },
 };

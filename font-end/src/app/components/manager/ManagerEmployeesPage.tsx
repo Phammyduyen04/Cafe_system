@@ -1,9 +1,13 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { staffService, type Employee, type Availability } from "../../../services/staff.service";
 
 const POSITIONS = ["Barista", "Cashier", "Kitchen", "Cleaner", "Manager"];
 const EMP_TYPES = ["FULL_TIME", "PART_TIME"];
 const DAY_LABELS: Record<string, string> = { MON: "T2", TUE: "T3", WED: "T4", THU: "T5", FRI: "T6", SAT: "T7", SUN: "CN" };
+
+const HOURS = Array.from({ length: 17 }, (_, i) => i + 6); // 6:00 → 22:00
+const DAYS_ORDER = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+const timeToMinutes = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
 
 export default function ManagerEmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -280,40 +284,58 @@ export default function ManagerEmployeesPage() {
       {/* Availability Dialog */}
       {availEmp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setAvailEmp(null)}>
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <h2 className="font-heading text-[var(--cafe-primary)] mb-1" style={{ fontSize: 20, fontWeight: 600 }}>Lịch rảnh</h2>
             <p className="font-body text-[var(--cafe-primary)]/60 mb-4" style={{ fontSize: 13 }}>{availEmp.fullName}</p>
-            {!availability ? (
-              <p className="font-body text-[var(--cafe-primary)]/50" style={{ fontSize: 13 }}>Chưa cập nhật lịch rảnh</p>
+
+            {!availability || (availability.availableDays?.length === 0 && availability.availableTimeRanges?.length === 0) ? (
+              <p className="font-body text-[var(--cafe-primary)]/50 text-center py-6" style={{ fontSize: 13 }}>Chưa cập nhật lịch rảnh</p>
             ) : (
-              <>
-                <div className="mb-3">
-                  <p className="font-body text-[var(--cafe-primary)] mb-1" style={{ fontSize: 13, fontWeight: 500 }}>Ngày rảnh:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {(availability.availableDays?.length ?? 0) === 0 ? (
-                      <span className="font-body text-[var(--cafe-primary)]/50" style={{ fontSize: 12 }}>Chưa chọn</span>
-                    ) : (
-                      availability.availableDays.map((d) => (
-                        <span key={d} className="font-body px-2 py-0.5 bg-[var(--cafe-accent)] rounded" style={{ fontSize: 11, fontWeight: 500 }}>{DAY_LABELS[d] || d}</span>
-                      ))
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <p className="font-body text-[var(--cafe-primary)] mb-1" style={{ fontSize: 13, fontWeight: 500 }}>Khung giờ:</p>
-                  {(availability.availableTimeRanges?.length ?? 0) === 0 ? (
-                    <span className="font-body text-[var(--cafe-primary)]/50" style={{ fontSize: 12 }}>Chưa có</span>
-                  ) : (
-                    <div className="space-y-1">
-                      {availability.availableTimeRanges.map((r, i) => (
-                        <p key={i} className="font-body text-[var(--cafe-primary)]" style={{ fontSize: 13 }}>{r.start} — {r.end}</p>
-                      ))}
+              <div className="overflow-y-auto flex-1">
+                <div style={{ display: "grid", gridTemplateColumns: "44px repeat(7, 1fr)" }}>
+                  {/* Header */}
+                  <div />
+                  {DAYS_ORDER.map((day) => (
+                    <div key={day} className="font-body text-center pb-2"
+                      style={{ fontSize: 12, fontWeight: 600, color: availability.availableDays.includes(day) ? "#c4a35a" : "#b0a89088" }}>
+                      {DAY_LABELS[day]}
                     </div>
-                  )}
+                  ))}
+                  {/* Hour rows */}
+                  {HOURS.map((hour) => (
+                    <React.Fragment key={hour}>
+                      <div className="font-body text-right pr-2 text-[var(--cafe-primary)]/40 select-none"
+                        style={{ fontSize: 10, lineHeight: "28px", height: 28 }}>
+                        {hour}:00
+                      </div>
+                      {DAYS_ORDER.map((day) => {
+                        const active = availability.availableDays.includes(day) && (
+                          availability.availableTimeRanges?.length === 0
+                            ? true
+                            : availability.availableTimeRanges.some((r) =>
+                                hour * 60 < timeToMinutes(r.end) && (hour + 1) * 60 > timeToMinutes(r.start)
+                              )
+                        );
+                        return (
+                          <div key={day} style={{
+                            height: 28,
+                            backgroundColor: active ? "#c4a35a28" : "transparent",
+                            borderTop: "1px solid #f0ece4",
+                            borderLeft: "1px solid #f0ece4",
+                          }} />
+                        );
+                      })}
+                    </React.Fragment>
+                  ))}
                 </div>
-              </>
+                <div className="flex items-center gap-2 mt-3">
+                  <div style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: "#c4a35a28", border: "1px solid #c4a35a55" }} />
+                  <span className="font-body text-[var(--cafe-primary)]/50" style={{ fontSize: 11 }}>Thời gian rảnh</span>
+                </div>
+              </div>
             )}
-            <button onClick={() => setAvailEmp(null)} className="font-body w-full mt-4 py-2.5 bg-[var(--cafe-primary)] text-white rounded-lg hover:opacity-90" style={{ fontSize: 14, fontWeight: 500 }}>
+
+            <button onClick={() => setAvailEmp(null)} className="font-body w-full mt-4 py-2.5 bg-[var(--cafe-primary)] text-white rounded-lg hover:opacity-90 shrink-0" style={{ fontSize: 14, fontWeight: 500 }}>
               Đóng
             </button>
           </div>

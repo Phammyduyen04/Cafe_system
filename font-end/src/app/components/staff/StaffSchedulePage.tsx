@@ -1,14 +1,25 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useAuth } from "../../../contexts/AuthContext";
 import { staffService, type Shift, type Assignment, type Employee } from "../../../services/staff.service";
 
-const DAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+const HOURS = Array.from({ length: 17 }, (_, i) => i + 6); // 6:00 → 22:00
+const CELL_H = 80;
 
-function formatDateVN(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return `${DAY_LABELS[d.getDay()]}, ${dateStr}`;
-}
+const getWeekStart = (date: Date): Date => {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay();
+  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+  return d;
+};
+
+const timeToY = (t: string) => {
+  const [h, m] = t.split(":").map(Number);
+  return (h + m / 60 - 6) * CELL_H;
+};
+
+const DAY_SHORT: Record<number, string> = { 0: "CN", 1: "T2", 2: "T3", 3: "T4", 4: "T5", 5: "T6", 6: "T7" };
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   PLANNED:   { bg: "#dbeafe", text: "#2563eb" },
@@ -17,87 +28,110 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   CANCELLED: { bg: "#fef2f2", text: "#dc2626" },
 };
 
+const DAY_LABELS_VN = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+function formatDateVN(dateStr: string) {
+  const d = new Date(dateStr + "T00:00:00");
+  return `${DAY_LABELS_VN[d.getDay()]}, ${dateStr}`;
+}
+
 export default function StaffSchedulePage() {
   const { user, isLoggedIn } = useAuth();
   const navigate = useNavigate();
+
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [tab, setTab] = useState<"all" | "mine">("all");
-  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [allShifts, setAllShifts] = useState<Shift[]>([]);
   const [myShifts, setMyShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
-  const [myLoading, setMyLoading] = useState(false);
-  const [filterDate, setFilterDate] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
-  const [detailShift, setDetailShift] = useState<(Shift & { assignments?: Assignment[] }) | null>(null);
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => getWeekStart(new Date()));
+  const [selectedShift, setSelectedShift] = useState<(Shift & { assignments?: Assignment[] }) | null>(null);
+  const [popoverPos, setPopoverPos] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (!isLoggedIn) { navigate("/login"); return; }
-    loadEmployee();
+    loadData();
   }, [isLoggedIn]);
 
-  useEffect(() => {
-    loadShifts();
-  }, [filterDate, filterStatus]);
-
-  useEffect(() => {
-    if (employee && tab === "mine") loadMyShifts();
-  }, [employee, tab, filterDate, filterStatus]);
-
-  const loadEmployee = async () => {
-    try {
-      const emp = await staffService.getEmployeeByAccountId(user!.accountId);
-      setEmployee(emp);
-    } catch {}
-  };
-
-  const loadShifts = async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
-      const params: any = { limit: 50 };
-      if (filterDate) params.date = filterDate;
-      if (filterStatus) params.status = filterStatus;
-      const res = await staffService.getShifts(params);
-      const list = Array.isArray(res) ? res : (res as any)?.shifts ?? (res as any)?.data ?? [];
-      setShifts(list);
+      const emp = await staffService.getEmployeeByAccountId(user!.accountId);
+      setEmployee(emp);
+      const [res, myRes] = await Promise.all([
+        staffService.getShifts({ limit: 200 }),
+        staffService.getEmployeeShifts(emp.employeeId, {}),
+      ]);
+      const allList = Array.isArray(res) ? res : (res as any)?.data ?? (res as any)?.shifts ?? [];
+      const myList = (myRes as any)?.shifts ?? (myRes as any)?.data ?? [];
+      setAllShifts(allList);
+      setMyShifts(Array.isArray(myList) ? myList : []);
     } catch {} finally {
       setLoading(false);
     }
   };
 
-  const loadMyShifts = async () => {
-    if (!employee) return;
+  const handleShiftClick = async (shift: Shift, e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
-      setMyLoading(true);
-      const params: any = {};
-      if (filterDate) params.date = filterDate;
-      if (filterStatus) params.status = filterStatus;
-      const res = await staffService.getEmployeeShifts(employee.employeeId, params);
-      const list = (res as any)?.shifts ?? (res as any)?.data ?? [];
-      setMyShifts(list);
-    } catch {} finally {
-      setMyLoading(false);
+      const detail = await staffService.getShiftById(shift.shiftId);
+      setSelectedShift(detail as Shift & { assignments?: Assignment[] });
+      setPopoverPos({ x: e.clientX, y: e.clientY });
+    } catch {
+      setSelectedShift(shift);
+      setPopoverPos({ x: e.clientX, y: e.clientY });
     }
   };
 
-  const openDetail = async (shift: Shift) => {
-    try {
-      const detail = await staffService.getShiftById(shift.shiftId);
-      setDetailShift(detail);
-    } catch {}
-  };
+  // Week helpers
+  const weekDates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(currentWeekStart);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
 
-  const activeList = tab === "all" ? shifts : myShifts;
-  const activeLoading = tab === "all" ? loading : myLoading;
+  const toDateStr = (d: Date) => d.toISOString().split("T")[0];
+  const isToday = (d: Date) => toDateStr(d) === toDateStr(new Date());
+
+  const myShiftIds = new Set(myShifts.map((s) => s.shiftId));
+  const activeList = tab === "all" ? allShifts : myShifts;
+
+  const visibleShifts = activeList.filter((s) =>
+    weekDates.some((d) => toDateStr(d) === s.workingDate) &&
+    (!filterStatus || s.status === filterStatus)
+  );
+
+  const shiftsForDate = (d: Date) => visibleShifts.filter((s) => s.workingDate === toDateStr(d));
+
+  const formatWeekRange = () =>
+    `${String(weekDates[0].getDate()).padStart(2, "0")}/${String(weekDates[0].getMonth() + 1).padStart(2, "0")} — ` +
+    `${String(weekDates[6].getDate()).padStart(2, "0")}/${String(weekDates[6].getMonth() + 1).padStart(2, "0")}/${weekDates[6].getFullYear()}`;
+
+  const prevWeek = () => { const d = new Date(currentWeekStart); d.setDate(d.getDate() - 7); setCurrentWeekStart(d); };
+  const nextWeek = () => { const d = new Date(currentWeekStart); d.setDate(d.getDate() + 7); setCurrentWeekStart(d); };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[var(--cafe-bg)] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-[var(--cafe-gold)] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[var(--cafe-bg)] pt-24">
-      <div className="max-w-[1000px] mx-auto px-6 md:px-12 py-12">
+      <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-10">
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="font-heading text-[var(--cafe-primary)]" style={{ fontSize: 28, fontWeight: 700 }}>
-            Lịch làm việc
-          </h1>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="font-heading text-[var(--cafe-primary)]" style={{ fontSize: 28, fontWeight: 700 }}>Lịch làm việc</h1>
+            {employee && (
+              <p className="font-body text-[var(--cafe-primary)] mt-1" style={{ fontSize: 13, opacity: 0.6 }}>
+                Xin chào <strong>{employee.fullName}</strong> — {employee.position}
+              </p>
+            )}
+          </div>
           <Link
             to="/staff/availability"
             className="font-body px-4 py-2 bg-[var(--cafe-primary)] text-white rounded-lg hover:opacity-90 transition-opacity"
@@ -107,22 +141,15 @@ export default function StaffSchedulePage() {
           </Link>
         </div>
 
-        {employee && (
-          <p className="font-body text-[var(--cafe-primary)]/60 mb-5" style={{ fontSize: 14 }}>
-            Xin chào <strong>{employee.fullName}</strong> — {employee.position}
-          </p>
-        )}
-
         {/* Tabs */}
-        <div className="flex gap-1 mb-6 bg-white border border-[var(--cafe-border)] rounded-xl p-1 w-fit">
+        <div className="flex gap-1 mb-4 bg-white border border-[var(--cafe-border)] rounded-xl p-1 w-fit">
           {(["all", "mine"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className="font-body px-5 py-2 rounded-lg transition-colors"
               style={{
-                fontSize: 13,
-                fontWeight: 600,
+                fontSize: 13, fontWeight: 600,
                 backgroundColor: tab === t ? "var(--cafe-primary)" : "transparent",
                 color: tab === t ? "#fff" : "var(--cafe-primary)",
               }}
@@ -132,147 +159,165 @@ export default function StaffSchedulePage() {
           ))}
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-3 mb-6">
-          <input
-            type="date"
-            value={filterDate}
-            onChange={(e) => setFilterDate(e.target.value)}
-            className="font-body px-4 py-2 border border-[var(--cafe-border)] rounded-lg bg-white focus:outline-none focus:border-[var(--cafe-gold)]"
-            style={{ fontSize: 13 }}
-          />
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="font-body px-4 py-2 border border-[var(--cafe-border)] rounded-lg bg-white focus:outline-none focus:border-[var(--cafe-gold)]"
-            style={{ fontSize: 13 }}
-          >
+        {/* Week nav + filter */}
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          <div className="flex items-center gap-1">
+            <button onClick={prevWeek} className="font-body w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--cafe-border)] bg-white hover:bg-[var(--cafe-accent)] text-[var(--cafe-primary)]" style={{ fontSize: 18 }}>‹</button>
+            <span className="font-body text-[var(--cafe-primary)] px-3 py-1.5 bg-white border border-[var(--cafe-border)] rounded-lg" style={{ fontSize: 13, fontWeight: 500, minWidth: 170, textAlign: "center" }}>
+              {formatWeekRange()}
+            </span>
+            <button onClick={nextWeek} className="font-body w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--cafe-border)] bg-white hover:bg-[var(--cafe-accent)] text-[var(--cafe-primary)]" style={{ fontSize: 18 }}>›</button>
+          </div>
+          <button onClick={() => setCurrentWeekStart(getWeekStart(new Date()))} className="font-body px-3 py-1.5 border border-[var(--cafe-border)] rounded-lg bg-white hover:bg-[var(--cafe-accent)] text-[var(--cafe-primary)]" style={{ fontSize: 12, fontWeight: 500 }}>
+            Hôm nay
+          </button>
+          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="font-body px-3 py-1.5 border border-[var(--cafe-border)] rounded-lg bg-white focus:outline-none focus:border-[var(--cafe-gold)] text-[var(--cafe-primary)]" style={{ fontSize: 13 }}>
             <option value="">Tất cả trạng thái</option>
             <option value="PLANNED">PLANNED</option>
             <option value="ACTIVE">ACTIVE</option>
             <option value="COMPLETED">COMPLETED</option>
             <option value="CANCELLED">CANCELLED</option>
           </select>
-          {(filterDate || filterStatus) && (
-            <button
-              onClick={() => { setFilterDate(""); setFilterStatus(""); }}
-              className="font-body px-3 py-2 text-[var(--cafe-red)] hover:underline"
-              style={{ fontSize: 13 }}
-            >
-              Xóa bộ lọc
-            </button>
-          )}
         </div>
 
-        {/* Shift list */}
-        {activeLoading ? (
-          <div className="flex justify-center py-12">
-            <div className="w-8 h-8 border-4 border-[var(--cafe-gold)] border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : activeList.length === 0 ? (
-          <div className="bg-white rounded-2xl p-8 border border-[var(--cafe-border)] text-center">
-            <p className="font-body text-[var(--cafe-primary)]/50" style={{ fontSize: 14 }}>
-              {tab === "mine" ? "Bạn chưa được phân công vào ca nào" : "Không có ca nào"}
-            </p>
-          </div>
-        ) : (
-          <div className="grid gap-4">
-            {activeList.map((shift) => {
-              const sc = STATUS_COLORS[shift.status] || STATUS_COLORS.PLANNED;
-              return (
-                <button
-                  key={shift.shiftId}
-                  onClick={() => openDetail(shift)}
-                  className="bg-white rounded-2xl p-5 border border-[var(--cafe-border)] hover:border-[var(--cafe-gold)] transition-colors text-left w-full"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-heading text-[var(--cafe-primary)]" style={{ fontSize: 18, fontWeight: 600 }}>
-                        {shift.shiftName}
-                      </h3>
-                      {tab === "mine" && (
-                        <span className="font-body px-2 py-0.5 rounded-full text-white" style={{ fontSize: 10, fontWeight: 600, backgroundColor: "var(--cafe-gold)" }}>
-                          Của bạn
-                        </span>
-                      )}
-                    </div>
-                    <span className="font-body px-2.5 py-0.5 rounded-full" style={{ backgroundColor: sc.bg, color: sc.text, fontSize: 11, fontWeight: 600 }}>
-                      {shift.status}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-4">
-                    <span className="font-body text-[var(--cafe-primary)]/60" style={{ fontSize: 13 }}>
-                      🕐 {shift.startTime} — {shift.endTime}
-                    </span>
-                    <span className="font-body text-[var(--cafe-primary)]/60" style={{ fontSize: 13 }}>
-                      📅 {formatDateVN(shift.workingDate)}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Detail Dialog */}
-        {detailShift && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setDetailShift(null)}>
-            <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
-              <h2 className="font-heading text-[var(--cafe-primary)] mb-4" style={{ fontSize: 22, fontWeight: 600 }}>
-                {detailShift.shiftName}
-              </h2>
-              <div className="space-y-2 mb-4">
-                <InfoLine label="Thời gian" value={`${detailShift.startTime} — ${detailShift.endTime}`} />
-                <InfoLine label="Ngày" value={formatDateVN(detailShift.workingDate)} />
-                <InfoLine label="Trạng thái" value={detailShift.status} />
+        {/* Calendar */}
+        <div className="bg-white rounded-2xl border border-[var(--cafe-border)] overflow-hidden">
+          {/* Day header */}
+          <div style={{ display: "grid", gridTemplateColumns: "44px repeat(7, 1fr)", borderBottom: "1px solid var(--cafe-border)" }}>
+            <div />
+            {weekDates.map((d, i) => (
+              <div key={i} className="font-body text-center py-3" style={{ borderLeft: "1px solid var(--cafe-border)" }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: isToday(d) ? "var(--cafe-gold)" : "var(--cafe-primary)", opacity: isToday(d) ? 1 : 0.5 }}>
+                  {DAY_SHORT[d.getDay()]}
+                </div>
+                <div style={{
+                  fontSize: 20, fontWeight: 700, marginTop: 2,
+                  width: 34, height: 34,
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  borderRadius: "50%",
+                  backgroundColor: isToday(d) ? "var(--cafe-gold)" : "transparent",
+                  color: isToday(d) ? "#fff" : "var(--cafe-primary)",
+                  fontFamily: "inherit",
+                }}>
+                  {d.getDate()}
+                </div>
               </div>
-              <h3 className="font-body text-[var(--cafe-primary)] mb-2" style={{ fontSize: 14, fontWeight: 600 }}>
-                Nhân viên trong ca ({detailShift.assignments?.length ?? 0})
-              </h3>
-              {(!detailShift.assignments || detailShift.assignments.length === 0) ? (
-                <p className="font-body text-[var(--cafe-primary)]/50" style={{ fontSize: 13 }}>Chưa có nhân viên nào được gán</p>
-              ) : (
-                <ul className="space-y-1">
-                  {detailShift.assignments.map((a, i) => {
-                    const isMe = a.employeeId === employee?.employeeId;
+            ))}
+          </div>
+
+          {/* Scrollable grid */}
+          <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 360px)" }}>
+            {/* Background grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "44px repeat(7, 1fr)" }}>
+              {HOURS.map((hour) => (
+                <React.Fragment key={hour}>
+                  <div className="font-body text-[var(--cafe-primary)] select-none"
+                    style={{ fontSize: 10, height: CELL_H, lineHeight: `${CELL_H}px`, textAlign: "right", paddingRight: 8, opacity: 0.35, borderTop: "1px solid var(--cafe-border)" }}>
+                    {hour}:00
+                  </div>
+                  {weekDates.map((d, di) => (
+                    <div key={`${di}-${hour}`} style={{
+                      height: CELL_H,
+                      borderTop: "1px solid var(--cafe-border)",
+                      borderLeft: "1px solid var(--cafe-border)",
+                      backgroundColor: isToday(d) ? "rgba(196,163,90,0.06)" : "transparent",
+                    }} />
+                  ))}
+                </React.Fragment>
+              ))}
+            </div>
+
+            {/* Shift blocks overlay */}
+            <div style={{ display: "grid", gridTemplateColumns: "44px repeat(7, 1fr)", marginTop: `-${HOURS.length * CELL_H}px`, pointerEvents: "none" }}>
+              <div />
+              {weekDates.map((d, di) => (
+                <div key={di} style={{ position: "relative", height: HOURS.length * CELL_H, pointerEvents: "auto" }}>
+                  {shiftsForDate(d).map((shift) => {
+                    const sc = STATUS_COLORS[shift.status] || STATUS_COLORS.PLANNED;
+                    const top = timeToY(shift.startTime);
+                    const height = Math.max(timeToY(shift.endTime) - top, 24);
+                    const isMyShift = myShiftIds.has(shift.shiftId);
                     return (
-                      <li
-                        key={a.employeeId}
-                        className="font-body px-3 py-2 rounded-lg flex items-center gap-2"
+                      <div
+                        key={shift.shiftId}
+                        onClick={(e) => handleShiftClick(shift, e)}
                         style={{
-                          fontSize: 13,
-                          backgroundColor: isMe ? "#fef9ec" : "var(--cafe-bg)",
-                          fontWeight: isMe ? 600 : 400,
+                          position: "absolute", top, height, left: 4, right: 4,
+                          borderRadius: 8,
+                          backgroundColor: sc.bg, color: sc.text,
+                          border: isMyShift ? `2px solid ${sc.text}` : `1.5px solid ${sc.text}44`,
+                          cursor: "pointer", padding: "6px 10px", overflow: "hidden", zIndex: 1,
                         }}
                       >
-                        <span style={{ color: isMe ? "var(--cafe-gold)" : "var(--cafe-primary)" }}>
-                          {isMe ? "★ Bạn" : `Nhân viên ${i + 1}`}
-                        </span>
-                      </li>
+                        <p className="font-body" style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {shift.shiftName}
+                        </p>
+                        <p className="font-body" style={{ fontSize: 12, opacity: 0.8 }}>{shift.startTime}–{shift.endTime}</p>
+                        {isMyShift && (
+                          <p className="font-body" style={{ fontSize: 11, fontWeight: 700, color: "var(--cafe-gold)" }}>★ Của bạn</p>
+                        )}
+                      </div>
                     );
                   })}
-                </ul>
-              )}
-              <button
-                onClick={() => setDetailShift(null)}
-                className="font-body w-full mt-4 py-2.5 bg-[var(--cafe-primary)] text-white rounded-lg hover:opacity-90"
-                style={{ fontSize: 14, fontWeight: 500 }}
-              >
-                Đóng
-              </button>
+                </div>
+              ))}
             </div>
           </div>
-        )}
-      </div>
-    </div>
-  );
-}
+        </div>
 
-function InfoLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex gap-2">
-      <span className="font-body text-[var(--cafe-primary)]/50 w-24 shrink-0" style={{ fontSize: 13 }}>{label}:</span>
-      <span className="font-body text-[var(--cafe-primary)]" style={{ fontSize: 13, fontWeight: 500 }}>{value}</span>
+        {/* Shift detail popover */}
+        {selectedShift && popoverPos && (
+          <>
+            <div className="fixed inset-0 z-30" onClick={() => setSelectedShift(null)} />
+            <div
+              className="fixed z-40 bg-white rounded-xl border border-[var(--cafe-border)]"
+              style={{
+                width: 224,
+                boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                top: Math.min(popoverPos.y + 8, window.innerHeight - 220),
+                left: Math.min(popoverPos.x + 8, window.innerWidth - 240),
+                padding: 16,
+              }}
+            >
+              <button onClick={() => setSelectedShift(null)} className="absolute top-2 right-3 font-body text-[var(--cafe-primary)] hover:opacity-80" style={{ fontSize: 18, lineHeight: 1, opacity: 0.4 }}>×</button>
+
+              <p className="font-heading text-[var(--cafe-primary)]" style={{ fontSize: 14, fontWeight: 600, paddingRight: 20 }}>{selectedShift.shiftName}</p>
+              <p className="font-body text-[var(--cafe-primary)] mt-1" style={{ fontSize: 11, opacity: 0.6 }}>{selectedShift.startTime} – {selectedShift.endTime}</p>
+              <p className="font-body text-[var(--cafe-primary)]" style={{ fontSize: 11, opacity: 0.6 }}>{formatDateVN(selectedShift.workingDate)}</p>
+
+              {(() => {
+                const sc = STATUS_COLORS[selectedShift.status] || STATUS_COLORS.PLANNED;
+                return (
+                  <span className="font-body inline-block mt-1.5 px-2 py-0.5 rounded-full" style={{ fontSize: 10, fontWeight: 600, backgroundColor: sc.bg, color: sc.text }}>
+                    {selectedShift.status}
+                  </span>
+                );
+              })()}
+
+              {selectedShift.assignments && selectedShift.assignments.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-[var(--cafe-border)]">
+                  <p className="font-body text-[var(--cafe-primary)] mb-1.5" style={{ fontSize: 11, fontWeight: 600, opacity: 0.7 }}>
+                    Nhân viên ({selectedShift.assignments.length})
+                  </p>
+                  {selectedShift.assignments.map((a, i) => {
+                    const isMe = a.employeeId === employee?.employeeId;
+                    return (
+                      <p key={a.employeeId} className="font-body" style={{
+                        fontSize: 12, fontWeight: isMe ? 600 : 400,
+                        color: isMe ? "var(--cafe-gold)" : "var(--cafe-primary)",
+                        opacity: isMe ? 1 : 0.65,
+                      }}>
+                        {isMe ? "★ Bạn" : `Nhân viên ${i + 1}`}
+                      </p>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+      </div>
     </div>
   );
 }

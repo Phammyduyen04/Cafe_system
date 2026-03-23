@@ -22,11 +22,12 @@ export default function ManagerDashboard() {
 
   const loadStats = async () => {
     try {
-      const [custRes, empRes, shiftRes, promoRes] = await Promise.allSettled([
+      const [custRes, empRes, shiftRes, promoRes, discountRes] = await Promise.allSettled([
         customerService.getAll(1, 1),
         staffService.getEmployees({ page: 1, limit: 1, status: "ACTIVE" }),
         staffService.getShifts({ page: 1, limit: 1, date: new Date().toISOString().split("T")[0] }),
         promotionService.getPromotions({ page: 1, limit: 1, status: "ACTIVE" }),
+        promotionService.getDiscounts({ page: 1, limit: 1, status: "ACTIVE" }),
       ]);
 
       const getTotal = (res: PromiseSettledResult<any>) =>
@@ -55,11 +56,18 @@ export default function ManagerDashboard() {
           color: "#c4a35a",
         },
         {
-          label: "KM đang chạy",
+          label: "Khuyến mãi đang chạy",
           value: getTotal(promoRes),
           icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
           to: "/manager/promotions",
           color: "#e74c3c",
+        },
+        {
+          label: "Giảm giá đang chạy",
+          value: getTotal(discountRes),
+          icon: "M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z",
+          to: "/manager/discounts",
+          color: "#9333ea",
         },
       ]);
     } catch {} finally {
@@ -78,7 +86,7 @@ export default function ManagerDashboard() {
           <div className="w-8 h-8 border-4 border-[var(--cafe-gold)] border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
           {stats.map((s) => (
             <Link
               key={s.label}

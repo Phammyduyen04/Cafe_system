@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { promotionService, type Discount } from "../../../services/promotion.service";
+import { productService, type Product, type Category } from "../../../services/product.service";
 
 type TimeFrameRow = { from: string; to: string };
 
@@ -74,7 +75,7 @@ export default function ManagerDiscountsPage() {
   // Create/Edit dialog
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formDiscountId, setFormDiscountId] = useState("");
+  const [editingStatus, setEditingStatus] = useState("");
   const [formName, setFormName] = useState("");
   const [formType, setFormType] = useState<"PERCENT" | "FIXED">("PERCENT");
   const [formValue, setFormValue] = useState("");
@@ -92,8 +93,10 @@ export default function ManagerDiscountsPage() {
   const [condMinOrder, setCondMinOrder] = useState("");
   const [custTypeRegular, setCustTypeRegular] = useState(false);
   const [custTypeVip, setCustTypeVip] = useState(false);
-  const [condProductIds, setCondProductIds] = useState("");
-  const [condCategoryIds, setCondCategoryIds] = useState("");
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
+  const [availableCategories, setAvailableCategories] = useState<Category[]>([]);
   const [timeFrameRows, setTimeFrameRows] = useState<TimeFrameRow[]>([]);
   const [condSaving, setCondSaving] = useState(false);
   const [condError, setCondError] = useState("");
@@ -119,7 +122,7 @@ export default function ManagerDiscountsPage() {
 
   const openCreate = () => {
     setEditingId(null);
-    setFormDiscountId("");
+    setEditingStatus("");
     setFormName("");
     setFormType("PERCENT");
     setFormValue("");
@@ -132,7 +135,7 @@ export default function ManagerDiscountsPage() {
 
   const openEdit = (disc: Discount) => {
     setEditingId(disc.discountId);
-    setFormDiscountId(disc.discountId);
+    setEditingStatus(disc.status);
     setFormName(disc.discountName);
     setFormType(disc.discountType);
     setFormValue(String(disc.discountValue));
@@ -147,6 +150,7 @@ export default function ManagerDiscountsPage() {
     if (!formName.trim()) { setError("Nhập tên giảm giá"); return; }
     const val = parseFloat(formValue);
     if (isNaN(val) || val <= 0) { setError("Nhập giá trị hợp lệ"); return; }
+    if (!formStart || !formEnd) { setError("Ngày bắt đầu và kết thúc là bắt buộc"); return; }
     try {
       setFormSaving(true);
       setError("");
@@ -161,9 +165,7 @@ export default function ManagerDiscountsPage() {
         });
         setSuccessMsg("Cập nhật giảm giá thành công!");
       } else {
-        if (!formDiscountId.trim()) { setError("Nhập mã giảm giá"); setFormSaving(false); return; }
         await promotionService.createDiscount({
-          discountId: formDiscountId,
           discountName: formName,
           discountType: formType,
           discountValue: val,
@@ -204,14 +206,20 @@ export default function ManagerDiscountsPage() {
     setCondSaving(false);
     setCondError("");
     try {
-      const detail = await promotionService.getDiscountById(disc.discountId);
+      const [detail, prods, cats] = await Promise.all([
+        promotionService.getDiscountById(disc.discountId),
+        productService.getProducts(),
+        productService.getCategories(),
+      ]);
+      setAvailableProducts(prods);
+      setAvailableCategories(cats);
       const cond = (detail as any)?.conditions;
       setCondMinOrder(cond?.minimumOrderAmount != null ? String(cond.minimumOrderAmount) : "");
       const types: string[] = cond?.applicableCustomerTypes ?? [];
       setCustTypeRegular(types.includes("REGULAR"));
       setCustTypeVip(types.includes("VIP"));
-      setCondProductIds(cond?.applicableProductIds?.join(", ") || "");
-      setCondCategoryIds(cond?.applicableCategoryIds?.join(", ") || "");
+      setSelectedProductIds(cond?.applicableProductIds ?? []);
+      setSelectedCategoryIds(cond?.applicableCategoryIds ?? []);
       setTimeFrameRows(
         (cond?.timeFrames ?? []).map((t: any) => ({ from: t.from ?? "", to: t.to ?? "" }))
       );
@@ -219,8 +227,8 @@ export default function ManagerDiscountsPage() {
       setCondMinOrder("");
       setCustTypeRegular(false);
       setCustTypeVip(false);
-      setCondProductIds("");
-      setCondCategoryIds("");
+      setSelectedProductIds([]);
+      setSelectedCategoryIds([]);
       setTimeFrameRows([]);
     }
   };
@@ -236,8 +244,8 @@ export default function ManagerDiscountsPage() {
           ...(custTypeRegular ? ["REGULAR"] : []),
           ...(custTypeVip ? ["VIP"] : []),
         ],
-        applicableProductIds: condProductIds ? condProductIds.split(",").map((s) => s.trim()).filter(Boolean) : [],
-        applicableCategoryIds: condCategoryIds ? condCategoryIds.split(",").map((s) => s.trim()).filter(Boolean) : [],
+        applicableProductIds: selectedProductIds,
+        applicableCategoryIds: selectedCategoryIds,
         timeFrames: timeFrameRows.filter((r) => r.from && r.to),
       });
       setCondDisc(null);
@@ -251,9 +259,15 @@ export default function ManagerDiscountsPage() {
   };
 
   const statusBadge = (status: string) => {
-    const active = status === "ACTIVE";
+    const styles: Record<string, { bg: string; color: string }> = {
+      ACTIVE:    { bg: "#dcfce7", color: "#16a34a" },
+      PLANNED:   { bg: "#dbeafe", color: "#2563eb" },
+      EXPIRED:   { bg: "#f3f4f6", color: "#6b7280" },
+      CANCELLED: { bg: "#fef2f2", color: "#dc2626" },
+    };
+    const s = styles[status] ?? { bg: "#f3f4f6", color: "#6b7280" };
     return (
-      <span className="font-body inline-block px-2 py-0.5 rounded-full" style={{ fontSize: 11, fontWeight: 600, backgroundColor: active ? "#dcfce7" : "#fef2f2", color: active ? "#16a34a" : "#dc2626" }}>
+      <span className="font-body inline-block px-2 py-0.5 rounded-full" style={{ fontSize: 11, fontWeight: 600, backgroundColor: s.bg, color: s.color }}>
         {status}
       </span>
     );
@@ -282,8 +296,10 @@ export default function ManagerDiscountsPage() {
       <div className="flex flex-wrap gap-3 mb-6">
         <select value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }} className="font-body px-4 py-2 border border-[var(--cafe-border)] rounded-lg bg-white focus:outline-none focus:border-[var(--cafe-gold)]" style={{ fontSize: 13 }}>
           <option value="">Tất cả trạng thái</option>
+          <option value="PLANNED">PLANNED</option>
           <option value="ACTIVE">ACTIVE</option>
-          <option value="INACTIVE">INACTIVE</option>
+          <option value="EXPIRED">EXPIRED</option>
+          <option value="CANCELLED">CANCELLED</option>
         </select>
       </div>
 
@@ -311,7 +327,7 @@ export default function ManagerDiscountsPage() {
                 <tr key={disc.discountId} className="border-b border-[var(--cafe-bg)] last:border-0">
                   <td className="px-4 py-3">
                     <span className="font-body text-[var(--cafe-primary)]/50 bg-[var(--cafe-bg)] px-2 py-0.5 rounded" style={{ fontSize: 11, fontFamily: "monospace" }}>
-                      {disc.discountId.slice(0, 8)}…
+                      {disc.discountId}
                     </span>
                   </td>
                   <td className="font-body px-4 py-3 text-[var(--cafe-primary)]" style={{ fontSize: 13, fontWeight: 500 }}>{disc.discountName}</td>
@@ -354,12 +370,6 @@ export default function ManagerDiscountsPage() {
             </h2>
             {error && <p className="font-body text-[var(--cafe-red)] mb-3 text-sm">{error}</p>}
             <div className="space-y-4">
-              {!editingId && (
-                <div>
-                  <label className="font-body text-[var(--cafe-primary)] block mb-1" style={{ fontSize: 13, fontWeight: 500 }}>Mã giảm giá</label>
-                  <input value={formDiscountId} onChange={(e) => setFormDiscountId(e.target.value)} placeholder="VD: DISC_001" className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)]" style={{ fontSize: 14 }} />
-                </div>
-              )}
               <div>
                 <label className="font-body text-[var(--cafe-primary)] block mb-1" style={{ fontSize: 13, fontWeight: 500 }}>Tên giảm giá</label>
                 <input value={formName} onChange={(e) => setFormName(e.target.value)} className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)]" style={{ fontSize: 14 }} />
@@ -383,14 +393,17 @@ export default function ManagerDiscountsPage() {
                 <label className="font-body text-[var(--cafe-primary)] block mb-1" style={{ fontSize: 13, fontWeight: 500 }}>Mô tả</label>
                 <input value={formDesc} onChange={(e) => setFormDesc(e.target.value)} className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)]" style={{ fontSize: 14 }} />
               </div>
+              {editingStatus === "ACTIVE" && (
+                <p className="font-body text-amber-600 text-xs">Không thể sửa ngày khi giảm giá đang ACTIVE.</p>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="font-body text-[var(--cafe-primary)] block mb-1" style={{ fontSize: 13, fontWeight: 500 }}>Bắt đầu</label>
-                  <input type="date" value={formStart} onChange={(e) => setFormStart(e.target.value)} className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)]" style={{ fontSize: 14 }} />
+                  <input type="date" value={formStart} onChange={(e) => setFormStart(e.target.value)} disabled={editingStatus === "ACTIVE"} className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)] disabled:opacity-50 disabled:cursor-not-allowed" style={{ fontSize: 14 }} />
                 </div>
                 <div>
                   <label className="font-body text-[var(--cafe-primary)] block mb-1" style={{ fontSize: 13, fontWeight: 500 }}>Kết thúc</label>
-                  <input type="date" value={formEnd} onChange={(e) => setFormEnd(e.target.value)} className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)]" style={{ fontSize: 14 }} />
+                  <input type="date" value={formEnd} onChange={(e) => setFormEnd(e.target.value)} disabled={editingStatus === "ACTIVE"} className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)] disabled:opacity-50 disabled:cursor-not-allowed" style={{ fontSize: 14 }} />
                 </div>
               </div>
             </div>
@@ -479,32 +492,62 @@ export default function ManagerDiscountsPage() {
 
               <div className="border-t border-[var(--cafe-bg)]" />
 
-              {/* Product IDs */}
+              {/* Products */}
               <div>
-                <label className="font-body text-[var(--cafe-primary)] block mb-1" style={{ fontSize: 13, fontWeight: 500 }}>
-                  Product IDs áp dụng
+                <label className="font-body text-[var(--cafe-primary)] block mb-2" style={{ fontSize: 13, fontWeight: 500 }}>
+                  Sản phẩm áp dụng
                 </label>
-                <input
-                  value={condProductIds}
-                  onChange={(e) => setCondProductIds(e.target.value)}
-                  placeholder="VD: prod_1, prod_2 (phân cách bởi dấu phẩy)"
-                  className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)]"
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {selectedProductIds.map((id) => {
+                    const p = availableProducts.find((x) => x._id === id);
+                    return (
+                      <span key={id} className="font-body inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[var(--cafe-bg)] border border-[var(--cafe-border)]" style={{ fontSize: 12 }}>
+                        {p?.name ?? id}
+                        <button type="button" onClick={() => setSelectedProductIds(selectedProductIds.filter((i) => i !== id))} className="text-[var(--cafe-red)] hover:opacity-70" style={{ fontSize: 14, lineHeight: 1 }}>×</button>
+                      </span>
+                    );
+                  })}
+                </div>
+                <select
+                  onChange={(e) => { if (e.target.value) { setSelectedProductIds([...selectedProductIds, e.target.value]); e.target.value = ""; } }}
+                  className="font-body w-full px-3 py-2 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)] bg-white"
                   style={{ fontSize: 13 }}
-                />
+                >
+                  <option value="">+ Chọn sản phẩm</option>
+                  {availableProducts.filter((p) => !selectedProductIds.includes(p._id)).map((p) => (
+                    <option key={p._id} value={p._id}>{p.name}</option>
+                  ))}
+                </select>
+                <p className="font-body text-[var(--cafe-primary)]/40 mt-1" style={{ fontSize: 11 }}>Không chọn = áp dụng tất cả sản phẩm</p>
               </div>
 
-              {/* Category IDs */}
+              {/* Categories */}
               <div>
-                <label className="font-body text-[var(--cafe-primary)] block mb-1" style={{ fontSize: 13, fontWeight: 500 }}>
-                  Category IDs áp dụng
+                <label className="font-body text-[var(--cafe-primary)] block mb-2" style={{ fontSize: 13, fontWeight: 500 }}>
+                  Danh mục áp dụng
                 </label>
-                <input
-                  value={condCategoryIds}
-                  onChange={(e) => setCondCategoryIds(e.target.value)}
-                  placeholder="VD: cat_1, cat_2 (phân cách bởi dấu phẩy)"
-                  className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)]"
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {selectedCategoryIds.map((id) => {
+                    const c = availableCategories.find((x) => x._id === id);
+                    return (
+                      <span key={id} className="font-body inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[var(--cafe-bg)] border border-[var(--cafe-border)]" style={{ fontSize: 12 }}>
+                        {c?.name ?? id}
+                        <button type="button" onClick={() => setSelectedCategoryIds(selectedCategoryIds.filter((i) => i !== id))} className="text-[var(--cafe-red)] hover:opacity-70" style={{ fontSize: 14, lineHeight: 1 }}>×</button>
+                      </span>
+                    );
+                  })}
+                </div>
+                <select
+                  onChange={(e) => { if (e.target.value) { setSelectedCategoryIds([...selectedCategoryIds, e.target.value]); e.target.value = ""; } }}
+                  className="font-body w-full px-3 py-2 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)] bg-white"
                   style={{ fontSize: 13 }}
-                />
+                >
+                  <option value="">+ Chọn danh mục</option>
+                  {availableCategories.filter((c) => !selectedCategoryIds.includes(c._id)).map((c) => (
+                    <option key={c._id} value={c._id}>{c.name}</option>
+                  ))}
+                </select>
+                <p className="font-body text-[var(--cafe-primary)]/40 mt-1" style={{ fontSize: 11 }}>Không chọn = áp dụng tất cả danh mục</p>
               </div>
 
               <div className="border-t border-[var(--cafe-bg)]" />
