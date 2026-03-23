@@ -17,4 +17,7 @@ router.delete('/:id', authorizeMiddleware('MANAGER'), employeeController.deleteE
 router.get('/:id/availability', employeeController.getAvailability);
 router.put('/:id/availability', authorizeMiddleware('STAFF'), employeeController.updateAvailability);
 
+// Assigned shifts
+router.get('/:id/shifts', employeeController.getEmployeeShifts);
+
 module.exports = router;

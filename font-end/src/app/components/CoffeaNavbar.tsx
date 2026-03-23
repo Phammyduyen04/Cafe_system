@@ -268,18 +268,45 @@ export default function CoffeaNavbar() {
                       {user?.username}
                     </p>
                   </div>
-                  <Link
-                    to="/profile"
-                    className="font-body flex items-center gap-3 w-full px-4 py-3 text-cafe-primary hover:bg-cafe-bg transition-colors"
-                    style={{ fontWeight: 500, fontSize: 14 }}
-                    onClick={() => setAccountOpen(false)}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-                      <circle cx="12" cy="7" r="4" />
-                    </svg>
-                    Hồ sơ tài khoản
-                  </Link>
+                  {(user?.roles?.includes("CUSTOMER") || user?.userType === "CUSTOMER") && (
+                    <Link
+                      to="/profile"
+                      className="font-body flex items-center gap-3 w-full px-4 py-3 text-cafe-primary hover:bg-cafe-bg transition-colors"
+                      style={{ fontWeight: 500, fontSize: 14 }}
+                      onClick={() => setAccountOpen(false)}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" />
+                      </svg>
+                      Tài khoản
+                    </Link>
+                  )}
+                  {(user?.roles?.includes("STAFF") || user?.userType === "EMPLOYEE") && (
+                    <Link
+                      to="/staff/schedule"
+                      className="font-body flex items-center gap-3 w-full px-4 py-3 text-cafe-primary hover:bg-cafe-bg transition-colors"
+                      style={{ fontWeight: 500, fontSize: 14 }}
+                      onClick={() => setAccountOpen(false)}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                      </svg>
+                      Lịch làm việc
+                    </Link>
+                  )}
+                  {(user?.roles?.includes("MANAGER") || user?.userType === "MANAGER") && (
+                    <Link
+                      to="/manager"
+                      className="font-body flex items-center gap-3 w-full px-4 py-3 text-cafe-primary hover:bg-cafe-bg transition-colors"
+                      style={{ fontWeight: 500, fontSize: 14 }}
+                      onClick={() => setAccountOpen(false)}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 20V10M18 20V4M6 20v-4" />
+                      </svg>
+                      Quản lý
+                    </Link>
+                  )}
                   <button
                     className="font-body flex items-center gap-3 w-full px-4 py-3 text-cafe-red hover:bg-red-50 transition-colors"
                     style={{ fontWeight: 500, fontSize: 14 }}
@@ -431,13 +458,24 @@ export default function CoffeaNavbar() {
             </button>
 
             {isLoggedIn ? (
-              <button
-                onClick={() => { setMobileOpen(false); handleLogout(); }}
-                className="font-body flex-1 py-2.5 border border-white/40 text-white rounded-full hover:bg-white/10 transition-colors"
-                style={{ fontWeight: 500, fontSize: 14 }}
-              >
-                Đăng xuất
-              </button>
+              <div className="flex flex-col gap-2 flex-1">
+                {(user?.roles?.includes("CUSTOMER") || user?.userType === "CUSTOMER") && (
+                  <Link to="/profile" className="font-body py-2.5 border border-white/40 text-white rounded-full hover:bg-white/10 transition-colors text-center" style={{ fontWeight: 500, fontSize: 14 }} onClick={() => setMobileOpen(false)}>Tài khoản</Link>
+                )}
+                {(user?.roles?.includes("STAFF") || user?.userType === "EMPLOYEE") && (
+                  <Link to="/staff/schedule" className="font-body py-2.5 border border-white/40 text-white rounded-full hover:bg-white/10 transition-colors text-center" style={{ fontWeight: 500, fontSize: 14 }} onClick={() => setMobileOpen(false)}>Lịch làm</Link>
+                )}
+                {(user?.roles?.includes("MANAGER") || user?.userType === "MANAGER") && (
+                  <Link to="/manager" className="font-body py-2.5 border border-white/40 text-white rounded-full hover:bg-white/10 transition-colors text-center" style={{ fontWeight: 500, fontSize: 14 }} onClick={() => setMobileOpen(false)}>Quản lý</Link>
+                )}
+                <button
+                  onClick={() => { setMobileOpen(false); handleLogout(); }}
+                  className="font-body py-2.5 border border-white/40 text-white rounded-full hover:bg-white/10 transition-colors"
+                  style={{ fontWeight: 500, fontSize: 14 }}
+                >
+                  Đăng xuất
+                </button>
+              </div>
             ) : (
               <>
                 <Link

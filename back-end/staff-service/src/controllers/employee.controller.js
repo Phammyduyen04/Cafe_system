@@ -1,4 +1,5 @@
 const employeeService = require('../services/employee.service');
+const shiftService = require('../services/shift.service');
 const { responseHelper } = require('../../../shared');
 
 const createEmployee = async (req, res, next) => {
@@ -58,4 +59,12 @@ const getEmployeeByAccountId = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-module.exports = { createEmployee, getAllEmployees, getEmployeeById, updateEmployee, deleteEmployee, getAvailability, updateAvailability, getEmployeeByAccountId };
+const getEmployeeShifts = async (req, res, next) => {
+  try {
+    const { date, status } = req.query;
+    const result = await shiftService.getShiftsByEmployee(req.params.id, { date, status });
+    return responseHelper.paginated(res, result.shifts, result.pagination);
+  } catch (error) { next(error); }
+};
+
+module.exports = { createEmployee, getAllEmployees, getEmployeeById, updateEmployee, deleteEmployee, getAvailability, updateAvailability, getEmployeeByAccountId, getEmployeeShifts };

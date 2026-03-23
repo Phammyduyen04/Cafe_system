@@ -13,6 +13,7 @@
     "express": "^4.18.2",
     "mongoose": "^8.2.0",
     "morgan": "^1.10.0",
+    "node-cron": "^3.0.3",
     "shared": "file:../shared"
   },
   "devDependencies": {

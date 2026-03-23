@@ -9,7 +9,17 @@ import ForgotPasswordPage from "./components/ForgotPasswordPage";
 import AboutPage from "./components/AboutPage";
 import ContactPage from "./components/ContactPage";
 import CheckoutPage from "./components/CheckoutPage";
-import ProfilePage from "./components/ProfilePage";
+import CustomerProfilePage from "./components/customer/CustomerProfilePage";
+import CustomerPointsPage from "./components/customer/CustomerPointsPage";
+import StaffSchedulePage from "./components/staff/StaffSchedulePage";
+import StaffAvailabilityPage from "./components/staff/StaffAvailabilityPage";
+import ManagerLayout from "./components/manager/ManagerLayout";
+import ManagerDashboard from "./components/manager/ManagerDashboard";
+import ManagerCustomersPage from "./components/manager/ManagerCustomersPage";
+import ManagerEmployeesPage from "./components/manager/ManagerEmployeesPage";
+import ManagerShiftsPage from "./components/manager/ManagerShiftsPage";
+import ManagerPromotionsPage from "./components/manager/ManagerPromotionsPage";
+import ManagerDiscountsPage from "./components/manager/ManagerDiscountsPage";
 
 export const router = createBrowserRouter([
   {
@@ -22,7 +32,22 @@ export const router = createBrowserRouter([
       { path: "about", Component: AboutPage },
       { path: "contact", Component: ContactPage },
       { path: "checkout", Component: CheckoutPage },
-      { path: "profile", Component: ProfilePage },
+      { path: "profile", Component: CustomerProfilePage },
+      { path: "profile/points", Component: CustomerPointsPage },
+      { path: "staff/schedule", Component: StaffSchedulePage },
+      { path: "staff/availability", Component: StaffAvailabilityPage },
+    ],
+  },
+  {
+    path: "/manager",
+    Component: ManagerLayout,
+    children: [
+      { index: true, Component: ManagerDashboard },
+      { path: "customers", Component: ManagerCustomersPage },
+      { path: "employees", Component: ManagerEmployeesPage },
+      { path: "shifts", Component: ManagerShiftsPage },
+      { path: "promotions", Component: ManagerPromotionsPage },
+      { path: "discounts", Component: ManagerDiscountsPage },
     ],
   },
   { path: "/login", Component: LoginPage },

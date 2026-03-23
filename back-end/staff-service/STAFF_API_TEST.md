@@ -207,13 +207,38 @@ Header: `Authorization: Bearer {{manager_token}}`
 Header: `Authorization: Bearer {{manager_token}}`
 200 — thong tin ca + `assignments: []`
 
-### Buoc 8: Cap nhat ca
+### Buoc 8: Cap nhat ten ca
 **PUT** `{{base_url}}/api/staff/shifts/{{shift_id_1}}`
 Header: `Authorization: Bearer {{manager_token}}`
 ```json
 { "shiftName": "Ca Sang (Updated)" }
 ```
-200
+200 — `shiftName` cap nhat, `status` giu nguyen "PLANNED"
+
+### Buoc 9: Cap nhat trang thai ca (PLANNED → ACTIVE)
+**PUT** `{{base_url}}/api/staff/shifts/{{shift_id_1}}`
+Header: `Authorization: Bearer {{manager_token}}`
+```json
+{ "status": "ACTIVE" }
+```
+200 — `status: "ACTIVE"`
+> ID truyen vao la `shiftId` UUID (lay tu `response.data.shiftId` khi tao ca, khong phai `_id` MongoDB)
+
+### Buoc 10: Cap nhat trang thai ca ve COMPLETED
+**PUT** `{{base_url}}/api/staff/shifts/{{shift_id_1}}`
+Header: `Authorization: Bearer {{manager_token}}`
+```json
+{ "status": "COMPLETED" }
+```
+200 — `status: "COMPLETED"`
+
+### Buoc 11: Ca khong ton tai — loi
+**PUT** `{{base_url}}/api/staff/shifts/00000000-0000-0000-0000-000000000000`
+Header: `Authorization: Bearer {{manager_token}}`
+```json
+{ "status": "ACTIVE" }
+```
+404 — "Shift not found"
 
 ---
 
@@ -299,7 +324,7 @@ Header: `Authorization: Bearer {{staff_token}}`
 
 ## Quy tac nghiep vu
 
-- **employeeId / shiftId**: tu sinh UUID, client khong can gui
+- **employeeId / shiftId**: tu sinh UUID, client khong can gui; API chap nhan ca UUID (`shiftId`) lan MongoDB ObjectId (`_id`) trong URL param
 - **Soft delete nhan vien**: `status: "INACTIVE"` — hien thi trong response, khong xuat hien trong GET danh sach (mac dinh chi lay ACTIVE)
 - **Soft delete ca**: `status: "CANCELLED"` — hien thi trong response
 - **Gan ca**: chi khi shift `PLANNED` hoac `ACTIVE` + employee `ACTIVE`
