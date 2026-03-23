@@ -1,25 +1,9 @@
 import { Link } from "react-router";
-import { COFFEE_BEANS_LEFT, COFFEE_BEANS_RIGHT } from "../../../constants/images";
 
 // ─── Coffee Beans Banner ───────────────────────────────────────────────────────
 export default function CoffeeBeansBanner() {
   return (
     <section className="relative bg-cafe-accent overflow-hidden" style={{ minHeight: 280 }}>
-      {/* Left beans */}
-      <img
-        src={COFFEE_BEANS_LEFT}
-        alt="Coffee beans"
-        className="absolute left-0 top-0 h-full object-cover pointer-events-none hidden sm:block"
-        style={{ width: "28%", transform: "scaleY(-1) rotate(180deg)", opacity: 0.9 }}
-      />
-      {/* Right beans */}
-      <img
-        src={COFFEE_BEANS_RIGHT}
-        alt="Coffee beans"
-        className="absolute right-0 top-0 h-full object-cover pointer-events-none hidden sm:block"
-        style={{ width: "28%", opacity: 0.9 }}
-      />
-
       {/* Center content */}
       <div className="relative z-10 flex flex-col items-center justify-center py-12 sm:py-16 px-8 sm:px-16 text-center gap-5 sm:gap-6">
         <h2

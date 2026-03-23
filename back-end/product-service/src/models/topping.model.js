@@ -11,6 +11,7 @@ const toppingSchema = new mongoose.Schema(
     },
     toppingName: { type: String, required: true },
     price: { type: Number, required: true, min: 0 },
+    image: { type: String, default: '' },
     isAvailable: { type: Boolean, default: true },
     status: { type: String, enum: ['ACTIVE', 'INACTIVE'], default: 'ACTIVE' },
     createdBy: { type: String },

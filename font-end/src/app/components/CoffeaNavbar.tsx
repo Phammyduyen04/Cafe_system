@@ -4,6 +4,8 @@ import svgPaths from "../../constants/svg-paths";
 import { useAuth } from "../../contexts/AuthContext";
 import { useCart } from "../../contexts/CartContext";
 import { authService } from "../../services/auth.service";
+import { productService } from "../../services/product.service";
+import type { Category } from "../../services/product.service";
 
 export default function CoffeaNavbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -22,6 +24,12 @@ export default function CoffeaNavbar() {
   const accountRef = useRef<HTMLDivElement>(null);
 
   const isMenuPage = location.pathname === "/menu";
+
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    productService.getCategories().then(setCategories).catch(() => {});
+  }, []);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -60,29 +68,22 @@ export default function CoffeaNavbar() {
   };
 
   const menuItems = [
-    { label: "Trang chủ", href: "/", children: [] },
+    { label: "Trang chủ", href: "/", children: [] as { label: string; href: string }[] },
     {
       label: "Menu",
       href: "/menu",
-      children: [
-        { label: "Cà phê", href: "/menu?category=Cà phê" },
-        { label: "Trà", href: "/menu?category=Trà" },
-        { label: "Đá xay", href: "/menu?category=Đá xay" },
-        { label: "Nước ép", href: "/menu?category=Nước ép" },
-        { label: "Bánh ngọt", href: "/menu?category=Bánh ngọt" },
-      ],
+      children: categories.map((cat) => ({
+        label: cat.name,
+        href: `/menu?category=${encodeURIComponent(cat.name)}`,
+      })),
     },
     {
       label: "Khuyến mãi",
       href: "#",
-      children: [
-        { label: "Flash sale", href: "#" },
-        { label: "Combo ưu đãi", href: "#" },
-        { label: "Mã giảm giá", href: "#" },
-      ],
+      children: [] as { label: string; href: string }[],
     },
-    { label: "Giới thiệu", href: "/about", children: [] },
-    { label: "Liên hệ", href: "/contact", children: [] },
+    { label: "Giới thiệu", href: "/about", children: [] as { label: string; href: string }[] },
+    { label: "Liên hệ", href: "/contact", children: [] as { label: string; href: string }[] },
   ];
 
   const ChevronDown = () => (

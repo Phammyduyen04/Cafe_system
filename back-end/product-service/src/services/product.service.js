@@ -2,7 +2,7 @@ const { AppError } = require('../../../shared');
 const productRepo = require('../repositories/product.repo');
 
 const createProduct = async (data, user) => {
-  const { productId, productName, price, description, productCategoryId } = data;
+  const { productId, productName, price, description, productCategoryId, image } = data;
   if (!productId || !productName || !price) {
     throw new AppError('Product ID, name, and price are required', 400);
   }
@@ -13,6 +13,7 @@ const createProduct = async (data, user) => {
     price,
     description: description || '',
     productCategoryId,
+    image: image || '',
     createdBy: user.username,
   });
 };

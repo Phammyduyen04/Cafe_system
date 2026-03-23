@@ -7,6 +7,7 @@ export interface ProductSize {
 
 export interface Category {
   _id: string;
+  categoryId: string;
   name: string;
   slug?: string;
 }
@@ -15,6 +16,16 @@ export interface Topping {
   _id: string;
   name: string;
   price: number;
+}
+
+export interface Review {
+  reviewId: string;
+  customerName: string;
+  avatar: string;
+  rating: number;
+  comment: string;
+  productId: string | null;
+  createdAt: string;
 }
 
 export interface Product {
@@ -29,62 +40,91 @@ export interface Product {
   sizes?: ProductSize[];
   tags?: string[];
   slug?: string;
+  productCategoryId?: string;
 }
 
-interface ProductListResponse {
-  products?: Product[];
-  data?: Product[];
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+/** Map backend product fields to frontend Product shape */
+function mapProduct(raw: any): Product {
+  return {
+    _id: raw._id ?? raw.productId,
+    name: raw.productName ?? raw.name ?? "",
+    description: raw.description ?? "",
+    price: raw.price ?? 0,
+    category: raw.category ?? raw.productCategoryId ?? "",
+    images: raw.images,
+    image: raw.image,
+    isAvailable: raw.isAvailable ?? raw.status === "ACTIVE",
+    sizes: raw.sizes,
+    tags: raw.tags,
+    slug: raw.slug,
+    productCategoryId: raw.productCategoryId,
+  };
 }
 
-interface ProductDetailResponse {
-  product?: Product;
-  data?: Product;
-}
-
-interface CategoryListResponse {
-  categories?: Category[];
-  data?: Category[];
-}
-
-interface ToppingListResponse {
-  toppings?: Topping[];
-  data?: Topping[];
+/** Map backend category fields to frontend Category shape */
+function mapCategory(raw: any): Category {
+  return {
+    _id: raw._id ?? raw.categoryId,
+    categoryId: raw.categoryId ?? raw._id,
+    name: raw.categoryName ?? raw.name ?? "",
+    slug: raw.slug,
+  };
 }
 
 export const productService = {
   getProducts: async (params?: { category?: string; search?: string }): Promise<Product[]> => {
-    let path = "/api/products";
-    if (params) {
-      const qs = new URLSearchParams();
-      if (params.category) qs.set("category", params.category);
-      if (params.search) qs.set("search", params.search);
-      if ([...qs].length) path += `?${qs}`;
-    }
-    const res = await api.get<Product[] | ProductListResponse>(path);
-    if (Array.isArray(res)) return res;
-    return (res as ProductListResponse).products ?? (res as ProductListResponse).data ?? [];
+    const qs = new URLSearchParams();
+    qs.set("limit", "100");
+    if (params?.category) qs.set("categoryId", params.category);
+    if (params?.search) qs.set("search", params.search);
+    const path = `/api/products?${qs}`;
+    const res = await api.get<any>(path);
+    const list: any[] = Array.isArray(res) ? res : (res?.products ?? res?.data ?? []);
+    return list.map(mapProduct);
   },
 
   getProduct: async (id: string): Promise<Product | null> => {
     try {
-      const res = await api.get<Product | ProductDetailResponse>(`/api/products/${id}`);
-      if ((res as Product)._id) return res as Product;
-      return (res as ProductDetailResponse).product ?? (res as ProductDetailResponse).data ?? null;
+      const res = await api.get<any>(`/api/products/${id}`);
+      const raw = res?._id ? res : (res?.product ?? res?.data ?? null);
+      return raw ? mapProduct(raw) : null;
     } catch {
       return null;
     }
   },
 
   getCategories: async (): Promise<Category[]> => {
-    const res = await api.get<Category[] | CategoryListResponse>("/api/products/categories");
-    if (Array.isArray(res)) return res;
-    return (res as CategoryListResponse).categories ?? (res as CategoryListResponse).data ?? [];
+    const res = await api.get<any>("/api/products/categories");
+    const list: any[] = Array.isArray(res) ? res : (res?.categories ?? res?.data ?? []);
+    return list.map(mapCategory);
   },
 
   getToppings: async (): Promise<Topping[]> => {
-    const res = await api.get<Topping[] | ToppingListResponse>("/api/products/toppings");
+    const res = await api.get<Topping[] | any>("/api/products/toppings");
     if (Array.isArray(res)) return res;
-    return (res as ToppingListResponse).toppings ?? (res as ToppingListResponse).data ?? [];
+    return res?.toppings ?? res?.data ?? [];
+  },
+
+  getStoreReviews: async (): Promise<Review[]> => {
+    const res = await api.get<any>("/api/products/reviews");
+    return Array.isArray(res) ? res : (res?.data ?? []);
+  },
+
+  getProductReviews: async (productId: string): Promise<Review[]> => {
+    const res = await api.get<any>(`/api/products/reviews/product/${productId}`);
+    return Array.isArray(res) ? res : (res?.data ?? []);
+  },
+
+  createReview: async (data: {
+    customerName: string;
+    avatar?: string;
+    rating: number;
+    comment: string;
+    productId?: string;
+  }): Promise<Review> => {
+    return await api.post<Review>("/api/products/reviews", data);
   },
 };
 
@@ -96,7 +136,17 @@ export function getProductImage(product: Product): string {
 }
 
 /** Get the category name string from a product */
-export function getCategoryName(product: Product): string {
+export function getCategoryName(product: Product, categories?: Category[]): string {
+  if (typeof product.category === "object" && product.category?.name) {
+    return product.category.name;
+  }
+  // If category is a categoryId string, look it up in the categories list
+  if (categories && typeof product.category === "string" && product.category) {
+    const found = categories.find(
+      (c) => c.categoryId === product.category || c._id === product.category
+    );
+    if (found) return found.name;
+  }
   if (typeof product.category === "string") return product.category;
-  return product.category?.name ?? "";
+  return "";
 }

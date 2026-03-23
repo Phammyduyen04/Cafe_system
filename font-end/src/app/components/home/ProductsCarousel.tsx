@@ -1,9 +1,9 @@
 import { useState } from "react";
 import svgPaths from "../../../constants/svg-paths";
 import ProductCard from "./ProductCard";
+import type { Product, Category } from "../../../services/product.service";
 
-// ─── Products Carousel ─────────────────────────────────────────────────────────
-export default function ProductsCarousel({ title, products }: { title: string; products: { img: string; name: string; desc: string; price: string; slug?: string }[] }) {
+export default function ProductsCarousel({ title, products, categories }: { title: string; products: Product[]; categories?: Category[] }) {
   const [idx, setIdx] = useState(0);
   const cardW = 300;
   const gap = 20;
@@ -20,9 +20,9 @@ export default function ProductsCarousel({ title, products }: { title: string; p
 
       {/* Mobile: horizontal scroll */}
       <div className="md:hidden overflow-x-auto flex gap-4 px-5 pb-4 snap-x snap-mandatory">
-        {products.map((p, i) => (
-          <div key={i} className="snap-start shrink-0">
-            <ProductCard {...p} />
+        {products.map((p) => (
+          <div key={p._id} className="snap-start shrink-0">
+            <ProductCard product={p} categories={categories} />
           </div>
         ))}
       </div>
@@ -48,9 +48,9 @@ export default function ProductsCarousel({ title, products }: { title: string; p
             className="flex gap-5 transition-transform duration-300"
             style={{ transform: `translateX(calc(-${idx} * ${cardW + gap}px))` }}
           >
-            {products.map((p, i) => (
-              <div key={i} className="shrink-0" style={{ width: cardW }}>
-                <ProductCard {...p} />
+            {products.map((p) => (
+              <div key={p._id} className="shrink-0" style={{ width: cardW }}>
+                <ProductCard product={p} categories={categories} />
               </div>
             ))}
           </div>

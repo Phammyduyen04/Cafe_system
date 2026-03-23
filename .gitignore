@@ -25,3 +25,5 @@ Thumbs.db
 mysql_data/
 mongo_data/
 rabbitmq_data/
+
+.claude

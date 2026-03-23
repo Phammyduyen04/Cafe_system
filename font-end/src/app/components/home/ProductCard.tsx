@@ -1,4 +1,6 @@
 import { Link } from "react-router";
+import { getProductImage, getCategoryName } from "../../../services/product.service";
+import type { Product, Category } from "../../../services/product.service";
 
 // ─── Star Rating ───────────────────────────────────────────────────────────────
 export function StarRating({ filled }: { filled: number }) {
@@ -13,20 +15,35 @@ export function StarRating({ filled }: { filled: number }) {
   );
 }
 
+function formatPrice(price: number) {
+  return price.toLocaleString("vi-VN") + " ₫";
+}
+
 // ─── Product Card ──────────────────────────────────────────────────────────────
-export default function ProductCard({ img, name, desc, price, slug }: { img: string; name: string; desc: string; price: string; slug?: string }) {
+export default function ProductCard({ product, categories }: { product: Product; categories?: Category[] }) {
+  const imageUrl = getProductImage(product);
+  const categoryName = getCategoryName(product, categories);
+
   return (
     <div className="bg-[rgba(226,217,200,0.2)] border border-cafe-accent rounded-[18px] p-4 flex flex-col shrink-0 w-[260px] sm:w-[280px] md:w-[300px] transition-all duration-300 hover:scale-[1.03] hover:shadow-xl hover:shadow-[rgba(48,38,28,0.15)] hover:border-[#c4b49a] cursor-pointer" style={{ height: 420 }}>
       <div className="relative rounded-[12px] overflow-hidden shrink-0" style={{ height: 220 }}>
-        <img src={img} alt={name} className="w-full h-full object-cover rounded-[12px]" />
+        <img src={imageUrl} alt={product.name} className="w-full h-full object-cover rounded-[12px]" />
+        {categoryName && (
+          <span
+            className="font-body absolute top-3 left-3 px-2.5 py-1 rounded-full text-white bg-cafe-primary/80"
+            style={{ fontWeight: 600, fontSize: 10, letterSpacing: "0.5px" }}
+          >
+            {categoryName}
+          </span>
+        )}
       </div>
       <div className="flex flex-col flex-1 gap-2 pt-3">
-        <p className="font-alt text-cafe-primary" style={{ fontWeight: 600, fontSize: 22 }}>{name}</p>
-        <p className="font-alt flex-1 text-cafe-dark" style={{ fontWeight: 400, fontSize: 14, lineHeight: 1.5 }}>{desc}</p>
+        <p className="font-alt text-cafe-primary" style={{ fontWeight: 600, fontSize: 22 }}>{product.name}</p>
+        <p className="font-alt flex-1 text-cafe-dark line-clamp-2" style={{ fontWeight: 400, fontSize: 14, lineHeight: 1.5 }}>{product.description}</p>
         <div className="flex items-center justify-between">
-          <span className="font-body text-cafe-dark" style={{ fontWeight: 600, fontSize: 16 }}>{price}</span>
+          <span className="font-body text-cafe-dark" style={{ fontWeight: 600, fontSize: 16 }}>{formatPrice(product.price)}</span>
           <Link
-            to={slug ? `/product/${slug}` : "/menu"}
+            to={`/product/${product._id}`}
             className="font-body bg-cafe-dark text-white px-5 py-2 rounded-lg cursor-pointer hover:bg-[#3d0000] transition-colors"
             style={{ fontWeight: 500, fontSize: 13 }}
           >

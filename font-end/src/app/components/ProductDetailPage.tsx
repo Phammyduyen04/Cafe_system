@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router";
 import { productService, getProductImage, getCategoryName } from "../../services/product.service";
-import type { Product } from "../../services/product.service";
+import type { Product, Category } from "../../services/product.service";
 import { useCart } from "../../contexts/CartContext";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -28,6 +28,7 @@ export default function ProductDetailPage() {
   const { isLoggedIn } = useAuth();
 
   const [product, setProduct] = useState<Product | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -39,19 +40,20 @@ export default function ProductDetailPage() {
   const [commentText, setCommentText] = useState("");
   const [commentRating, setCommentRating] = useState(5);
   const [hoverRating, setHoverRating] = useState(0);
-  const [comments, setComments] = useState([
-    { id: 1, name: "Nguyễn Minh Anh", rating: 5, date: "15/03/2026", text: "Cà phê thơm ngon, hương vị đậm đà rất đặc trưng. Lần nào ghé Coffea cũng phải order món này!" },
-    { id: 2, name: "Trần Bảo Châu", rating: 4, date: "10/03/2026", text: "Vị cân bằng, không quá đắng. Không gian quán cũng rất thoải mái, mình sẽ quay lại." },
-    { id: 3, name: "Lê Hoàng Phúc", rating: 5, date: "02/03/2026", text: "Tuyệt vời! Đây là một trong những ly cà phê ngon nhất mình từng thử. Nhân viên phục vụ nhiệt tình." },
-  ]);
+  // TODO: Fetch comments from backend API
+  const [comments, setComments] = useState<{ id: number; name: string; rating: number; date: string; text: string }[]>([]);
 
   useEffect(() => {
     if (!slug) return;
     setLoading(true);
     setNotFound(false);
-    productService.getProduct(slug).then(p => {
+    Promise.all([
+      productService.getProduct(slug),
+      productService.getCategories(),
+    ]).then(([p, cats]) => {
       if (!p) setNotFound(true);
       else setProduct(p);
+      setCategories(cats);
     }).finally(() => setLoading(false));
   }, [slug]);
 
@@ -120,7 +122,7 @@ export default function ProductDetailPage() {
 
   const images = product.images && product.images.length > 0 ? product.images : [getProductImage(product)];
   const sizes = product.sizes ?? [{ label: "S" }, { label: "M" }, { label: "L" }];
-  const categoryName = getCategoryName(product);
+  const categoryName = getCategoryName(product, categories);
 
   return (
     <div className="min-h-screen bg-cafe-bg">

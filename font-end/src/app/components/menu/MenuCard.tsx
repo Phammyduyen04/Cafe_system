@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
 import { getProductImage, getCategoryName } from "../../../services/product.service";
-import type { Product } from "../../../services/product.service";
+import type { Product, Category } from "../../../services/product.service";
 import { useCart } from "../../../contexts/CartContext";
 import { useAuth } from "../../../contexts/AuthContext";
 
@@ -12,16 +12,17 @@ function formatPrice(price: number) {
 
 interface MenuCardProps {
   item: Product;
+  categories?: Category[];
 }
 
-export default function MenuCard({ item }: MenuCardProps) {
+export default function MenuCard({ item, categories }: MenuCardProps) {
   const { addToCart } = useCart();
   const { isLoggedIn } = useAuth();
   const navigate = useNavigate();
   const [added, setAdded] = useState(false);
   const [adding, setAdding] = useState(false);
 
-  const categoryName = getCategoryName(item);
+  const categoryName = getCategoryName(item, categories);
   const imageUrl = getProductImage(item);
 
   const handleAddToCart = async (e: React.MouseEvent) => {

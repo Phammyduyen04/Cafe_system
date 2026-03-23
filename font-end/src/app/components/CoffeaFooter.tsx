@@ -1,16 +1,12 @@
+import { Link } from "react-router";
 import svgPaths from "../../constants/svg-paths";
 
-export default function CoffeaFooter() {
-  const footerColumns = [
-    { heading: "Chính sách", links: ["Điều khoản sử dụng", "Chính sách bảo mật", "Cookies"] },
-    { heading: "Dịch vụ", links: ["Cửa hàng", "Đặt hàng trước", "Thực đơn"] },
-    { heading: "Về chúng tôi", links: ["Tìm chi nhánh", "Giới thiệu", "Câu chuyện của chúng tôi"] },
-    { heading: "Thông tin", links: ["Bảng giá", "Bán sản phẩm", "Tuyển dụng"] },
-  ];
+// TODO: Fetch footer links from backend API or CMS
 
+export default function CoffeaFooter() {
   return (
     <footer className="bg-cafe-primary text-white pt-12 md:pt-14 pb-8 px-6 sm:px-10 md:px-16">
-      <div className="max-w-[1400px] mx-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6 md:gap-10">
+      <div className="max-w-[1400px] mx-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6 md:gap-10">
         {/* Logo */}
         <div className="col-span-2 sm:col-span-3 lg:col-span-1 mb-2">
           <span className="font-heading" style={{ fontWeight: 700, fontSize: 28 }}>
@@ -21,27 +17,46 @@ export default function CoffeaFooter() {
           </p>
         </div>
 
-        {/* Links */}
-        {footerColumns.map((col) => (
-          <div key={col.heading} className="flex flex-col gap-3">
-            <h4
-              className="font-body uppercase"
-              style={{ fontWeight: 500, fontSize: "clamp(12px, 1.2vw, 17px)", color: "white" }}
-            >
-              {col.heading}
-            </h4>
-            {col.links.map((link) => (
-              <a
-                key={link}
-                href="#"
-                className="font-body text-white/70 hover:text-white transition-colors"
-                style={{ fontWeight: 400, fontSize: "clamp(12px, 1vw, 14px)" }}
-              >
-                {link}
-              </a>
-            ))}
-          </div>
-        ))}
+        {/* Navigation */}
+        <div className="flex flex-col gap-3">
+          <h4
+            className="font-body uppercase"
+            style={{ fontWeight: 500, fontSize: "clamp(12px, 1.2vw, 17px)", color: "white" }}
+          >
+            Điều hướng
+          </h4>
+          <Link to="/" className="font-body text-white/70 hover:text-white transition-colors" style={{ fontWeight: 400, fontSize: "clamp(12px, 1vw, 14px)" }}>
+            Trang chủ
+          </Link>
+          <Link to="/menu" className="font-body text-white/70 hover:text-white transition-colors" style={{ fontWeight: 400, fontSize: "clamp(12px, 1vw, 14px)" }}>
+            Thực đơn
+          </Link>
+          <Link to="/about" className="font-body text-white/70 hover:text-white transition-colors" style={{ fontWeight: 400, fontSize: "clamp(12px, 1vw, 14px)" }}>
+            Giới thiệu
+          </Link>
+          <Link to="/contact" className="font-body text-white/70 hover:text-white transition-colors" style={{ fontWeight: 400, fontSize: "clamp(12px, 1vw, 14px)" }}>
+            Liên hệ
+          </Link>
+        </div>
+
+        {/* Account */}
+        <div className="flex flex-col gap-3">
+          <h4
+            className="font-body uppercase"
+            style={{ fontWeight: 500, fontSize: "clamp(12px, 1.2vw, 17px)", color: "white" }}
+          >
+            Tài khoản
+          </h4>
+          <Link to="/login" className="font-body text-white/70 hover:text-white transition-colors" style={{ fontWeight: 400, fontSize: "clamp(12px, 1vw, 14px)" }}>
+            Đăng nhập
+          </Link>
+          <Link to="/register" className="font-body text-white/70 hover:text-white transition-colors" style={{ fontWeight: 400, fontSize: "clamp(12px, 1vw, 14px)" }}>
+            Đăng ký
+          </Link>
+          <Link to="/profile" className="font-body text-white/70 hover:text-white transition-colors" style={{ fontWeight: 400, fontSize: "clamp(12px, 1vw, 14px)" }}>
+            Hồ sơ
+          </Link>
+        </div>
 
         {/* Social Media */}
         <div className="flex flex-col gap-4 col-span-2 sm:col-span-1">
@@ -80,7 +95,6 @@ export default function CoffeaFooter() {
         <p className="font-body" style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
           © 2026 Coffea. Bảo lưu mọi quyền.
         </p>
-
       </div>
     </footer>
   );
