@@ -75,8 +75,10 @@ export const promotionService = {
   updatePromotionConditions: (id: string, data: Partial<PromotionCondition>) =>
     api.put(`/api/promotions/${id}/conditions`, data),
 
-  checkPromotion: (params: { orderId?: string; total?: number }) => {
-    const qs = new URLSearchParams(params as Record<string, string>);
+  checkPromotions: (params?: { productIds?: string; orderAmount?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.productIds) qs.set("productIds", params.productIds);
+    if (params?.orderAmount) qs.set("orderAmount", String(params.orderAmount));
     return api.get<Promotion[]>(`/api/promotions/check?${qs}`);
   },
 

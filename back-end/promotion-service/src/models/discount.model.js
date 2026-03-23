@@ -8,7 +8,7 @@ const discountSchema = new mongoose.Schema(
     discountType: { type: String, enum: ['PERCENT', 'FIXED'], required: true },
     discountValue: { type: Number, required: true },
     description: { type: String, default: '' },
-    status: { type: String, enum: ['ACTIVE', 'INACTIVE'], default: 'ACTIVE' },
+    status: { type: String, enum: ['PLANNED', 'ACTIVE', 'EXPIRED', 'CANCELLED'], default: 'ACTIVE' },
     startDate: { type: Date },
     endDate: { type: Date },
     createdBy: { type: String },

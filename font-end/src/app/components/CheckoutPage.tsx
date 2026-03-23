@@ -8,6 +8,7 @@ import type { PaymentMethod, PaymentInfo } from "../../services/order.service";
 import StepIndicator, { STEPS } from "./checkout/StepIndicator";
 import OrderSummary from "./checkout/OrderSummary";
 import FloatingInput from "./checkout/FloatingInput";
+import AddressAutocomplete from "./checkout/AddressAutocomplete";
 
 // ─── Shipping options ────────────────────────────────────────────────────────
 const SHIP_OPTIONS = [
@@ -397,7 +398,7 @@ export default function CheckoutPage() {
                   <FloatingInput label="Họ và tên" value={fullName} onChange={setFullName} required />
                   <FloatingInput label="Số điện thoại" type="tel" value={phone} onChange={setPhone} required />
                   <FloatingInput label="Email" type="email" value={email} onChange={setEmail} required />
-                  <FloatingInput label="Địa chỉ giao hàng" value={address} onChange={setAddress} required />
+                  <AddressAutocomplete value={address} onChange={setAddress} required />
                 </div>
               )}
 

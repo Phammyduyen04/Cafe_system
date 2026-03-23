@@ -445,13 +445,24 @@ export default function CoffeaNavbar() {
             </button>
 
             {isLoggedIn ? (
-              <button
-                onClick={() => { setMobileOpen(false); handleLogout(); }}
-                className="font-body flex-1 py-2.5 border border-white/40 text-white rounded-full hover:bg-white/10 transition-colors"
-                style={{ fontWeight: 500, fontSize: 14 }}
-              >
-                Đăng xuất
-              </button>
+              <div className="flex flex-col gap-2 flex-1">
+                {(user?.roles?.includes("CUSTOMER") || user?.userType === "CUSTOMER") && (
+                  <Link to="/profile" className="font-body py-2.5 border border-white/40 text-white rounded-full hover:bg-white/10 transition-colors text-center" style={{ fontWeight: 500, fontSize: 14 }} onClick={() => setMobileOpen(false)}>Tài khoản</Link>
+                )}
+                {(user?.roles?.includes("STAFF") || user?.userType === "EMPLOYEE") && (
+                  <Link to="/staff/schedule" className="font-body py-2.5 border border-white/40 text-white rounded-full hover:bg-white/10 transition-colors text-center" style={{ fontWeight: 500, fontSize: 14 }} onClick={() => setMobileOpen(false)}>Lịch làm</Link>
+                )}
+                {(user?.roles?.includes("MANAGER") || user?.userType === "MANAGER") && (
+                  <Link to="/manager" className="font-body py-2.5 border border-white/40 text-white rounded-full hover:bg-white/10 transition-colors text-center" style={{ fontWeight: 500, fontSize: 14 }} onClick={() => setMobileOpen(false)}>Quản lý</Link>
+                )}
+                <button
+                  onClick={() => { setMobileOpen(false); handleLogout(); }}
+                  className="font-body py-2.5 border border-white/40 text-white rounded-full hover:bg-white/10 transition-colors"
+                  style={{ fontWeight: 500, fontSize: 14 }}
+                >
+                  Đăng xuất
+                </button>
+              </div>
             ) : (
               <>
                 <Link
