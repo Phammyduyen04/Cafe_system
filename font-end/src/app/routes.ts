@@ -9,6 +9,7 @@ import ForgotPasswordPage from "./components/ForgotPasswordPage";
 import AboutPage from "./components/AboutPage";
 import ContactPage from "./components/ContactPage";
 import CheckoutPage from "./components/CheckoutPage";
+import ProfilePage from "./components/ProfilePage";
 
 export const router = createBrowserRouter([
   {
@@ -21,6 +22,7 @@ export const router = createBrowserRouter([
       { path: "about", Component: AboutPage },
       { path: "contact", Component: ContactPage },
       { path: "checkout", Component: CheckoutPage },
+      { path: "profile", Component: ProfilePage },
     ],
   },
   { path: "/login", Component: LoginPage },

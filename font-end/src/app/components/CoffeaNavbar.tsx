@@ -267,10 +267,19 @@ export default function CoffeaNavbar() {
                     <p className="font-body text-cafe-primary" style={{ fontWeight: 600, fontSize: 13 }}>
                       {user?.username}
                     </p>
-                    <p className="font-body" style={{ fontSize: 11, color: "rgba(48,38,28,0.5)" }}>
-                      {user?.userType}
-                    </p>
                   </div>
+                  <Link
+                    to="/profile"
+                    className="font-body flex items-center gap-3 w-full px-4 py-3 text-cafe-primary hover:bg-cafe-bg transition-colors"
+                    style={{ fontWeight: 500, fontSize: 14 }}
+                    onClick={() => setAccountOpen(false)}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
+                    Hồ sơ tài khoản
+                  </Link>
                   <button
                     className="font-body flex items-center gap-3 w-full px-4 py-3 text-cafe-red hover:bg-red-50 transition-colors"
                     style={{ fontWeight: 500, fontSize: 14 }}
