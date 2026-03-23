@@ -2,17 +2,42 @@ const { AppError } = require('../../../shared');
 const discountRepo = require('../repositories/discount.repo');
 const conditionRepo = require('../repositories/discountCondition.repo');
 
-const createDiscount = async (data, user) => {
-  const { discountId, discountName, discountType, discountValue, description, startDate, endDate } = data;
-  if (!discountId || !discountName || !discountType || !discountValue) {
-    throw new AppError('Discount ID, name, type, and value are required', 400);
+// Tính trạng thái dựa vào ngày bắt đầu và kết thúc
+const computeStatus = (startDate, endDate) => {
+  const now = new Date();
+  if (endDate && now > new Date(endDate)) return 'EXPIRED';
+  if (startDate && now < new Date(startDate)) return 'PLANNED';
+  return 'ACTIVE';
+};
+
+// Tự động sinh mã giảm giá theo format DISCOUNT_001, DISCOUNT_002, ...
+const generateNextDiscountId = async () => {
+  const existing = await discountRepo.findAll({ discountId: /^DISCOUNT_\d+$/ });
+  let maxNum = 0;
+  for (const d of existing) {
+    const match = d.discountId.match(/^DISCOUNT_(\d+)$/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxNum) maxNum = num;
+    }
   }
+  return `DISCOUNT_${String(maxNum + 1).padStart(3, '0')}`;
+};
+
+const createDiscount = async (data, user) => {
+  const { discountName, discountType, discountValue, description, startDate, endDate } = data;
+  if (!discountName || !discountType || discountValue == null) {
+    throw new AppError('Discount name, type, and value are required', 400);
+  }
+
+  const discountId = await generateNextDiscountId();
 
   const discount = await discountRepo.create({
     discountId, discountName, discountType, discountValue,
     description: description || '',
     startDate: startDate ? new Date(startDate) : null,
     endDate: endDate ? new Date(endDate) : null,
+    status: computeStatus(startDate, endDate),
     createdBy: user.username,
   });
 
@@ -45,30 +70,31 @@ const getDiscountById = async (id) => {
 const updateDiscount = async (id, data) => {
   const discount = await discountRepo.findByDiscountId(id);
   if (!discount) throw new AppError('Discount not found', 404);
+  if (['EXPIRED', 'CANCELLED'].includes(discount.status)) {
+    throw new AppError('Không thể sửa chương trình giảm giá đã hết hạn hoặc đã hủy', 400);
+  }
   return await discountRepo.update(id, data);
 };
 
 const deleteDiscount = async (id) => {
   const discount = await discountRepo.findByDiscountId(id);
   if (!discount) throw new AppError('Discount not found', 404);
-  return await discountRepo.update(id, { status: 'INACTIVE' });
+  // Xóa mềm: chỉ đổi trạng thái, không xóa document khỏi DB
+  return await discountRepo.update(id, { status: 'CANCELLED' });
 };
 
 const updateConditions = async (discountId, data) => {
   const discount = await discountRepo.findByDiscountId(discountId);
   if (!discount) throw new AppError('Discount not found', 404);
+  if (['EXPIRED', 'CANCELLED'].includes(discount.status)) {
+    throw new AppError('Không thể cập nhật điều kiện của chương trình đã hết hạn hoặc đã hủy', 400);
+  }
   return await conditionRepo.createOrUpdate(discountId, { ...data, discountId });
 };
 
 const checkApplicableDiscounts = async ({ orderAmount, productIds, categoryIds, customerType }) => {
   const now = new Date();
-  const activeDiscounts = await discountRepo.findAll({
-    status: 'ACTIVE',
-    $and: [
-      { $or: [{ endDate: null }, { endDate: { $gte: now } }] },
-      { $or: [{ startDate: null }, { startDate: { $lte: now } }] },
-    ],
-  });
+  const activeDiscounts = await discountRepo.findAll({ status: 'ACTIVE' });
 
   const applicable = [];
   for (const discount of activeDiscounts) {
