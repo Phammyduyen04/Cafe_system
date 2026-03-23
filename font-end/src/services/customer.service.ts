@@ -45,4 +45,20 @@ export const customerService = {
   adjustPoints: async (customerId: string, points: number, reason?: string) => {
     return await api.post(`/api/customers/${customerId}/points/adjust`, { points, reason });
   },
+
+  getByAccountId: async (accountId: string) => {
+    return await api.get<Customer>(`/api/customers/account/${accountId}`);
+  },
+
+  createFromAuth: async (data: { fullName: string; accountId: string }) => {
+    return await api.post<Customer>(`/api/customers/from-auth`, data);
+  },
+
+  updateMyProfile: async (data: { fullName?: string; email?: string; phoneNumber?: string }) => {
+    return await api.put<Customer>(`/api/customers/me`, data);
+  },
+
+  deleteMyAccount: async () => {
+    return await api.delete(`/api/customers/me`);
+  },
 };

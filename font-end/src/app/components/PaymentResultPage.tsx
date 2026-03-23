@@ -118,9 +118,9 @@ export default function PaymentResultPage() {
           {message}
         </p>
       )}
-      {orderId && (
+      {internalOrderId && (
         <p className="font-body" style={{ fontSize: 11, color: "rgba(48,38,28,0.4)" }}>
-          Mã đơn: {orderId}
+          Mã đơn: {internalOrderId}
         </p>
       )}
       <div className="flex gap-3 mt-2">
