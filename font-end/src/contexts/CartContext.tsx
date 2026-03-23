@@ -34,9 +34,29 @@ const CartContext = createContext<CartContextValue>({
   clearCart: async () => {},
 });
 
-interface CartResponse {
-  items?: CartItem[];
-  cartItems?: CartItem[];
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+const IMAGE_CACHE_KEY = "coffea_product_image_cache";
+
+function getImageCache(): Record<string, string> {
+  try { return JSON.parse(localStorage.getItem(IMAGE_CACHE_KEY) || "{}"); } catch { return {}; }
+}
+
+function saveImageCache(cache: Record<string, string>) {
+  try { localStorage.setItem(IMAGE_CACHE_KEY, JSON.stringify(cache)); } catch {}
+}
+
+function mapCartItemWithCache(raw: any, cache: Record<string, string>): CartItem {
+  const productId = raw.product_id ?? raw.productId ?? "";
+  return {
+    itemId: raw.cart_item_id ?? raw.itemId ?? "",
+    productId,
+    name: raw.product_name ?? raw.productName ?? raw.name ?? "",
+    image: raw.image ?? cache[productId],
+    size: raw.size ?? "",
+    quantity: raw.quantity ?? 1,
+    price: Number(raw.unit_price ?? raw.price ?? 0),
+  };
 }
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
@@ -48,8 +68,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (!isLoggedIn) { setItems([]); return; }
     try {
       setLoading(true);
-      const data = await api.get<CartResponse>("/api/orders/cart");
-      setItems(data?.items ?? data?.cartItems ?? []);
+      const data = await api.get<any>("/api/orders/cart");
+      const rawItems: any[] = data?.items ?? data?.cartItems ?? [];
+      const cache = getImageCache();
+      setItems(rawItems.map(r => mapCartItemWithCache(r, cache)));
     } catch {
       setItems([]);
     } finally {
@@ -69,7 +91,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     name: string;
     image?: string;
   }) => {
-    await api.post("/api/orders/cart/items", item);
+    // Cache image by productId so it survives re-fetch (backend CartItem has no image column)
+    if (item.image && item.productId) {
+      const cache = getImageCache();
+      cache[item.productId] = item.image;
+      saveImageCache(cache);
+    }
+    await api.post("/api/orders/cart/items", {
+      productId: item.productId,
+      size: item.size || null,
+      quantity: item.quantity,
+    });
     await fetchCart();
   }, [fetchCart]);
 

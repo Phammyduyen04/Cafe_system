@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
 import { getProductImage, getCategoryName } from "../../../services/product.service";
-import type { Product } from "../../../services/product.service";
+import type { Product, Category } from "../../../services/product.service";
 import { useCart } from "../../../contexts/CartContext";
 import { useAuth } from "../../../contexts/AuthContext";
 
@@ -12,16 +12,16 @@ function formatPrice(price: number) {
 
 interface MenuCardProps {
   item: Product;
+  categories?: Category[];
 }
 
-export default function MenuCard({ item }: MenuCardProps) {
+export default function MenuCard({ item, categories }: MenuCardProps) {
   const { addToCart } = useCart();
   const { isLoggedIn } = useAuth();
   const navigate = useNavigate();
-  const [added, setAdded] = useState(false);
   const [adding, setAdding] = useState(false);
 
-  const categoryName = getCategoryName(item);
+  const categoryName = getCategoryName(item, categories);
   const imageUrl = getProductImage(item);
 
   const handleAddToCart = async (e: React.MouseEvent) => {
@@ -40,10 +40,9 @@ export default function MenuCard({ item }: MenuCardProps) {
         name: item.name,
         image: imageUrl,
       });
-      setAdded(true);
-      setTimeout(() => setAdded(false), 1500);
-    } catch {
-      // silent fail
+      navigate("/cart");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Không thể thêm vào giỏ hàng.");
     } finally {
       setAdding(false);
     }
@@ -104,14 +103,14 @@ export default function MenuCard({ item }: MenuCardProps) {
             style={{
               fontWeight: 600,
               fontSize: 13,
-              background: added ? "#4caf50" : "#30261c",
+              background: "#30261c",
               color: "#f1f0ee",
               opacity: adding ? 0.7 : 1,
             }}
             onClick={handleAddToCart}
             disabled={adding}
           >
-            {added ? "\u2713 \u0110\u00e3 th\u00eam" : adding ? "\u0110ang th\u00eam..." : "Th\u00eam v\u00e0o gi\u1ecf"}
+            {adding ? "Đang thêm..." : "Thêm vào giỏ"}
           </button>
         )}
       </div>

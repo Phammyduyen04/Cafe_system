@@ -1,4 +1,4 @@
-const { AppError } = require('../../../shared');
+const { AppError, publisher } = require('../../../shared');
 const paymentRepo = require('../repositories/payment.repo');
 const momoService = require('./momo.service');
 const vietQRService = require('./vietqr.service');
@@ -6,6 +6,20 @@ const crypto = require('crypto');
 
 const generateCode = (prefix) => {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+};
+
+/**
+ * Publish sự kiện payment.completed để order-service cập nhật trạng thái đơn hàng → PAID
+ */
+const publishPaymentCompleted = async (orderId, paymentMethod) => {
+  try {
+    await publisher.publish('payment_exchange', 'payment.completed', {
+      orderId,
+      paymentMethod,
+    });
+  } catch (err) {
+    console.error(`[payment-service] Failed to publish payment.completed for order ${orderId}: ${err.message}`);
+  }
 };
 
 // =============================================
@@ -153,11 +167,13 @@ const confirmCashPayment = async (paymentId, amountReceived, change) => {
     paid_at: new Date(),
   });
 
-  return await paymentRepo.updatePayment(paymentId, {
+  const completed = await paymentRepo.updatePayment(paymentId, {
     paid_amount: totalAmount,
     remaining_amount: 0,
     payment_status: 'COMPLETED',
   });
+  await publishPaymentCompleted(payment.order_id, 'CASH');
+  return completed;
 };
 
 // =============================================
@@ -195,11 +211,13 @@ const confirmQRPayment = async (paymentId, user) => {
     paid_at: new Date(),
   });
 
-  return await paymentRepo.updatePayment(paymentId, {
+  const completedQR = await paymentRepo.updatePayment(paymentId, {
     paid_amount: Number(payment.total_amount),
     remaining_amount: 0,
     payment_status: 'COMPLETED',
   });
+  await publishPaymentCompleted(payment.order_id, 'QR');
+  return completedQR;
 };
 
 // =============================================
@@ -258,6 +276,7 @@ const handleMomoCallback = async (data) => {
     payment_status: 'COMPLETED',
   });
 
+  await publishPaymentCompleted(payment.order_id, 'MOMO');
   return { success: true };
 };
 

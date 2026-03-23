@@ -12,8 +12,8 @@ const createProduct = async (req, res, next) => {
 
 const getAllProducts = async (req, res, next) => {
   try {
-    const { page = 1, limit = 10, search, categoryId, status } = req.query;
-    const result = await productService.getAllProducts(parseInt(page), parseInt(limit), { search, categoryId, status });
+    const { page = 1, limit = 10, search, categoryId, status, all } = req.query;
+    const result = await productService.getAllProducts(parseInt(page), parseInt(limit), { search, categoryId, status, all });
     return responseHelper.paginated(res, result.products, result.pagination);
   } catch (error) {
     next(error);

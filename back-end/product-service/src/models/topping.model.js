@@ -10,9 +10,10 @@ const toppingSchema = new mongoose.Schema(
       default: () => `TOP-${crypto.randomUUID().split('-')[0].toUpperCase()}`,
     },
     toppingName: { type: String, required: true },
-    price: { type: Number, required: true, min: 0 },
+    price: { type: Number, required: true, min: 1 },
+    image: { type: String, default: '' },
     isAvailable: { type: Boolean, default: true },
-    status: { type: String, enum: ['ACTIVE', 'INACTIVE'], default: 'ACTIVE' },
+    status: { type: String, enum: ['ACTIVE', 'INACTIVE', 'OUT_OF_SEASON'], default: 'ACTIVE' },
     createdBy: { type: String },
   },
   {

@@ -3,11 +3,16 @@ const ingredientRepo = require('../repositories/ingredient.repo');
 const importLogRepo = require('../repositories/importLog.repo');
 
 const createIngredient = async (data) => {
-  const { ingredientId, ingredientName, unit } = data;
-  if (!ingredientId || !ingredientName || !unit) {
-    throw new AppError('Ingredient ID, name, and unit are required', 400);
+  const { ingredientName, unit, currentQuantity, image } = data;
+  if (!ingredientName || !unit) {
+    throw new AppError('Ingredient name and unit are required', 400);
   }
-  return await ingredientRepo.create({ ingredientId, ingredientName, unit });
+  return await ingredientRepo.create({
+    ingredientName,
+    unit,
+    currentQuantity: currentQuantity || 0,
+    image: image || '',
+  });
 };
 
 const getAllIngredients = async () => {
@@ -30,19 +35,20 @@ const importIngredient = async (id, data) => {
   const ingredient = await ingredientRepo.findByIngredientId(id);
   if (!ingredient) throw new AppError('Ingredient not found', 404);
 
-  const { quantityImported, unitPrice, supplier, note } = data;
-  if (!quantityImported || quantityImported <= 0) {
-    throw new AppError('Imported quantity must be a positive number', 400);
+  const { quantityImported, quantity, unitPrice, supplier, note } = data;
+  const qty = quantityImported || quantity;
+  if (!qty || qty <= 0) {
+    throw new AppError('Số lượng nhập phải là số dương', 400);
   }
 
   // Update current quantity
-  const newQuantity = ingredient.currentQuantity + quantityImported;
+  const newQuantity = ingredient.currentQuantity + qty;
   await ingredientRepo.update(id, { currentQuantity: newQuantity });
 
   // Create import log
   const log = await importLogRepo.create({
     ingredientId: id,
-    quantityImported,
+    quantityImported: qty,
     unitPrice: unitPrice || 0,
     supplier: supplier || '',
     note: note || '',

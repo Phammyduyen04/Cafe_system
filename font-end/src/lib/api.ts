@@ -53,6 +53,31 @@ async function request<T>(
   return json as T;
 }
 
+/** Raw request that returns the full JSON envelope (no unwrap) */
+async function rawRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string>),
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try { const body = await res.json(); message = body.message ?? message; } catch {}
+    if (res.status === 401 && token) {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      localStorage.removeItem("user");
+      window.dispatchEvent(new Event("auth:logout"));
+    }
+    throw new Error(message);
+  }
+  if (res.status === 204) return undefined as T;
+  return await res.json() as T;
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body: unknown) =>
@@ -60,4 +85,19 @@ export const api = {
   put: <T>(path: string, body: unknown) =>
     request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+  /** Returns full response envelope { success, data, pagination, message } */
+  getRaw: <T>(path: string) => rawRequest<T>(path),
+  /** Upload file via multipart/form-data (no Content-Type header — browser sets boundary) */
+  upload: async <T>(path: string, formData: FormData): Promise<T> => {
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const res = await fetch(`${BASE_URL}${path}`, { method: "POST", headers, body: formData });
+    if (!res.ok) {
+      let message = `HTTP ${res.status}`;
+      try { const body = await res.json(); message = body.message ?? message; } catch {}
+      throw new Error(message);
+    }
+    return await res.json() as T;
+  },
 };

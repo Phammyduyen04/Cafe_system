@@ -105,11 +105,22 @@ const createOrder = async (data, user, authToken) => {
 
   const totalAmount = subtotalAmount - discountAmount - promotionAmount;
 
-  // Xác định trạng thái ban đầu dựa vào kênh đặt hàng
-  const initialStatus = orderChannel === 'ONLINE' ? 'PENDING' : 'CONFIRMED';
-  const statusNote = orderChannel === 'ONLINE'
-    ? 'Khách hàng đặt đơn online'
-    : 'Nhân viên tạo đơn tại quầy';
+  // Xác định trạng thái ban đầu dựa vào kênh và phương thức thanh toán
+  const pm = (paymentMethod || 'CASH').toUpperCase();
+  let initialStatus;
+  let statusNote;
+  if (orderChannel === 'ONLINE') {
+    if (pm === 'MOMO' || pm === 'QR') {
+      initialStatus = 'PENDING_PAYMENT'; // Chờ hoàn tất thanh toán online
+      statusNote = 'Khách hàng đặt đơn online, chờ thanh toán';
+    } else {
+      initialStatus = 'PENDING'; // COD — chờ xác nhận
+      statusNote = 'Khách hàng đặt đơn online (COD)';
+    }
+  } else {
+    initialStatus = 'CONFIRMED';
+    statusNote = 'Nhân viên tạo đơn tại quầy';
+  }
 
   const finalTotalAmount = totalAmount > 0 ? totalAmount : 0;
 
@@ -138,17 +149,6 @@ const createOrder = async (data, user, authToken) => {
     },
   });
 
-  // Publish event (RabbitMQ fallback cho payment-service)
-  await publisher.publish('order_exchange', 'order.created', {
-    orderId: order.order_id,
-    orderCode: order.order_code,
-    orderChannel: order.order_channel,
-    customerId: order.customer_id,
-    totalAmount: Number(order.total_amount),
-    paymentMethod: order.payment_method,
-    createdBy: user.username,
-  });
-
   // Gọi payment-service HTTP để khởi tạo payment và lấy payUrl/qrUrl ngay lập tức
   let paymentInfo = null;
   try {
@@ -167,9 +167,21 @@ const createOrder = async (data, user, authToken) => {
     );
     paymentInfo = response.data.data;
   } catch (err) {
-    // Không fail đơn hàng nếu payment-service không phản hồi
-    // RabbitMQ event sẽ tạo payment record làm fallback
+    // HTTP thất bại → publish RabbitMQ làm fallback (payment-service sẽ tạo CASH payment)
     console.warn(`[order-service] Payment initiation failed for order ${order.order_code}: ${err.message}`, err.response?.data || '');
+    try {
+      await publisher.publish('order_exchange', 'order.created', {
+        orderId: order.order_id,
+        orderCode: order.order_code,
+        orderChannel: order.order_channel,
+        customerId: order.customer_id,
+        totalAmount: Number(order.total_amount),
+        paymentMethod: order.payment_method,
+        createdBy: user.username,
+      });
+    } catch (pubErr) {
+      console.warn(`[order-service] RabbitMQ publish failed: ${pubErr.message}`);
+    }
   }
 
   return { ...order, paymentInfo };
@@ -258,12 +270,14 @@ const updateOrderStatus = async (id, newStatus, user, note) => {
   if (!order) throw new AppError('Order not found', 404);
 
   const validTransitions = {
-    PENDING: ['CONFIRMED', 'CANCELLED'],
-    CONFIRMED: ['READY', 'CANCELLED'],
-    PREPARING: ['READY', 'CANCELLED'],
-    READY: ['COMPLETED', 'CANCELLED'],
-    COMPLETED: [],
-    CANCELLED: [],
+    PENDING_PAYMENT: ['PAID', 'CANCELLED'],
+    PENDING:         ['CONFIRMED', 'CANCELLED'],
+    PAID:            ['CONFIRMED', 'CANCELLED'],
+    CONFIRMED:       ['PREPARING', 'CANCELLED'],
+    PREPARING:       ['DELIVERING', 'COMPLETED', 'CANCELLED'],
+    DELIVERING:      ['COMPLETED'],
+    COMPLETED:       [],
+    CANCELLED:       [],
   };
 
   const allowed = validTransitions[order.status] || [];
@@ -303,8 +317,8 @@ const cancelMyOrder = async (orderId, user) => {
     throw new AppError('You can only cancel your own orders', 403);
   }
 
-  if (order.status !== 'PENDING') {
-    throw new AppError('Only pending orders can be cancelled', 400);
+  if (!['PENDING', 'PENDING_PAYMENT'].includes(order.status)) {
+    throw new AppError('Chỉ có thể hủy đơn đang chờ xác nhận hoặc chờ thanh toán', 400);
   }
 
   return await orderRepo.updateStatus(orderId, 'CANCELLED', {
@@ -313,6 +327,30 @@ const cancelMyOrder = async (orderId, user) => {
     changed_by: user.username,
     note: 'Khách hàng hủy đơn hàng',
   });
+};
+
+/**
+ * Gọi bởi payment-service (qua RabbitMQ) khi thanh toán hoàn tất.
+ * Chuyển PENDING_PAYMENT → PAID
+ */
+const paymentConfirmed = async (orderId) => {
+  const order = await orderRepo.findById(orderId);
+  if (!order) {
+    console.warn(`[order-service] paymentConfirmed: order ${orderId} not found`);
+    return null;
+  }
+  if (order.status !== 'PENDING_PAYMENT') {
+    console.warn(`[order-service] paymentConfirmed: order ${orderId} already at status ${order.status}`);
+    return order;
+  }
+  const updated = await orderRepo.updateStatus(orderId, 'PAID', {
+    old_status: 'PENDING_PAYMENT',
+    new_status: 'PAID',
+    changed_by: 'system',
+    note: 'Thanh toán xác nhận tự động',
+  });
+  console.log(`[order-service] Order ${orderId} transitioned PENDING_PAYMENT → PAID`);
+  return updated;
 };
 
 const getOrderStatusLogs = async (orderId) => {
@@ -327,5 +365,6 @@ module.exports = {
   getOrderById,
   updateOrderStatus,
   cancelMyOrder,
+  paymentConfirmed,
   getOrderStatusLogs,
 };

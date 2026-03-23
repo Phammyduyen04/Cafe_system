@@ -2,7 +2,8 @@ const axios = require('axios');
 const { AppError } = require('../../../shared');
 
 const PRODUCT_SERVICE_URL = process.env.PRODUCT_SERVICE_URL || 'http://localhost:3005';
-const TOPPING_SERVICE_URL = `${PRODUCT_SERVICE_URL}/toppings`;
+const PRODUCTS_API = `${PRODUCT_SERVICE_URL}/api/products`;
+const TOPPING_SERVICE_URL = `${PRODUCTS_API}/toppings`;
 
 /**
  * Gọi product-service để lấy thông tin sản phẩm theo productId
@@ -10,7 +11,7 @@ const TOPPING_SERVICE_URL = `${PRODUCT_SERVICE_URL}/toppings`;
  */
 const getProductById = async (productId) => {
   try {
-    const response = await axios.get(`${PRODUCT_SERVICE_URL}/${productId}`);
+    const response = await axios.get(`${PRODUCTS_API}/${productId}`);
     const product = response.data.data;
 
     if (!product) {

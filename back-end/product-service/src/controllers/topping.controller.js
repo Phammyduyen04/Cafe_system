@@ -2,7 +2,8 @@ const toppingService = require('../services/topping.service');
 
 const getAllToppings = async (req, res, next) => {
   try {
-    const onlyAvailable = req.query.available === 'true';
+    // all=true: manager gets all toppings; default: customer sees only available
+    const onlyAvailable = req.query.all !== 'true';
     const toppings = await toppingService.getAllToppings(onlyAvailable);
     res.json({ success: true, data: toppings });
   } catch (err) {

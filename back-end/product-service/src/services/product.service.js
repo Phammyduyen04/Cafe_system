@@ -2,17 +2,19 @@ const { AppError } = require('../../../shared');
 const productRepo = require('../repositories/product.repo');
 
 const createProduct = async (data, user) => {
-  const { productId, productName, price, description, productCategoryId } = data;
-  if (!productId || !productName || !price) {
-    throw new AppError('Product ID, name, and price are required', 400);
+  const { productName, price, description, productCategoryId, image, status } = data;
+  if (!productName || !price || !productCategoryId) {
+    throw new AppError('Product name, price, and category are required', 400);
   }
 
   return await productRepo.create({
-    productId,
     productName,
     price,
     description: description || '',
     productCategoryId,
+    image: image || '',
+    status: status || 'ACTIVE',
+    isAvailable: status ? status === 'ACTIVE' : true,
     createdBy: user.username,
   });
 };
@@ -29,6 +31,9 @@ const getAllProducts = async (page, limit, filters) => {
   }
   if (filters.status) {
     query.status = filters.status;
+  } else if (filters.all !== 'true') {
+    // Public/customer view: only show available products
+    query.isAvailable = true;
   }
 
   const [products, total] = await Promise.all([

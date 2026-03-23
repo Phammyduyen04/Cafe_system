@@ -1,13 +1,25 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import svgPaths from "../../../constants/svg-paths";
 import ProductCard from "./ProductCard";
+import type { Product, Category } from "../../../services/product.service";
 
-// ─── Products Carousel ─────────────────────────────────────────────────────────
-export default function ProductsCarousel({ title, products }: { title: string; products: { img: string; name: string; desc: string; price: string; slug?: string }[] }) {
+export default function ProductsCarousel({ title, products, categories }: { title: string; products: Product[]; categories?: Category[] }) {
   const [idx, setIdx] = useState(0);
   const cardW = 300;
   const gap = 20;
   const max = Math.max(0, products.length - 1);
+  const paused = useRef(false);
+
+  // Auto-play: advance one card every 3.5s, reset to 0 at end
+  useEffect(() => {
+    if (products.length <= 1) return;
+    const timer = setInterval(() => {
+      if (!paused.current) {
+        setIdx((prev) => (prev >= max ? 0 : prev + 1));
+      }
+    }, 3500);
+    return () => clearInterval(timer);
+  }, [max, products.length]);
 
   return (
     <section className="py-16 bg-cafe-bg">
@@ -20,18 +32,22 @@ export default function ProductsCarousel({ title, products }: { title: string; p
 
       {/* Mobile: horizontal scroll */}
       <div className="md:hidden overflow-x-auto flex gap-4 px-5 pb-4 snap-x snap-mandatory">
-        {products.map((p, i) => (
-          <div key={i} className="snap-start shrink-0">
-            <ProductCard {...p} />
+        {products.map((p) => (
+          <div key={p._id} className="snap-start shrink-0">
+            <ProductCard product={p} categories={categories} />
           </div>
         ))}
       </div>
 
       {/* Desktop: controlled carousel */}
-      <div className="hidden md:flex relative items-center justify-center px-6 max-w-[1440px] mx-auto">
+      <div
+        className="hidden md:flex relative items-center justify-center px-6 max-w-[1440px] mx-auto"
+        onMouseEnter={() => { paused.current = true; }}
+        onMouseLeave={() => { paused.current = false; }}
+      >
         {/* Prev */}
         <button
-          onClick={() => setIdx((prev) => Math.max(0, prev - 1))}
+          onClick={() => { paused.current = true; setIdx((prev) => Math.max(0, prev - 1)); setTimeout(() => { paused.current = false; }, 5000); }}
           disabled={idx === 0}
           className="shrink-0 w-[56px] h-[56px] rounded-full flex items-center justify-center mr-4 transition-opacity hover:opacity-70 disabled:opacity-30 bg-cafe-accent"
           aria-label="Previous"
@@ -48,9 +64,9 @@ export default function ProductsCarousel({ title, products }: { title: string; p
             className="flex gap-5 transition-transform duration-300"
             style={{ transform: `translateX(calc(-${idx} * ${cardW + gap}px))` }}
           >
-            {products.map((p, i) => (
-              <div key={i} className="shrink-0" style={{ width: cardW }}>
-                <ProductCard {...p} />
+            {products.map((p) => (
+              <div key={p._id} className="shrink-0" style={{ width: cardW }}>
+                <ProductCard product={p} categories={categories} />
               </div>
             ))}
           </div>
@@ -58,7 +74,7 @@ export default function ProductsCarousel({ title, products }: { title: string; p
 
         {/* Next */}
         <button
-          onClick={() => setIdx((prev) => Math.min(max, prev + 1))}
+          onClick={() => { paused.current = true; setIdx((prev) => Math.min(max, prev + 1)); setTimeout(() => { paused.current = false; }, 5000); }}
           disabled={idx === max}
           className="shrink-0 w-[56px] h-[56px] rounded-full flex items-center justify-center ml-4 transition-opacity hover:opacity-70 disabled:opacity-30 bg-cafe-accent"
           aria-label="Next"

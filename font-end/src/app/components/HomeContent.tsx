@@ -1,39 +1,74 @@
+import { useState, useEffect } from "react";
 import HeroSection from "./home/HeroSection";
 import ProductsCarousel from "./home/ProductsCarousel";
 import CoffeeBeansBanner from "./home/CoffeeBeansBanner";
 import TestimonialsSection from "./home/TestimonialsSection";
 import NewsletterSection from "./home/NewsletterSection";
-import {
-  PRODUCT_LUNGO,
-  PRODUCT_ESPRESSO,
-  PRODUCT_LATTE,
-  PRODUCT_CAPPUCCINO,
-  PRODUCT_TIRAMISU,
-  PRODUCT_CROISSANT,
-  PRODUCT_CHEESECAKE,
-  PRODUCT_MACARON,
-} from "../../constants/images";
-
-const coffeeProducts = [
-  { img: PRODUCT_LUNGO, name: "Cà phê Lungo", desc: "Hương vị đậm đà, pha chế từ hạt cà phê Arabica thượng hạng, thơm ngon khó cưỡng.", price: "45.000 ₫", slug: "ca-phe-lungo" },
-  { img: PRODUCT_ESPRESSO, name: "Cà phê Espresso", desc: "Đậm đặc và mạnh mẽ, được ép từ hạt cà phê rang vừa, mang lại cảm giác tỉnh táo tức thì.", price: "40.000 ₫", slug: "ca-phe-espresso" },
-  { img: PRODUCT_LATTE, name: "Cà phê Latte", desc: "Sự kết hợp hoàn hảo giữa espresso và sữa tươi béo ngậy, nhẹ nhàng và thơm ngon.", price: "55.000 ₫", slug: "ca-phe-latte" },
-  { img: PRODUCT_CAPPUCCINO, name: "Cà phê Cappuccino", desc: "Lớp bọt sữa mịn màng phủ trên nền espresso đậm đà, tạo nên hương vị cân bằng tuyệt hảo.", price: "55.000 ₫", slug: "ca-phe-latte" },
-];
-
-const dessertProducts = [
-  { img: PRODUCT_TIRAMISU, name: "Bánh Tiramisu", desc: "Bánh Tiramisu mềm mịn thấm đẫm cà phê Espresso, hòa quyện cùng kem phô mai béo ngậy.", price: "65.000 ₫" },
-  { img: PRODUCT_CROISSANT, name: "Bánh Croissant", desc: "Croissant giòn rụm lớp ngoài, mềm xốp bên trong, nướng tươi mỗi ngày từ bột mì nguyên chất.", price: "45.000 ₫" },
-  { img: PRODUCT_CHEESECAKE, name: "Cheesecake Cà Phê", desc: "Cheesecake mịn béo kết hợp cùng lớp cà phê phủ trên, tạo nên hương vị độc đáo và quyến rũ.", price: "70.000 ₫" },
-  { img: PRODUCT_MACARON, name: "Bánh Macaron", desc: "Macaron nhân kem cà phê thơm ngát, vỏ ngoài giòn nhẹ tan trong miệng, màu sắc bắt mắt.", price: "35.000 ₫" },
-];
+import { productService } from "../../services/product.service";
+import type { Product, Category } from "../../services/product.service";
 
 export default function HomeContent() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [prods, cats] = await Promise.all([
+          productService.getProducts(),
+          productService.getCategories(),
+        ]);
+        setProducts(prods);
+        setCategories(cats);
+      } catch {
+        // keep empty
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  // Group products by category
+  const productsByCategory: Record<string, Product[]> = {};
+  for (const product of products) {
+    const catId = product.productCategoryId ?? (typeof product.category === "string" ? product.category : product.category?._id ?? "");
+    if (!productsByCategory[catId]) productsByCategory[catId] = [];
+    productsByCategory[catId].push(product);
+  }
+
+  // Show top 3 categories in priority order: Cà phê → Trà sữa → Bánh & ăn nhẹ, then others
+  const priorityNames = ["Cà phê", "Trà sữa", "Trà sữa trân châu", "Bánh & ăn nhẹ", "Bánh và ăn nhẹ"];
+  const prioritized = priorityNames
+    .map((name) => categories.find((c) => c.name === name))
+    .filter((c): c is Category => !!c);
+  const others = categories.filter((c) => !priorityNames.includes(c.name));
+  const displayCategories = [...prioritized, ...others].slice(0, 3);
+
   return (
     <>
       <HeroSection />
-      <ProductsCarousel title="Cà phê đặc biệt" products={coffeeProducts} />
-      <ProductsCarousel title="Tráng miệng đặc biệt" products={dessertProducts} />
+      {loading ? (
+        <section className="py-16 bg-cafe-bg">
+          <div className="flex justify-center">
+            <div className="w-8 h-8 border-2 border-cafe-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        </section>
+      ) : (
+        displayCategories.map((cat) => {
+          const catProducts = productsByCategory[cat.categoryId] ?? productsByCategory[cat._id] ?? [];
+          if (catProducts.length === 0) return null;
+          return (
+            <ProductsCarousel
+              key={cat._id}
+              title={cat.name}
+              products={catProducts}
+              categories={categories}
+            />
+          );
+        })
+      )}
       <CoffeeBeansBanner />
       <TestimonialsSection />
       <NewsletterSection />

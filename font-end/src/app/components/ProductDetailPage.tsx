@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router";
 import { productService, getProductImage, getCategoryName } from "../../services/product.service";
-import type { Product } from "../../services/product.service";
+import type { Product, Category, Review } from "../../services/product.service";
+import { orderService } from "../../services/order.service";
 import { useCart } from "../../contexts/CartContext";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -28,6 +29,7 @@ export default function ProductDetailPage() {
   const { isLoggedIn } = useAuth();
 
   const [product, setProduct] = useState<Product | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -39,19 +41,39 @@ export default function ProductDetailPage() {
   const [commentText, setCommentText] = useState("");
   const [commentRating, setCommentRating] = useState(5);
   const [hoverRating, setHoverRating] = useState(0);
-  const [comments, setComments] = useState([
-    { id: 1, name: "Nguyễn Minh Anh", rating: 5, date: "15/03/2026", text: "Cà phê thơm ngon, hương vị đậm đà rất đặc trưng. Lần nào ghé Coffea cũng phải order món này!" },
-    { id: 2, name: "Trần Bảo Châu", rating: 4, date: "10/03/2026", text: "Vị cân bằng, không quá đắng. Không gian quán cũng rất thoải mái, mình sẽ quay lại." },
-    { id: 3, name: "Lê Hoàng Phúc", rating: 5, date: "02/03/2026", text: "Tuyệt vời! Đây là một trong những ly cà phê ngon nhất mình từng thử. Nhân viên phục vụ nhiệt tình." },
-  ]);
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [canReview, setCanReview] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
     setLoading(true);
     setNotFound(false);
-    productService.getProduct(slug).then(p => {
+    Promise.all([
+      productService.getProduct(slug),
+      productService.getCategories(),
+    ]).then(([p, cats]) => {
       if (!p) setNotFound(true);
-      else setProduct(p);
+      else {
+        setProduct(p);
+        productService.getProductReviews(p._id).then(setReviews).catch(() => {});
+        // Check if user has a completed order with this product
+        if (isLoggedIn) {
+          orderService.getMyOrders()
+            .then(res => {
+              const orders: any[] = Array.isArray(res) ? res : ((res as any)?.data ?? []);
+              const bought = orders.some(o =>
+                o.status === 'COMPLETED' &&
+                (o.order_details ?? o.items ?? []).some(
+                  (d: any) => (d.product_id ?? d.productId) === p._id
+                )
+              );
+              setCanReview(bought);
+            })
+            .catch(() => {});
+        }
+      }
+      setCategories(cats);
     }).finally(() => setLoading(false));
   }, [slug]);
 
@@ -74,25 +96,35 @@ export default function ProductDetailPage() {
         name: product.name,
         image: imageUrl,
       });
-      setAdded(true);
-      setTimeout(() => setAdded(false), 1800);
-    } catch {
-      // silent fail
+      navigate("/cart");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Không thể thêm vào giỏ hàng. Vui lòng thử lại.");
     } finally {
       setAdding(false);
     }
   };
 
-  const handleSubmitComment = () => {
-    if (!commentText.trim()) return;
-    const now = new Date();
-    const date = `${String(now.getDate()).padStart(2,"0")}/${String(now.getMonth()+1).padStart(2,"0")}/${now.getFullYear()}`;
-    setComments(prev => [{ id: Date.now(), name: "Bạn", rating: commentRating, date, text: commentText.trim() }, ...prev]);
-    setCommentText("");
-    setCommentRating(5);
+  const handleSubmitComment = async () => {
+    if (!commentText.trim() || !product) return;
+    setSubmittingReview(true);
+    try {
+      const newReview = await productService.createReview({
+        customerName: user?.username ?? "Khách",
+        rating: commentRating,
+        comment: commentText.trim(),
+        productId: product._id,
+      });
+      setReviews(prev => [newReview, ...prev]);
+      setCommentText("");
+      setCommentRating(5);
+    } catch {
+      // silent fail
+    } finally {
+      setSubmittingReview(false);
+    }
   };
 
-  const avgRating = comments.length ? (comments.reduce((s, c) => s + c.rating, 0) / comments.length).toFixed(1) : "0";
+  const avgRating = reviews.length ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1) : "0";
 
   // ─── Loading ───
   if (loading) {
@@ -120,7 +152,7 @@ export default function ProductDetailPage() {
 
   const images = product.images && product.images.length > 0 ? product.images : [getProductImage(product)];
   const sizes = product.sizes ?? [{ label: "S" }, { label: "M" }, { label: "L" }];
-  const categoryName = getCategoryName(product);
+  const categoryName = getCategoryName(product, categories);
 
   return (
     <div className="min-h-screen bg-cafe-bg">
@@ -375,72 +407,93 @@ export default function ProductDetailPage() {
                 </svg>
               ))}
             </div>
-            <span className="font-body" style={{ fontSize: 12, color: "rgba(48,38,28,0.5)" }}>({comments.length} đánh giá)</span>
+            <span className="font-body" style={{ fontSize: 12, color: "rgba(48,38,28,0.5)" }}>({reviews.length} đánh giá)</span>
           </div>
         </div>
 
         <div className="flex flex-col gap-12">
           <div className="flex flex-col gap-6">
-            {comments.map(c => (
-              <div key={c.id} className="border-b border-[#e8e4de] pb-6">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-cafe-primary">
-                      <span className="font-body" style={{ fontSize: 12, color: "var(--cafe-bg)", fontWeight: 600 }}>{c.name.charAt(0)}</span>
+            {reviews.length === 0 && (
+              <p className="font-body" style={{ fontSize: 13, color: "rgba(48,38,28,0.45)" }}>Chưa có đánh giá nào. Hãy là người đầu tiên!</p>
+            )}
+            {reviews.map(r => {
+              const date = r.createdAt ? new Date(r.createdAt).toLocaleDateString("vi-VN") : "";
+              return (
+                <div key={r.reviewId} className="border-b border-[#e8e4de] pb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-cafe-primary">
+                        <span className="font-body" style={{ fontSize: 12, color: "var(--cafe-bg)", fontWeight: 600 }}>{r.customerName.charAt(0).toUpperCase()}</span>
+                      </div>
+                      <span className="font-body text-cafe-primary" style={{ fontSize: 13, fontWeight: 600 }}>{r.customerName}</span>
                     </div>
-                    <span className="font-body text-cafe-primary" style={{ fontSize: 13, fontWeight: 600 }}>{c.name}</span>
+                    <span className="font-body" style={{ fontSize: 11, color: "rgba(48,38,28,0.45)" }}>{date}</span>
                   </div>
-                  <span className="font-body" style={{ fontSize: 11, color: "rgba(48,38,28,0.45)" }}>{c.date}</span>
+                  <div className="flex gap-0.5 mb-2 ml-11">
+                    {[1,2,3,4,5].map(s => (
+                      <svg key={s} width="13" height="13" viewBox="0 0 24 24" fill={r.rating >= s ? "#f5b731" : "none"} stroke="#f5b731" strokeWidth="1.5">
+                        <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+                      </svg>
+                    ))}
+                  </div>
+                  <p className="font-body ml-11" style={{ fontSize: 13, color: "rgba(48,38,28,0.8)", lineHeight: 1.7 }}>{r.comment}</p>
                 </div>
-                <div className="flex gap-0.5 mb-2 ml-11">
-                  {[1,2,3,4,5].map(s => (
-                    <svg key={s} width="13" height="13" viewBox="0 0 24 24" fill={c.rating >= s ? "#f5b731" : "none"} stroke="#f5b731" strokeWidth="1.5">
-                      <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
-                    </svg>
-                  ))}
-                </div>
-                <p className="font-body ml-11" style={{ fontSize: 13, color: "rgba(48,38,28,0.8)", lineHeight: 1.7 }}>{c.text}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
-          <div className="w-full border border-cafe-border p-6 flex flex-col gap-4" style={{ backgroundColor: "rgba(255,255,255,0.55)" }}>
-            <p className="font-body text-cafe-primary uppercase tracking-[2px]" style={{ fontWeight: 600, fontSize: 12 }}>
-              Viết đánh giá
-            </p>
-            <div className="flex gap-1">
-              {[1,2,3,4,5].map(s => (
-                <button
-                  key={s}
-                  onMouseEnter={() => setHoverRating(s)}
-                  onMouseLeave={() => setHoverRating(0)}
-                  onClick={() => setCommentRating(s)}
-                  className="transition-transform hover:scale-110"
-                  aria-label={`${s} sao`}
-                >
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill={(hoverRating || commentRating) >= s ? "#f5b731" : "none"} stroke="#f5b731" strokeWidth="1.5">
-                    <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
-                  </svg>
-                </button>
-              ))}
+          {!isLoggedIn ? (
+            <div className="w-full border border-cafe-border p-6 flex flex-col items-center gap-3" style={{ backgroundColor: "rgba(255,255,255,0.55)" }}>
+              <p className="font-body text-cafe-primary" style={{ fontSize: 13, fontWeight: 600 }}>Đăng nhập để xem và gửi đánh giá</p>
+              <Link to="/login" className="font-body px-6 py-2.5 bg-cafe-primary text-cafe-bg" style={{ fontSize: 12, letterSpacing: "2px", fontWeight: 600 }}>ĐĂNG NHẬP</Link>
             </div>
-            <textarea
-              value={commentText}
-              onChange={e => setCommentText(e.target.value)}
-              placeholder="Chia sẻ cảm nhận của bạn..."
-              rows={4}
-              className="font-body w-full resize-none border border-cafe-border bg-transparent p-3 outline-none focus:border-cafe-primary transition-colors text-cafe-primary placeholder:text-[rgba(48,38,28,0.35)]"
-              style={{ fontSize: 12 }}
-            />
-            <button
-              onClick={handleSubmitComment}
-              disabled={!commentText.trim()}
-              className="font-body w-full py-3 bg-cafe-primary text-cafe-bg transition-all duration-200 hover:brightness-90 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{ fontWeight: 600, fontSize: 12, letterSpacing: "2px" }}
-            >
-              GỬI ĐÁNH GIÁ
-            </button>
-          </div>
+          ) : !canReview ? (
+            <div className="w-full border border-cafe-border p-6 flex flex-col items-center gap-2" style={{ backgroundColor: "rgba(255,255,255,0.55)" }}>
+              <p className="font-body text-cafe-primary" style={{ fontSize: 13, fontWeight: 600 }}>Bạn chưa thể đánh giá sản phẩm này</p>
+              <p className="font-body" style={{ fontSize: 12, color: "rgba(48,38,28,0.55)", textAlign: "center" }}>
+                Hãy đặt hàng và nhận sản phẩm để có thể gửi đánh giá.
+              </p>
+              <Link to="/menu" className="font-body mt-1 px-5 py-2 border border-cafe-primary text-cafe-primary" style={{ fontSize: 11, letterSpacing: "1.5px", fontWeight: 600 }}>ĐẶT HÀNG NGAY</Link>
+            </div>
+          ) : (
+            <div className="w-full border border-cafe-border p-6 flex flex-col gap-4" style={{ backgroundColor: "rgba(255,255,255,0.55)" }}>
+              <p className="font-body text-cafe-primary uppercase tracking-[2px]" style={{ fontWeight: 600, fontSize: 12 }}>
+                Viết đánh giá
+              </p>
+              <div className="flex gap-1">
+                {[1,2,3,4,5].map(s => (
+                  <button
+                    key={s}
+                    onMouseEnter={() => setHoverRating(s)}
+                    onMouseLeave={() => setHoverRating(0)}
+                    onClick={() => setCommentRating(s)}
+                    className="transition-transform hover:scale-110"
+                    aria-label={`${s} sao`}
+                  >
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill={(hoverRating || commentRating) >= s ? "#f5b731" : "none"} stroke="#f5b731" strokeWidth="1.5">
+                      <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+                    </svg>
+                  </button>
+                ))}
+              </div>
+              <textarea
+                value={commentText}
+                onChange={e => setCommentText(e.target.value)}
+                placeholder="Chia sẻ cảm nhận của bạn..."
+                rows={4}
+                className="font-body w-full resize-none border border-cafe-border bg-transparent p-3 outline-none focus:border-cafe-primary transition-colors text-cafe-primary placeholder:text-[rgba(48,38,28,0.35)]"
+                style={{ fontSize: 12 }}
+              />
+              <button
+                onClick={handleSubmitComment}
+                disabled={!commentText.trim() || submittingReview}
+                className="font-body w-full py-3 bg-cafe-primary text-cafe-bg transition-all duration-200 hover:brightness-90 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ fontWeight: 600, fontSize: 12, letterSpacing: "2px" }}
+              >
+                {submittingReview ? "ĐANG GỬI..." : "GỬI ĐÁNH GIÁ"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

@@ -1,15 +1,20 @@
 import { api } from "../lib/api";
 
+interface PaginatedResponse<T> {
+  success: boolean;
+  data: T[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+}
+
 export interface Promotion {
-  _id: string;
   promotionId: string;
   promotionName: string;
-  benefitType: string;
   description: string;
-  status: "PLANNED" | "ACTIVE" | "EXPIRED" | "CANCELLED";
+  benefitType: string;
+  status: string;
   startDate: string | null;
   endDate: string | null;
-  createdBy: string;
+  createdBy: string | null;
   conditions?: PromotionCondition;
 }
 
@@ -18,20 +23,18 @@ export interface PromotionCondition {
   triggerProducts: { productId: string; quantity: number }[];
   rewardProducts: { productId: string; quantity: number }[];
   minimumOrderAmount: number | null;
-  applicableCustomerTypes?: string[];
 }
 
 export interface Discount {
-  _id: string;
   discountId: string;
   discountName: string;
-  discountType: "PERCENT" | "FIXED";
+  discountType: string;
   discountValue: number;
   description: string;
-  status: "PLANNED" | "ACTIVE" | "EXPIRED" | "CANCELLED";
+  status: string;
   startDate: string | null;
   endDate: string | null;
-  createdBy: string;
+  createdBy: string | null;
   conditions?: DiscountCondition;
 }
 
@@ -44,38 +47,33 @@ export interface DiscountCondition {
   timeFrames: { from: string; to: string }[];
 }
 
-interface Paginated<T> {
-  data: T[];
-  pagination: { page: number; limit: number; total: number; totalPages: number };
-}
-
 export const promotionService = {
-  // Promotions
+  // ── Promotions ──
   getPromotions: (params?: { page?: number; limit?: number; status?: string }) => {
-    const qs = new URLSearchParams();
-    if (params?.page) qs.set("page", String(params.page));
-    if (params?.limit) qs.set("limit", String(params.limit));
-    if (params?.status) qs.set("status", params.status);
-    return api.get<Paginated<Promotion>>(`/api/promotions?${qs}`);
+    if (params?.page !== undefined) {
+      const qs = new URLSearchParams();
+      qs.set("page", String(params.page));
+      qs.set("limit", String(params.limit ?? 10));
+      if (params.status) qs.set("status", params.status);
+      return api.getRaw<PaginatedResponse<Promotion>>(`/api/promotions?${qs}`);
+    }
+    return api.get<Promotion[]>("/api/promotions");
   },
 
-  getPromotionById: (id: string) => api.get<Promotion>(`/api/promotions/${id}`),
+  getPromotionById: (id: string) =>
+    api.get<Promotion>(`/api/promotions/${id}`),
 
-  createPromotion: (data: {
-    promotionName: string;
-    benefitType: string;
-    description?: string;
-    startDate?: string;
-    endDate?: string;
-  }) => api.post<Promotion>("/api/promotions", data),
+  createPromotion: (data: Partial<Promotion>) =>
+    api.post<Promotion>("/api/promotions", data),
 
   updatePromotion: (id: string, data: Partial<Promotion>) =>
     api.put<Promotion>(`/api/promotions/${id}`, data),
 
-  deletePromotion: (id: string) => api.delete<void>(`/api/promotions/${id}`),
+  deletePromotion: (id: string) =>
+    api.delete(`/api/promotions/${id}`),
 
   updatePromotionConditions: (id: string, data: Partial<PromotionCondition>) =>
-    api.put<PromotionCondition>(`/api/promotions/${id}/conditions`, data),
+    api.put(`/api/promotions/${id}/conditions`, data),
 
   checkPromotions: (params?: { productIds?: string; orderAmount?: number }) => {
     const qs = new URLSearchParams();
@@ -84,40 +82,35 @@ export const promotionService = {
     return api.get<Promotion[]>(`/api/promotions/check?${qs}`);
   },
 
-  // Discounts — nằm trong /api/promotions/discounts
+  // ── Discounts ──
   getDiscounts: (params?: { page?: number; limit?: number; status?: string }) => {
-    const qs = new URLSearchParams();
-    if (params?.page) qs.set("page", String(params.page));
-    if (params?.limit) qs.set("limit", String(params.limit));
-    if (params?.status) qs.set("status", params.status);
-    return api.get<Paginated<Discount>>(`/api/promotions/discounts?${qs}`);
+    if (params && params.page !== undefined) {
+      const qs = new URLSearchParams();
+      qs.set("page", String(params.page));
+      qs.set("limit", String(params.limit ?? 10));
+      if (params.status) qs.set("status", params.status);
+      return api.getRaw<PaginatedResponse<Discount>>(`/api/discounts?${qs}`);
+    }
+    return api.get<Discount[]>("/api/discounts");
   },
 
-  getDiscountById: (id: string) => api.get<Discount>(`/api/promotions/discounts/${id}`),
+  getDiscountById: (id: string) =>
+    api.get<Discount>(`/api/discounts/${id}`),
 
-  createDiscount: (data: {
-    discountName: string;
-    discountType: "PERCENT" | "FIXED";
-    discountValue: number;
-    description?: string;
-    startDate?: string;
-    endDate?: string;
-  }) => api.post<Discount>("/api/promotions/discounts", data),
+  createDiscount: (data: Partial<Discount>) =>
+    api.post<Discount>("/api/discounts", data),
 
   updateDiscount: (id: string, data: Partial<Discount>) =>
-    api.put<Discount>(`/api/promotions/discounts/${id}`, data),
+    api.put<Discount>(`/api/discounts/${id}`, data),
 
-  deleteDiscount: (id: string) => api.delete<void>(`/api/promotions/discounts/${id}`),
+  deleteDiscount: (id: string) =>
+    api.delete(`/api/discounts/${id}`),
 
   updateDiscountConditions: (id: string, data: Partial<DiscountCondition>) =>
-    api.put<DiscountCondition>(`/api/promotions/discounts/${id}/conditions`, data),
+    api.put(`/api/discounts/${id}/conditions`, data),
 
-  checkDiscounts: (params?: { orderAmount?: number; productIds?: string; categoryIds?: string; customerType?: string }) => {
-    const qs = new URLSearchParams();
-    if (params?.orderAmount) qs.set("orderAmount", String(params.orderAmount));
-    if (params?.productIds) qs.set("productIds", params.productIds);
-    if (params?.categoryIds) qs.set("categoryIds", params.categoryIds);
-    if (params?.customerType) qs.set("customerType", params.customerType);
-    return api.get<Discount[]>(`/api/promotions/discounts/check?${qs}`);
+  checkDiscount: (code: string, total?: number) => {
+    const qs = new URLSearchParams({ code, ...(total ? { total: String(total) } : {}) });
+    return api.get<Discount>(`/api/discounts/check?${qs}`);
   },
 };

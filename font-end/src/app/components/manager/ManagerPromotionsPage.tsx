@@ -1,24 +1,21 @@
 import { useEffect, useState } from "react";
 import { promotionService, type Promotion } from "../../../services/promotion.service";
-import { productService, type Product } from "../../../services/product.service";
 
 type ProductRow = { productId: string; quantity: string };
 
-function ProductSelectRows({
+function ProductRows({
   label,
   rows,
   setRows,
-  products,
 }: {
   label: string;
   rows: ProductRow[];
   setRows: (rows: ProductRow[]) => void;
-  products: Product[];
 }) {
-  const updateQty = (i: number, val: string) =>
-    setRows(rows.map((r, idx) => (idx === i ? { ...r, quantity: val } : r)));
-  const updateProduct = (i: number, val: string) =>
-    setRows(rows.map((r, idx) => (idx === i ? { ...r, productId: val } : r)));
+  const update = (i: number, field: keyof ProductRow, val: string) => {
+    const next = rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r));
+    setRows(next);
+  };
   const remove = (i: number) => setRows(rows.filter((_, idx) => idx !== i));
   const add = () => setRows([...rows, { productId: "", quantity: "1" }]);
 
@@ -30,22 +27,18 @@ function ProductSelectRows({
       <div className="space-y-2 mb-2">
         {rows.map((row, i) => (
           <div key={i} className="flex gap-2 items-center">
-            <select
+            <input
               value={row.productId}
-              onChange={(e) => updateProduct(i, e.target.value)}
-              className="font-body flex-1 px-3 py-2 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)] bg-white"
+              onChange={(e) => update(i, "productId", e.target.value)}
+              placeholder="Product ID"
+              className="font-body flex-1 px-3 py-2 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)]"
               style={{ fontSize: 13 }}
-            >
-              <option value="">-- Chọn sản phẩm --</option>
-              {products.map((p) => (
-                <option key={p._id} value={p._id}>{p.name}</option>
-              ))}
-            </select>
+            />
             <input
               type="number"
               min="1"
               value={row.quantity}
-              onChange={(e) => updateQty(i, e.target.value)}
+              onChange={(e) => update(i, "quantity", e.target.value)}
               placeholder="SL"
               className="font-body w-16 px-3 py-2 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)] text-center"
               style={{ fontSize: 13 }}
@@ -85,7 +78,7 @@ export default function ManagerPromotionsPage() {
   // Create/Edit dialog
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingStatus, setEditingStatus] = useState("");
+  const [formPromoId, setFormPromoId] = useState("");
   const [formName, setFormName] = useState("");
   const [formBenefit, setFormBenefit] = useState("BUY_X_GET_Y");
   const [formDesc, setFormDesc] = useState("");
@@ -102,9 +95,6 @@ export default function ManagerPromotionsPage() {
   const [triggerRows, setTriggerRows] = useState<ProductRow[]>([]);
   const [rewardRows, setRewardRows] = useState<ProductRow[]>([]);
   const [condMinOrder, setCondMinOrder] = useState("");
-  const [condCustRegular, setCondCustRegular] = useState(false);
-  const [condCustVip, setCondCustVip] = useState(false);
-  const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
   const [condSaving, setCondSaving] = useState(false);
   const [condError, setCondError] = useState("");
 
@@ -129,7 +119,7 @@ export default function ManagerPromotionsPage() {
 
   const openCreate = () => {
     setEditingId(null);
-    setEditingStatus("");
+    setFormPromoId("");
     setFormName("");
     setFormBenefit("BUY_X_GET_Y");
     setFormDesc("");
@@ -141,7 +131,7 @@ export default function ManagerPromotionsPage() {
 
   const openEdit = (promo: Promotion) => {
     setEditingId(promo.promotionId);
-    setEditingStatus(promo.status);
+    setFormPromoId(promo.promotionId);
     setFormName(promo.promotionName);
     setFormBenefit(promo.benefitType);
     setFormDesc(promo.description || "");
@@ -153,7 +143,6 @@ export default function ManagerPromotionsPage() {
 
   const handleSave = async () => {
     if (!formName.trim()) { setError("Nhập tên khuyến mãi"); return; }
-    if (!formStart || !formEnd) { setError("Ngày bắt đầu và kết thúc là bắt buộc"); return; }
     try {
       setFormSaving(true);
       setError("");
@@ -165,16 +154,18 @@ export default function ManagerPromotionsPage() {
           startDate: formStart || null,
           endDate: formEnd || null,
         });
-        setSuccessMsg("Cập nhật khuyến mãi thành công!");
+        setSuccessMsg("Cập nhật KM thành công!");
       } else {
+        if (!formPromoId.trim()) { setError("Nhập mã khuyến mãi"); setFormSaving(false); return; }
         await promotionService.createPromotion({
+          promotionId: formPromoId,
           promotionName: formName,
           benefitType: formBenefit,
           description: formDesc || undefined,
           startDate: formStart || undefined,
           endDate: formEnd || undefined,
         });
-        setSuccessMsg("Tạo khuyến mãi thành công!");
+        setSuccessMsg("Tạo KM thành công!");
       }
       setFormOpen(false);
       setTimeout(() => setSuccessMsg(""), 3000);
@@ -192,7 +183,7 @@ export default function ManagerPromotionsPage() {
       setDeleting(true);
       await promotionService.deletePromotion(deletePromo.promotionId);
       setDeletePromo(null);
-      setSuccessMsg("Đã xóa khuyến mãi!");
+      setSuccessMsg("Đã xóa KM!");
       setTimeout(() => setSuccessMsg(""), 3000);
       loadPromotions();
     } catch (err: any) {
@@ -207,11 +198,7 @@ export default function ManagerPromotionsPage() {
     setCondSaving(false);
     setCondError("");
     try {
-      const [detail, prods] = await Promise.all([
-        promotionService.getPromotionById(promo.promotionId),
-        productService.getProducts(),
-      ]);
-      setAvailableProducts(prods);
+      const detail = await promotionService.getPromotionById(promo.promotionId);
       const cond = (detail as any)?.conditions;
       setTriggerRows(
         cond?.triggerProducts?.map((p: any) => ({ productId: p.productId, quantity: String(p.quantity) })) ?? []
@@ -220,15 +207,10 @@ export default function ManagerPromotionsPage() {
         cond?.rewardProducts?.map((p: any) => ({ productId: p.productId, quantity: String(p.quantity) })) ?? []
       );
       setCondMinOrder(cond?.minimumOrderAmount != null ? String(cond.minimumOrderAmount) : "");
-      const types: string[] = cond?.applicableCustomerTypes ?? [];
-      setCondCustRegular(types.includes("REGULAR"));
-      setCondCustVip(types.includes("VIP"));
     } catch {
       setTriggerRows([]);
       setRewardRows([]);
       setCondMinOrder("");
-      setCondCustRegular(false);
-      setCondCustVip(false);
     }
   };
 
@@ -247,10 +229,6 @@ export default function ManagerPromotionsPage() {
         triggerProducts,
         rewardProducts,
         minimumOrderAmount: condMinOrder ? parseFloat(condMinOrder) : null,
-        applicableCustomerTypes: [
-          ...(condCustRegular ? ["REGULAR"] : []),
-          ...(condCustVip ? ["VIP"] : []),
-        ],
       });
       setCondPromo(null);
       setSuccessMsg("Cập nhật điều kiện thành công!");
@@ -263,15 +241,9 @@ export default function ManagerPromotionsPage() {
   };
 
   const statusBadge = (status: string) => {
-    const styles: Record<string, { bg: string; color: string }> = {
-      ACTIVE:    { bg: "#dcfce7", color: "#16a34a" },
-      PLANNED:   { bg: "#dbeafe", color: "#2563eb" },
-      EXPIRED:   { bg: "#f3f4f6", color: "#6b7280" },
-      CANCELLED: { bg: "#fef2f2", color: "#dc2626" },
-    };
-    const s = styles[status] ?? { bg: "#f3f4f6", color: "#6b7280" };
+    const active = status === "ACTIVE";
     return (
-      <span className="font-body inline-block px-2 py-0.5 rounded-full" style={{ fontSize: 11, fontWeight: 600, backgroundColor: s.bg, color: s.color }}>
+      <span className="font-body inline-block px-2 py-0.5 rounded-full" style={{ fontSize: 11, fontWeight: 600, backgroundColor: active ? "#dcfce7" : "#fef2f2", color: active ? "#16a34a" : "#dc2626" }}>
         {status}
       </span>
     );
@@ -282,7 +254,7 @@ export default function ManagerPromotionsPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="font-heading text-[var(--cafe-primary)]" style={{ fontSize: 28, fontWeight: 700 }}>Quản lý khuyến mãi</h1>
         <button onClick={openCreate} className="font-body px-4 py-2.5 bg-[var(--cafe-primary)] text-white rounded-lg hover:opacity-90 transition-opacity" style={{ fontSize: 13, fontWeight: 500 }}>
-          + Tạo khuyến mãi
+          + Tạo KM
         </button>
       </div>
 
@@ -294,10 +266,8 @@ export default function ManagerPromotionsPage() {
       <div className="flex flex-wrap gap-3 mb-6">
         <select value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }} className="font-body px-4 py-2 border border-[var(--cafe-border)] rounded-lg bg-white focus:outline-none focus:border-[var(--cafe-gold)]" style={{ fontSize: 13 }}>
           <option value="">Tất cả trạng thái</option>
-          <option value="PLANNED">PLANNED</option>
           <option value="ACTIVE">ACTIVE</option>
-          <option value="EXPIRED">EXPIRED</option>
-          <option value="CANCELLED">CANCELLED</option>
+          <option value="INACTIVE">INACTIVE</option>
         </select>
       </div>
 
@@ -325,7 +295,7 @@ export default function ManagerPromotionsPage() {
                 <tr key={promo.promotionId} className="border-b border-[var(--cafe-bg)] last:border-0">
                   <td className="px-4 py-3">
                     <span className="font-body text-[var(--cafe-primary)]/50 bg-[var(--cafe-bg)] px-2 py-0.5 rounded" style={{ fontSize: 11, fontFamily: "monospace" }}>
-                      {promo.promotionId}
+                      {promo.promotionId.slice(0, 8)}…
                     </span>
                   </td>
                   <td className="font-body px-4 py-3 text-[var(--cafe-primary)]" style={{ fontSize: 13, fontWeight: 500 }}>{promo.promotionName}</td>
@@ -365,8 +335,14 @@ export default function ManagerPromotionsPage() {
             </h2>
             {error && <p className="font-body text-[var(--cafe-red)] mb-3 text-sm">{error}</p>}
             <div className="space-y-4">
+              {!editingId && (
+                <div>
+                  <label className="font-body text-[var(--cafe-primary)] block mb-1" style={{ fontSize: 13, fontWeight: 500 }}>Mã KM</label>
+                  <input value={formPromoId} onChange={(e) => setFormPromoId(e.target.value)} placeholder="VD: PROMO_001" className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)]" style={{ fontSize: 14 }} />
+                </div>
+              )}
               <div>
-                <label className="font-body text-[var(--cafe-primary)] block mb-1" style={{ fontSize: 13, fontWeight: 500 }}>Tên khuyến mãi</label>
+                <label className="font-body text-[var(--cafe-primary)] block mb-1" style={{ fontSize: 13, fontWeight: 500 }}>Tên KM</label>
                 <input value={formName} onChange={(e) => setFormName(e.target.value)} className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)]" style={{ fontSize: 14 }} />
               </div>
               <div>
@@ -381,17 +357,14 @@ export default function ManagerPromotionsPage() {
                 <label className="font-body text-[var(--cafe-primary)] block mb-1" style={{ fontSize: 13, fontWeight: 500 }}>Mô tả</label>
                 <input value={formDesc} onChange={(e) => setFormDesc(e.target.value)} className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)]" style={{ fontSize: 14 }} />
               </div>
-              {editingStatus === "ACTIVE" && (
-                <p className="font-body text-amber-600 text-xs">Không thể sửa ngày khi khuyến mãi đang ACTIVE.</p>
-              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="font-body text-[var(--cafe-primary)] block mb-1" style={{ fontSize: 13, fontWeight: 500 }}>Bắt đầu</label>
-                  <input type="date" value={formStart} onChange={(e) => setFormStart(e.target.value)} disabled={editingStatus === "ACTIVE"} className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)] disabled:opacity-50 disabled:cursor-not-allowed" style={{ fontSize: 14 }} />
+                  <input type="date" value={formStart} onChange={(e) => setFormStart(e.target.value)} className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)]" style={{ fontSize: 14 }} />
                 </div>
                 <div>
                   <label className="font-body text-[var(--cafe-primary)] block mb-1" style={{ fontSize: 13, fontWeight: 500 }}>Kết thúc</label>
-                  <input type="date" value={formEnd} onChange={(e) => setFormEnd(e.target.value)} disabled={editingStatus === "ACTIVE"} className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)] disabled:opacity-50 disabled:cursor-not-allowed" style={{ fontSize: 14 }} />
+                  <input type="date" value={formEnd} onChange={(e) => setFormEnd(e.target.value)} className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)]" style={{ fontSize: 14 }} />
                 </div>
               </div>
             </div>
@@ -427,7 +400,7 @@ export default function ManagerPromotionsPage() {
       {condPromo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setCondPromo(null)}>
           <div className="bg-white rounded-2xl p-6 w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <h2 className="font-heading text-[var(--cafe-primary)] mb-1" style={{ fontSize: 22, fontWeight: 600 }}>Điều kiện khuyến mãi</h2>
+            <h2 className="font-heading text-[var(--cafe-primary)] mb-1" style={{ fontSize: 22, fontWeight: 600 }}>Điều kiện KM</h2>
             <p className="font-body text-[var(--cafe-primary)]/60 mb-5" style={{ fontSize: 13 }}>{condPromo.promotionName}</p>
 
             {condError && (
@@ -435,32 +408,11 @@ export default function ManagerPromotionsPage() {
             )}
 
             <div className="space-y-6">
-              <ProductSelectRows label="Sản phẩm kích hoạt" rows={triggerRows} setRows={setTriggerRows} products={availableProducts} />
+              <ProductRows label="Sản phẩm kích hoạt" rows={triggerRows} setRows={setTriggerRows} />
 
               <div className="border-t border-[var(--cafe-bg)]" />
 
-              <ProductSelectRows label="Sản phẩm thưởng" rows={rewardRows} setRows={setRewardRows} products={availableProducts} />
-
-              <div className="border-t border-[var(--cafe-bg)]" />
-
-              {/* Customer types */}
-              <div>
-                <label className="font-body text-[var(--cafe-primary)] block mb-2" style={{ fontSize: 13, fontWeight: 500 }}>
-                  Loại khách hàng áp dụng
-                </label>
-                <div className="flex gap-6">
-                  {[
-                    { key: "regular", label: "REGULAR", checked: condCustRegular, set: setCondCustRegular },
-                    { key: "vip", label: "VIP", checked: condCustVip, set: setCondCustVip },
-                  ].map(({ key, label, checked, set }) => (
-                    <label key={key} className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={checked} onChange={(e) => set(e.target.checked)} className="w-4 h-4 accent-[var(--cafe-gold)]" />
-                      <span className="font-body text-[var(--cafe-primary)]" style={{ fontSize: 13, fontWeight: 500 }}>{label}</span>
-                    </label>
-                  ))}
-                </div>
-                <p className="font-body text-[var(--cafe-primary)]/40 mt-1" style={{ fontSize: 11 }}>Không chọn = áp dụng tất cả loại KH</p>
-              </div>
+              <ProductRows label="Sản phẩm thưởng" rows={rewardRows} setRows={setRewardRows} />
 
               <div className="border-t border-[var(--cafe-bg)]" />
 
