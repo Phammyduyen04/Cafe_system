@@ -20,4 +20,4 @@ RUN npx prisma generate
 EXPOSE 3002
 
 # Run migrations then start server
-CMD ["sh", "-c", "npx prisma migrate deploy && node src/server.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy || npx prisma db push --accept-data-loss && node src/server.js"]

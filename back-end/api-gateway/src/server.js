@@ -39,6 +39,7 @@ const proxyOptions = {
     console.error('Proxy error:', err.message);
     res.status(502).json({ success: false, message: 'Service unavailable' });
   },
+  parseReqBody: false,  // Required for file upload (multipart/form-data) to pass through correctly
 };
 
 // Routes — proxyReqPathResolver giữ nguyên path gốc (vd: /api/payments/:id)
@@ -47,6 +48,13 @@ app.use('/api/customers',  proxy(CUSTOMER_URL,  proxyOptions));
 app.use('/api/orders',     proxy(ORDER_URL,     proxyOptions));
 app.use('/api/payments',   proxy(PAYMENT_URL,   proxyOptions));
 app.use('/api/products',   proxy(PRODUCT_URL,   proxyOptions));
+app.use('/uploads',        proxy(PRODUCT_URL,   {
+  proxyReqPathResolver(req) { return req.originalUrl; },
+  proxyErrorHandler(err, res, next) {
+    console.error('Proxy error:', err.message);
+    res.status(502).json({ success: false, message: 'Service unavailable' });
+  },
+}));
 app.use('/api/promotions', proxy(PROMOTION_URL, proxyOptions));
 app.use('/api/staff',      proxy(STAFF_URL,     proxyOptions));
 

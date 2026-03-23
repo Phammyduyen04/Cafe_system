@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { uploadProduct, uploadTopping } = require('../middlewares/upload.middleware');
+const { uploadProduct, uploadTopping, uploadIngredient } = require('../middlewares/upload.middleware');
 const { authMiddleware, authorizeMiddleware } = require('../../../shared');
 
 // POST /api/products/upload/product  — upload 1 ảnh sản phẩm
@@ -25,6 +25,19 @@ router.post(
   (req, res) => {
     if (!req.file) return res.status(400).json({ message: 'Không có file được gửi lên' });
     const url = `/uploads/toppings/${req.file.filename}`;
+    return res.status(201).json({ url });
+  }
+);
+
+// POST /api/products/upload/ingredient  — upload 1 ảnh nguyên liệu
+router.post(
+  '/ingredient',
+  authMiddleware,
+  authorizeMiddleware('ADMIN', 'MANAGER'),
+  uploadIngredient.single('image'),
+  (req, res) => {
+    if (!req.file) return res.status(400).json({ message: 'Không có file được gửi lên' });
+    const url = `/uploads/ingredients/${req.file.filename}`;
     return res.status(201).json({ url });
   }
 );

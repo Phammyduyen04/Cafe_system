@@ -4,7 +4,12 @@ import { useCart } from "../../../contexts/CartContext";
 const formatVND = (n: number) =>
   n.toLocaleString("vi-VN", { style: "currency", currency: "VND" });
 
-export default function OrderSummary() {
+interface OrderSummaryProps {
+  shippingFee?: number;
+  shipOption?: string;
+}
+
+export default function OrderSummary({ shippingFee, shipOption }: OrderSummaryProps = {}) {
   const { items } = useCart();
 
   if (items.length === 0) {
@@ -20,6 +25,9 @@ export default function OrderSummary() {
 
   const subtotal = items.reduce((s, i) => s + (i.price ?? 0) * (i.quantity ?? 1), 0);
   const totalQty = items.reduce((s, i) => s + (i.quantity ?? 1), 0);
+  const isDynamic = shipOption === "partner";
+  const fee = shippingFee ?? 0;
+  const total = isDynamic ? subtotal : subtotal + fee;
 
   return (
     <div className="font-body border border-[#d9d9d9] bg-white">
@@ -73,12 +81,24 @@ export default function OrderSummary() {
         </div>
         <div className="flex justify-between">
           <span style={{ fontSize: 12, color: "rgba(48,38,28,0.65)" }}>Phí vận chuyển</span>
-          <span style={{ fontSize: 11, color: "rgba(48,38,28,0.45)", fontStyle: "italic" }}>Tính ở bước tiếp theo</span>
+          {shipOption === undefined ? (
+            <span style={{ fontSize: 11, color: "rgba(48,38,28,0.45)", fontStyle: "italic" }}>Tính ở bước tiếp theo</span>
+          ) : isDynamic ? (
+            <span style={{ fontSize: 11, color: "rgba(48,38,28,0.45)", fontStyle: "italic" }}>Tính theo khoảng cách</span>
+          ) : fee === 0 ? (
+            <span style={{ fontSize: 12, color: "#5a8a5a", fontWeight: 600 }}>Miễn phí</span>
+          ) : (
+            <span className="text-cafe-primary" style={{ fontSize: 12, fontWeight: 600 }}>+{formatVND(fee)}</span>
+          )}
         </div>
         <div className="h-px bg-cafe-accent my-2" />
         <div className="flex justify-between">
           <span className="text-cafe-primary" style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.5px" }}>Tổng cộng</span>
-          <span className="text-cafe-primary" style={{ fontSize: 13, fontWeight: 700 }}>{formatVND(subtotal)}</span>
+          {isDynamic ? (
+            <span style={{ fontSize: 11, color: "rgba(48,38,28,0.45)", fontStyle: "italic" }}>Tính theo khoảng cách</span>
+          ) : (
+            <span className="text-cafe-primary" style={{ fontSize: 13, fontWeight: 700 }}>{formatVND(total)}</span>
+          )}
         </div>
       </div>
     </div>

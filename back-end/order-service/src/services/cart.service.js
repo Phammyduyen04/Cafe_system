@@ -3,7 +3,6 @@ const cartRepo = require('../repositories/cart.repo');
 const { getProductById, getToppingById } = require('./product.client');
 
 // ========== Ràng buộc nghiệp vụ ==========
-const VALID_SIZES = ['M', 'L'];
 const VALID_LEVELS = ['0%', '25%', '50%', '75%', '100%'];
 const MAX_QUANTITY = 200;
 
@@ -21,10 +20,10 @@ const validateItemData = (data) => {
     }
   }
 
-  // Validate size
-  if (data.size !== undefined && data.size !== null) {
-    if (!VALID_SIZES.includes(data.size)) {
-      throw new AppError(`Size chỉ được chọn: ${VALID_SIZES.join(', ')}`, 400);
+  // Validate size — accept any non-empty string (product sizes are dynamic)
+  if (data.size !== undefined && data.size !== null && data.size !== '') {
+    if (typeof data.size !== 'string' || data.size.length > 20) {
+      throw new AppError('Size không hợp lệ', 400);
     }
   }
 

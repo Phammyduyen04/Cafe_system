@@ -19,7 +19,6 @@ export default function MenuCard({ item, categories }: MenuCardProps) {
   const { addToCart } = useCart();
   const { isLoggedIn } = useAuth();
   const navigate = useNavigate();
-  const [added, setAdded] = useState(false);
   const [adding, setAdding] = useState(false);
 
   const categoryName = getCategoryName(item, categories);
@@ -41,10 +40,9 @@ export default function MenuCard({ item, categories }: MenuCardProps) {
         name: item.name,
         image: imageUrl,
       });
-      setAdded(true);
-      setTimeout(() => setAdded(false), 1500);
-    } catch {
-      // silent fail
+      navigate("/cart");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Không thể thêm vào giỏ hàng.");
     } finally {
       setAdding(false);
     }
@@ -105,14 +103,14 @@ export default function MenuCard({ item, categories }: MenuCardProps) {
             style={{
               fontWeight: 600,
               fontSize: 13,
-              background: added ? "#4caf50" : "#30261c",
+              background: "#30261c",
               color: "#f1f0ee",
               opacity: adding ? 0.7 : 1,
             }}
             onClick={handleAddToCart}
             disabled={adding}
           >
-            {added ? "\u2713 \u0110\u00e3 th\u00eam" : adding ? "\u0110ang th\u00eam..." : "Th\u00eam v\u00e0o gi\u1ecf"}
+            {adding ? "Đang thêm..." : "Thêm vào giỏ"}
           </button>
         )}
       </div>

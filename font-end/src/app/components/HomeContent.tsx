@@ -38,11 +38,13 @@ export default function HomeContent() {
     productsByCategory[catId].push(product);
   }
 
-  // Only show 3 categories in this order
-  const displayOrder = ["Cà phê", "Trà sữa", "Bánh và ăn nhẹ", "Bánh & ăn nhẹ"];
-  const displayCategories = displayOrder
+  // Show top 3 categories in priority order: Cà phê → Trà sữa → Bánh & ăn nhẹ, then others
+  const priorityNames = ["Cà phê", "Trà sữa", "Trà sữa trân châu", "Bánh & ăn nhẹ", "Bánh và ăn nhẹ"];
+  const prioritized = priorityNames
     .map((name) => categories.find((c) => c.name === name))
     .filter((c): c is Category => !!c);
+  const others = categories.filter((c) => !priorityNames.includes(c.name));
+  const displayCategories = [...prioritized, ...others].slice(0, 3);
 
   return (
     <>

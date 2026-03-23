@@ -63,7 +63,7 @@ export default function CoffeaNavbar() {
     if (!isLoggedIn) {
       navigate("/login");
     } else {
-      navigate("/checkout");
+      navigate("/cart");
     }
   };
 
@@ -280,6 +280,19 @@ export default function CoffeaNavbar() {
                       <circle cx="12" cy="7" r="4" />
                     </svg>
                     Hồ sơ tài khoản
+                  </Link>
+                  <Link
+                    to="/my-orders"
+                    className="font-body flex items-center gap-3 w-full px-4 py-3 text-cafe-primary hover:bg-cafe-bg transition-colors"
+                    style={{ fontWeight: 500, fontSize: 14 }}
+                    onClick={() => setAccountOpen(false)}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+                      <rect x="9" y="3" width="6" height="4" rx="1" />
+                      <path d="M9 12h6M9 16h4" />
+                    </svg>
+                    Đơn hàng của tôi
                   </Link>
                   <button
                     className="font-body flex items-center gap-3 w-full px-4 py-3 text-cafe-red hover:bg-red-50 transition-colors"

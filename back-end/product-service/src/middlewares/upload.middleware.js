@@ -28,5 +28,6 @@ function fileFilter(req, file, cb) {
 
 const uploadProduct = multer({ storage: createStorage('products'), fileFilter, limits: { fileSize: MAX_SIZE } });
 const uploadTopping = multer({ storage: createStorage('toppings'), fileFilter, limits: { fileSize: MAX_SIZE } });
+const uploadIngredient = multer({ storage: createStorage('ingredients'), fileFilter, limits: { fileSize: MAX_SIZE } });
 
-module.exports = { uploadProduct, uploadTopping };
+module.exports = { uploadProduct, uploadTopping, uploadIngredient };

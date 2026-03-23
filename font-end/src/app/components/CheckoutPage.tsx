@@ -1,17 +1,51 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import { useCart } from "../../contexts/CartContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { orderService } from "../../services/order.service";
+import type { PaymentMethod, PaymentInfo } from "../../services/order.service";
 
 import StepIndicator, { STEPS } from "./checkout/StepIndicator";
 import OrderSummary from "./checkout/OrderSummary";
 import FloatingInput from "./checkout/FloatingInput";
-import FloatingSelect from "./checkout/FloatingSelect";
 
-const formatVND = (n: number) =>
-  n.toLocaleString("vi-VN", { style: "currency", currency: "VND" });
+// ─── Shipping options ────────────────────────────────────────────────────────
+const SHIP_OPTIONS = [
+  {
+    id: "partner",
+    label: "Giao hàng qua đối tác",
+    sub: "20–40 phút · Grab / ShopeeFood / Ahamove (tự phân công)",
+    feeLabel: "Tính theo khoảng cách",
+    fee: 0,
+    feeIsDynamic: true,
+  },
+  {
+    id: "priority",
+    label: "Giao hàng ưu tiên",
+    sub: "15–25 phút · Ưu tiên tài xế gần / express",
+    feeLabel: "+15.000₫",
+    fee: 15000,
+    feeIsDynamic: false,
+  },
+  {
+    id: "self",
+    label: "Khách tự đặt ship",
+    sub: "Tùy khách · Quán chuẩn bị sẵn đồ, khách gọi tài xế riêng",
+    feeLabel: "Khách tự trả",
+    fee: 0,
+    feeIsDynamic: false,
+  },
+  {
+    id: "pickup",
+    label: "Nhận tại quán",
+    sub: "5–10 phút chuẩn bị · Đến quán lấy trực tiếp",
+    feeLabel: "Miễn phí",
+    fee: 0,
+    feeIsDynamic: false,
+  },
+];
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <p className="font-body text-cafe-primary" style={{ fontSize: 10, fontWeight: 600, letterSpacing: "2.5px", textTransform: "uppercase", marginBottom: 12 }}>
@@ -20,6 +54,21 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+const ArrowRight = () => (
+  <svg width="32" height="10" viewBox="0 0 48 10" fill="none">
+    <line x1="0" y1="5" x2="40" y2="5" stroke="currentColor" strokeWidth="1.5" />
+    <path d="M38 1L44 5L38 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const ArrowLeft = () => (
+  <svg width="52" height="12" viewBox="0 0 52 12" fill="none">
+    <line x1="52" y1="6" x2="12" y2="6" stroke="currentColor" strokeWidth="1.5" />
+    <path d="M14 1.5L8 6L14 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const { items, clearCart } = useCart();
@@ -28,23 +77,63 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  // form state
-  const [email, setEmail] = useState(user?.username ?? "");
+  // Step 0 — contact + address
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [firstName, setFirst] = useState("");
-  const [lastName, setLast] = useState("");
-  const [country, setCountry] = useState("");
-  const [region, setRegion] = useState("");
   const [address, setAddress] = useState("");
-  const [city, setCity] = useState("");
-  const [postal, setPostal] = useState("");
-  const [shipMethod, setShipMethod] = useState("standard");
-  const [cardName, setCardName] = useState("");
-  const [cardNum, setCardNum] = useState("");
-  const [cardExp, setCardExp] = useState("");
-  const [cardCvv, setCardCvv] = useState("");
+
+  // Step 1 — shipping
+  const [shipMethod, setShipMethod] = useState("partner");
+
+  // Step 2 — payment
+  const [payMethods, setPayMethods] = useState<PaymentMethod[]>([]);
+  const [selectedPayMethod, setSelectedPayMethod] = useState("CASH");
+
+  // Result
   const [done, setDone] = useState(false);
+  const [waitingQR, setWaitingQR] = useState(false);
   const [orderId, setOrderId] = useState("");
+  const [orderCode, setOrderCode] = useState("");
+  const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);
+  const [qrPaid, setQrPaid] = useState(false);
+
+  // Compute shipping fee from selected option
+  const selectedShip = SHIP_OPTIONS.find(o => o.id === shipMethod) ?? SHIP_OPTIONS[0];
+  const shippingFee = selectedShip.fee;
+
+  // Poll order status when waiting for QR payment
+  useEffect(() => {
+    if (!waitingQR || qrPaid || !orderId) return;
+    const interval = setInterval(async () => {
+      try {
+        const order = await orderService.getOrderById(orderId);
+        const status = (order as any)?.status ?? (order as any)?.data?.status;
+        if (status === "PAID" || status === "CONFIRMED" || status === "PREPARING" || status === "COMPLETED") {
+          setQrPaid(true);
+          clearInterval(interval);
+        }
+      } catch {}
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [waitingQR, qrPaid, orderId]);
+
+  useEffect(() => {
+    orderService.getPaymentMethods()
+      .then(res => {
+        const list: PaymentMethod[] = Array.isArray(res) ? res : ((res as any)?.data ?? []);
+        const active = list.filter(m => m.is_active);
+        setPayMethods(active);
+        if (active.length > 0) setSelectedPayMethod(active[0].method_code);
+      })
+      .catch(() => {
+        setPayMethods([
+          { id: 1, method_code: "CASH", method_name: "Tiền mặt", description: "Thanh toán tiền mặt khi nhận hàng hoặc tại quán", is_active: true },
+          { id: 2, method_code: "QR", method_name: "Chuyển khoản QR", description: "Chuyển khoản ngân hàng qua mã VietQR", is_active: true },
+          { id: 3, method_code: "MOMO", method_name: "Ví MoMo", description: "Thanh toán qua ví điện tử MoMo", is_active: true },
+        ]);
+      });
+  }, []);
 
   if (!isLoggedIn) {
     return (
@@ -55,23 +144,28 @@ export default function CheckoutPage() {
     );
   }
 
-  const ArrowRight = () => (
-    <svg width="32" height="10" viewBox="0 0 48 10" fill="none">
-      <line x1="0" y1="5" x2="40" y2="5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M38 1L44 5L38 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-
-  const ArrowLeft = () => (
-    <svg width="52" height="12" viewBox="0 0 52 12" fill="none">
-      <line x1="52" y1="6" x2="12" y2="6" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M14 1.5L8 6L14 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+  const validateStep0 = (): string => {
+    if (!fullName.trim() || fullName.trim().length < 2)
+      return "Vui lòng nhập họ tên (tối thiểu 2 ký tự).";
+    const phoneClean = phone.trim().replace(/\s/g, "");
+    if (!phoneClean)
+      return "Vui lòng nhập số điện thoại.";
+    if (!/^(0|\+84)[3|5|7|8|9][0-9]{8}$/.test(phoneClean))
+      return "Số điện thoại không hợp lệ (VD: 0912345678).";
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+      return "Email không hợp lệ.";
+    if (!address.trim() || address.trim().length < 10)
+      return "Địa chỉ giao hàng quá ngắn, vui lòng nhập đầy đủ (tối thiểu 10 ký tự).";
+    return "";
+  };
 
   const handleNext = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    if (step === 0) {
+      const err = validateStep0();
+      if (err) { setError(err); return; }
+    }
     if (step < STEPS.length - 1) {
       setStep(s => s + 1);
       return;
@@ -81,18 +175,42 @@ export default function CheckoutPage() {
     try {
       const res = await orderService.checkout({
         customerInfo: {
-          fullName: `${firstName} ${lastName}`.trim() || user?.username || "Khách",
+          fullName: fullName || user?.username || "Khách",
           email,
           phone,
           address,
-          city,
-          region,
-          country: country || "Việt Nam",
+          city: "",
+          region: "",
+          country: "Việt Nam",
         },
         shippingMethod: shipMethod,
-        paymentMethod: "cash",
+        paymentMethod: selectedPayMethod,
       });
-      setOrderId(res.order?._id ?? "");
+      const order = (res as any)?.order ?? res;
+      const pInfo = (res as any)?.paymentInfo ?? null;
+      setOrderId(order?._id ?? order?.order_id ?? "");
+      setOrderCode(order?.order_code ?? "");
+      setPaymentInfo(pInfo);
+
+      if (selectedPayMethod === "MOMO") {
+        if (!pInfo?.payUrl) {
+          setError("Không thể khởi tạo thanh toán MoMo. Vui lòng thử lại hoặc chọn phương thức khác.");
+          return;
+        }
+        await clearCart();
+        const oid = order?.order_id ?? "";
+        if (oid) localStorage.setItem("pendingMomoOrderId", oid);
+        window.location.href = pInfo.payUrl;
+        return;
+      }
+
+      if (selectedPayMethod === "QR") {
+        await clearCart();
+        setWaitingQR(true);
+        return;
+      }
+
+      // CASH — hiển thị thành công ngay
       await clearCart();
       setDone(true);
     } catch (err) {
@@ -102,7 +220,85 @@ export default function CheckoutPage() {
     }
   };
 
+  // ─── QR Waiting screen ───────────────────────────────────────────────────
+  if (waitingQR) {
+    const qrUrl = paymentInfo?.qrUrl;
+    const subtotal = items.reduce((s, i) => s + (i.price ?? 0) * (i.quantity ?? 1), 0);
+    const total = selectedShip.feeIsDynamic ? subtotal : subtotal + shippingFee;
+
+    if (qrPaid) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center gap-6 px-6 bg-cafe-bg pt-20">
+          <div className="w-16 h-16 flex items-center justify-center bg-cafe-primary">
+            <svg width="28" height="22" viewBox="0 0 28 22" fill="none">
+              <path d="M2 11L10 19L26 2" stroke="#f1f0ee" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <p className="font-body text-cafe-primary" style={{ fontSize: 22, fontWeight: 700, letterSpacing: "2px", textTransform: "uppercase" }}>Thanh toán thành công!</p>
+          <p className="font-body" style={{ fontSize: 12, color: "rgba(48,38,28,0.5)" }}>Mã đơn hàng: <strong>{orderCode}</strong></p>
+          <p className="font-body text-center" style={{ fontSize: 13, color: "rgba(48,38,28,0.6)", maxWidth: 360, lineHeight: 1.8 }}>
+            Hệ thống đã ghi nhận thanh toán. Đơn hàng đang được xử lý.
+          </p>
+          <div className="flex gap-3 mt-2">
+            <Link to="/my-orders" className="font-body px-6 py-3 border border-cafe-primary text-cafe-primary" style={{ fontSize: 11, fontWeight: 600, letterSpacing: "2px", textTransform: "uppercase" }}>Xem đơn hàng</Link>
+            <Link to="/" className="font-body px-6 py-3 bg-cafe-primary text-cafe-bg" style={{ fontSize: 11, fontWeight: 600, letterSpacing: "2px", textTransform: "uppercase" }}>Về trang chủ</Link>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-6 px-6 bg-cafe-bg pt-20">
+        {/* Spinner */}
+        <div className="flex flex-col items-center gap-2">
+          <svg className="animate-spin" width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <circle cx="16" cy="16" r="13" stroke="#d9d9d9" strokeWidth="3" />
+            <path d="M16 3 A13 13 0 0 1 29 16" stroke="#30261c" strokeWidth="3" strokeLinecap="round" />
+          </svg>
+          <p className="font-body text-cafe-primary" style={{ fontSize: 14, fontWeight: 600, letterSpacing: "1px" }}>Đang chờ thanh toán...</p>
+        </div>
+
+        <div className="flex flex-col items-center gap-4 w-full max-w-xs border border-cafe-border bg-white p-6">
+          <p className="font-body text-cafe-primary" style={{ fontSize: 12, fontWeight: 700, letterSpacing: "1px", textTransform: "uppercase" }}>Quét mã QR để thanh toán</p>
+          {qrUrl ? (
+            <img src={qrUrl} alt="QR thanh toán" className="w-56 h-56 object-contain" />
+          ) : (
+            <div className="w-56 h-56 border border-dashed flex items-center justify-center">
+              <p className="font-body text-center" style={{ fontSize: 11, color: "rgba(48,38,28,0.45)" }}>Không thể tải mã QR</p>
+            </div>
+          )}
+          <div className="w-full flex flex-col gap-1 pt-2 border-t border-[#f0ece5]">
+            <div className="flex justify-between">
+              <span className="font-body" style={{ fontSize: 11, color: "rgba(48,38,28,0.5)" }}>Mã đơn hàng</span>
+              <span className="font-body text-cafe-primary" style={{ fontSize: 11, fontWeight: 700 }}>{orderCode}</span>
+            </div>
+            {!selectedShip.feeIsDynamic && (
+              <div className="flex justify-between">
+                <span className="font-body" style={{ fontSize: 11, color: "rgba(48,38,28,0.5)" }}>Tổng tiền</span>
+                <span className="font-body text-cafe-primary" style={{ fontSize: 13, fontWeight: 700 }}>
+                  {total.toLocaleString("vi-VN")}₫
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <p className="font-body text-center" style={{ fontSize: 11, color: "rgba(48,38,28,0.5)", maxWidth: 320, lineHeight: 1.8 }}>
+          Chuyển khoản đúng số tiền và nội dung <strong>{orderCode}</strong>.<br />
+          Trang này sẽ tự cập nhật khi nhận được thanh toán.
+        </p>
+
+        <Link to="/my-orders" className="font-body" style={{ fontSize: 11, color: "rgba(48,38,28,0.45)", textDecoration: "underline" }}>
+          Kiểm tra đơn hàng
+        </Link>
+      </div>
+    );
+  }
+
+  // ─── Success screen ───────────────────────────────────────────────────────
   if (done) {
+    const qrUrl = paymentInfo?.qrUrl;
+    const isQR = selectedPayMethod === "QR";
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-6 px-6 bg-cafe-bg">
         <div className="w-16 h-16 flex items-center justify-center bg-cafe-primary">
@@ -114,22 +310,49 @@ export default function CheckoutPage() {
           Đặt hàng thành công!
         </p>
         {orderId && (
-          <p className="font-body" style={{ fontSize: 12, color: "rgba(48,38,28,0.5)" }}>Mã đơn hàng: #{orderId.slice(-8).toUpperCase()}</p>
+          <p className="font-body" style={{ fontSize: 12, color: "rgba(48,38,28,0.5)" }}>
+            Mã đơn hàng: <strong>{orderCode || `#${orderId.slice(-8).toUpperCase()}`}</strong>
+          </p>
         )}
-        <p className="font-body" style={{ fontSize: 13, color: "rgba(48,38,28,0.6)", textAlign: "center", maxWidth: 360, lineHeight: 1.8 }}>
-          Cảm ơn bạn đã tin tưởng Coffea. Chúng tôi sẽ xác nhận đơn hàng và liên hệ sớm nhất có thể.
-        </p>
-        <Link
-          to="/"
-          className="font-body mt-2 px-8 py-3 bg-cafe-primary text-cafe-bg"
-          style={{ fontSize: 12, fontWeight: 600, letterSpacing: "2.5px", textTransform: "uppercase" }}
-        >
-          Về trang chủ
-        </Link>
+
+        {isQR && (
+          <div className="flex flex-col items-center gap-4 w-full max-w-xs border border-cafe-border bg-white p-6">
+            <p className="font-body text-cafe-primary" style={{ fontSize: 13, fontWeight: 700, letterSpacing: "1px", textTransform: "uppercase" }}>
+              Quét mã QR để thanh toán
+            </p>
+            {qrUrl ? (
+              <img src={qrUrl} alt="QR thanh toán" className="w-52 h-52 object-contain" />
+            ) : (
+              <div className="w-52 h-52 border border-dashed border-cafe-border flex items-center justify-center">
+                <p className="font-body text-center" style={{ fontSize: 11, color: "rgba(48,38,28,0.45)" }}>Không thể tải mã QR</p>
+              </div>
+            )}
+            <p className="font-body text-center" style={{ fontSize: 11, color: "rgba(48,38,28,0.55)", lineHeight: 1.7 }}>
+              Chuyển khoản đúng số tiền và nội dung <strong>{orderCode}</strong>.<br />
+              Nhân viên sẽ xác nhận sau khi nhận được tiền.
+            </p>
+          </div>
+        )}
+
+        {!isQR && (
+          <p className="font-body" style={{ fontSize: 13, color: "rgba(48,38,28,0.6)", textAlign: "center", maxWidth: 360, lineHeight: 1.8 }}>
+            Cảm ơn bạn đã tin tưởng Coffea.<br />Chúng tôi sẽ xác nhận đơn hàng và liên hệ sớm nhất có thể.
+          </p>
+        )}
+
+        <div className="flex gap-3 mt-2">
+          <Link to="/my-orders" className="font-body px-6 py-3 border border-cafe-primary text-cafe-primary" style={{ fontSize: 11, fontWeight: 600, letterSpacing: "2px", textTransform: "uppercase" }}>
+            Xem đơn hàng
+          </Link>
+          <Link to="/" className="font-body px-6 py-3 bg-cafe-primary text-cafe-bg" style={{ fontSize: 11, fontWeight: 600, letterSpacing: "2px", textTransform: "uppercase" }}>
+            Về trang chủ
+          </Link>
+        </div>
       </div>
     );
   }
 
+  // ─── Checkout form ──────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-cafe-bg">
       <div className="pt-20">
@@ -144,127 +367,154 @@ export default function CheckoutPage() {
             <ArrowLeft />
           </button>
 
-          {/* Title */}
           <h1 className="font-body text-cafe-primary" style={{ fontSize: 34, fontWeight: 700, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 16 }}>
             Thanh toán
           </h1>
 
-          {/* Step tabs */}
+          {/* Step indicator */}
           <div className="mb-10">
             <StepIndicator current={step} />
             <div className="h-px bg-[#d9d9d9] mt-3 relative">
-              <div
-                className="absolute top-0 left-0 h-px bg-cafe-primary transition-all duration-500"
-                style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
-              />
+              <div className="absolute top-0 left-0 h-px bg-cafe-primary transition-all duration-500" style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} />
             </div>
           </div>
 
-          {/* Error */}
           {error && (
             <div className="font-body mb-6 px-4 py-3 bg-red-50 border border-red-200" style={{ fontSize: 13, color: "#e74c3c" }}>
               {error}
             </div>
           )}
 
-          {/* Two-column layout */}
           <div className="flex flex-col lg:flex-row gap-10 xl:gap-16 items-start">
 
             {/* LEFT: Form */}
             <form onSubmit={handleNext} className="flex-1 min-w-0 flex flex-col gap-8">
 
-              {/* STEP 0: Information */}
+              {/* ── STEP 0: Contact + Address ── */}
               {step === 0 && (
-                <>
-                  <div>
-                    <SectionLabel>Thông tin liên hệ</SectionLabel>
-                    <div className="flex flex-col gap-3">
-                      <FloatingInput label="Email" type="email" value={email} onChange={setEmail} required />
-                      <FloatingInput label="Số điện thoại" type="tel" value={phone} onChange={setPhone} required />
-                    </div>
-                  </div>
-                  <div>
-                    <SectionLabel>Địa chỉ giao hàng</SectionLabel>
-                    <div className="flex flex-col gap-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <FloatingInput label="Họ" value={firstName} onChange={setFirst} required />
-                        <FloatingInput label="Tên" value={lastName} onChange={setLast} required />
-                      </div>
-                      <FloatingSelect
-                        label="Quốc gia"
-                        value={country}
-                        onChange={setCountry}
-                        options={["Việt Nam", "Hoa Kỳ", "Nhật Bản", "Hàn Quốc", "Khác"]}
-                      />
-                      <FloatingInput label="Tỉnh / Thành phố" value={region} onChange={setRegion} required />
-                      <FloatingInput label="Địa chỉ" value={address} onChange={setAddress} required />
-                      <div className="grid grid-cols-2 gap-3">
-                        <FloatingInput label="Quận / Huyện" value={city} onChange={setCity} required />
-                        <FloatingInput label="Mã bưu chính" value={postal} onChange={setPostal} />
-                      </div>
-                    </div>
-                  </div>
-                </>
+                <div className="flex flex-col gap-3">
+                  <SectionLabel>Thông tin đặt hàng</SectionLabel>
+                  <FloatingInput label="Họ và tên" value={fullName} onChange={setFullName} required />
+                  <FloatingInput label="Số điện thoại" type="tel" value={phone} onChange={setPhone} required />
+                  <FloatingInput label="Email" type="email" value={email} onChange={setEmail} required />
+                  <FloatingInput label="Địa chỉ giao hàng" value={address} onChange={setAddress} required />
+                </div>
               )}
 
-              {/* STEP 1: Shipping */}
+              {/* ── STEP 1: Shipping ── */}
               {step === 1 && (
                 <div>
                   <SectionLabel>Phương thức vận chuyển</SectionLabel>
                   <div className="flex flex-col gap-3">
-                    {[
-                      { id: "standard", label: "Giao hàng tiêu chuẩn", sub: "3–5 ngày làm việc", price: "Miễn phí" },
-                      { id: "express", label: "Giao hàng nhanh", sub: "1–2 ngày làm việc", price: "25.000₫" },
-                      { id: "sameday", label: "Giao trong ngày", sub: "Trong vòng 4 giờ", price: "45.000₫" },
-                    ].map(opt => (
+                    {SHIP_OPTIONS.map(opt => (
                       <label
                         key={opt.id}
-                        className="flex items-center gap-4 px-5 py-4 border cursor-pointer transition-all duration-150"
+                        className="flex items-start gap-4 px-5 py-4 border cursor-pointer transition-all duration-150"
                         style={{
                           background: shipMethod === opt.id ? "rgba(48,38,28,0.04)" : "white",
                           borderColor: shipMethod === opt.id ? "#30261c" : "#d9d9d9",
                         }}
                       >
-                        <div
-                          className="w-4 h-4 border-2 rounded-full flex items-center justify-center shrink-0 transition-colors"
-                          style={{ borderColor: shipMethod === opt.id ? "#30261c" : "#d9d9d9" }}
-                        >
+                        <div className="mt-0.5 w-4 h-4 border-2 rounded-full flex items-center justify-center shrink-0 transition-colors" style={{ borderColor: shipMethod === opt.id ? "#30261c" : "#d9d9d9" }}>
                           {shipMethod === opt.id && <div className="w-2 h-2 rounded-full bg-cafe-primary" />}
                         </div>
                         <input type="radio" name="ship" value={opt.id} className="sr-only" checked={shipMethod === opt.id} onChange={() => setShipMethod(opt.id)} />
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <p className="font-body text-cafe-primary" style={{ fontSize: 13, fontWeight: 600 }}>{opt.label}</p>
-                          <p className="font-body" style={{ fontSize: 11, color: "rgba(48,38,28,0.5)", marginTop: 2 }}>{opt.sub}</p>
+                          <p className="font-body" style={{ fontSize: 11, color: "rgba(48,38,28,0.5)", marginTop: 3, lineHeight: 1.6 }}>{opt.sub}</p>
                         </div>
-                        <span className="font-body text-cafe-primary" style={{ fontSize: 12, fontWeight: 600 }}>{opt.price}</span>
+                        <span className="font-body shrink-0" style={{ fontSize: 12, fontWeight: 600, color: opt.feeIsDynamic ? "rgba(48,38,28,0.45)" : "#30261c", fontStyle: opt.feeIsDynamic ? "italic" : "normal" }}>
+                          {opt.feeLabel}
+                        </span>
                       </label>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* STEP 2: Payment */}
+              {/* ── STEP 2: Payment ── */}
               {step === 2 && (
-                <div>
-                  <SectionLabel>Thông tin thanh toán</SectionLabel>
-                  <div className="flex flex-col gap-3">
-                    <FloatingInput label="Tên chủ thẻ" value={cardName} onChange={setCardName} required />
-                    <FloatingInput label="Số thẻ" value={cardNum} onChange={v => setCardNum(v.replace(/\D/g, "").slice(0, 16))} required />
-                    <div className="grid grid-cols-2 gap-3">
-                      <FloatingInput label="MM / YY" value={cardExp} onChange={v => {
-                        const clean = v.replace(/\D/g, "").slice(0, 4);
-                        setCardExp(clean.length > 2 ? clean.slice(0,2) + "/" + clean.slice(2) : clean);
-                      }} required />
-                      <FloatingInput label="CVV" type="password" value={cardCvv} onChange={v => setCardCvv(v.slice(0,4))} required />
-                    </div>
-                    <div className="flex items-center gap-3 pt-1">
-                      {["VISA", "MC", "JCB"].map(m => (
-                        <div key={m} className="border border-[#d9d9d9] bg-white px-3 py-1.5">
-                          <span className="font-body" style={{ fontSize: 10, fontWeight: 700, color: "rgba(48,38,28,0.5)", letterSpacing: "1px" }}>{m}</span>
-                        </div>
+                <div className="flex flex-col gap-6">
+                  <div>
+                    <SectionLabel>Phương thức thanh toán</SectionLabel>
+                    <div className="flex flex-col gap-3">
+                      {payMethods.map(m => (
+                        <label
+                          key={m.method_code}
+                          className="flex items-center gap-4 px-5 py-4 border cursor-pointer transition-all duration-150"
+                          style={{
+                            background: selectedPayMethod === m.method_code ? "rgba(48,38,28,0.04)" : "white",
+                            borderColor: selectedPayMethod === m.method_code ? "#30261c" : "#d9d9d9",
+                          }}
+                        >
+                          <div className="w-4 h-4 border-2 rounded-full flex items-center justify-center shrink-0" style={{ borderColor: selectedPayMethod === m.method_code ? "#30261c" : "#d9d9d9" }}>
+                            {selectedPayMethod === m.method_code && <div className="w-2 h-2 rounded-full bg-cafe-primary" />}
+                          </div>
+                          <input type="radio" name="payMethod" value={m.method_code} className="sr-only" checked={selectedPayMethod === m.method_code} onChange={() => setSelectedPayMethod(m.method_code)} />
+                          <div className="flex-1">
+                            <p className="font-body text-cafe-primary" style={{ fontSize: 13, fontWeight: 600 }}>{m.method_name}</p>
+                            {m.description && (
+                              <p className="font-body" style={{ fontSize: 11, color: "rgba(48,38,28,0.5)", marginTop: 2 }}>{m.description}</p>
+                            )}
+                          </div>
+                          {/* Payment icon hint */}
+                          {m.method_code === "MOMO" && (
+                            <span className="font-body px-2 py-0.5 text-white shrink-0" style={{ fontSize: 10, fontWeight: 700, background: "#a50064", borderRadius: 4 }}>MoMo</span>
+                          )}
+                          {m.method_code === "QR" && (
+                            <span className="font-body px-2 py-0.5 shrink-0" style={{ fontSize: 10, fontWeight: 700, background: "#e8f5e9", color: "#2e7d32", borderRadius: 4 }}>VietQR</span>
+                          )}
+                        </label>
                       ))}
+                      {payMethods.length === 0 && (
+                        <p className="font-body" style={{ fontSize: 12, color: "rgba(48,38,28,0.5)" }}>Đang tải phương thức thanh toán...</p>
+                      )}
                     </div>
                   </div>
+
+                  {/* Payment method info panel */}
+                  {selectedPayMethod === "QR" && (
+                    <div className="border border-[#c8e6c9] bg-[#f1f8f1] p-5 flex flex-col gap-3">
+                      <p className="font-body text-cafe-primary" style={{ fontSize: 12, fontWeight: 700, letterSpacing: "1px" }}>HƯỚNG DẪN CHUYỂN KHOẢN</p>
+                      <p className="font-body" style={{ fontSize: 12, color: "rgba(48,38,28,0.7)", lineHeight: 1.8 }}>
+                        Sau khi xác nhận đơn hàng, bạn sẽ nhận được mã QR để chuyển khoản ngân hàng.<br />
+                        Vui lòng điền đúng <strong>số tiền</strong> và <strong>nội dung chuyển khoản</strong> để đơn được xác nhận nhanh chóng.
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" strokeWidth="2" strokeLinecap="round">
+                          <path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
+                        </svg>
+                        <span className="font-body" style={{ fontSize: 11, color: "#2e7d32" }}>Hỗ trợ tất cả ngân hàng nội địa qua VietQR</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedPayMethod === "MOMO" && (
+                    <div className="border border-[#f8bbd0] bg-[#fdf0f5] p-5 flex flex-col gap-3">
+                      <p className="font-body" style={{ fontSize: 12, fontWeight: 700, letterSpacing: "1px", color: "#a50064" }}>THANH TOÁN QUA MoMo</p>
+                      <p className="font-body" style={{ fontSize: 12, color: "rgba(48,38,28,0.7)", lineHeight: 1.8 }}>
+                        Sau khi xác nhận đơn hàng, bạn sẽ được chuyển đến trang thanh toán MoMo.<br />
+                        Hoàn tất thanh toán trên ứng dụng MoMo để đơn hàng được xử lý ngay lập tức.
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a50064" strokeWidth="2" strokeLinecap="round">
+                          <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
+                        <span className="font-body" style={{ fontSize: 11, color: "#a50064" }}>Bạn sẽ được chuyển sang MoMo sau khi nhấn xác nhận</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedPayMethod === "CASH" && (
+                    <div className="border border-[#fff3cd] bg-[#fffbf0] p-5 flex flex-col gap-3">
+                      <p className="font-body text-cafe-primary" style={{ fontSize: 12, fontWeight: 700, letterSpacing: "1px" }}>THANH TOÁN TIỀN MẶT</p>
+                      <p className="font-body" style={{ fontSize: 12, color: "rgba(48,38,28,0.7)", lineHeight: 1.8 }}>
+                        {shipMethod === "pickup"
+                          ? "Vui lòng thanh toán tại quầy khi đến nhận hàng."
+                          : "Vui lòng chuẩn bị tiền mặt khi nhận hàng. Nhân viên giao hàng sẽ thu tiền tại địa chỉ của bạn."}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -281,15 +531,14 @@ export default function CheckoutPage() {
                 <span className="text-cafe-bg"><ArrowRight /></span>
               </button>
 
-              {/* Order summary on mobile */}
               <div className="lg:hidden mt-4">
-                <OrderSummary />
+                <OrderSummary shippingFee={step >= 1 ? shippingFee : undefined} shipOption={step >= 1 ? selectedShip.id : undefined} />
               </div>
             </form>
 
-            {/* RIGHT: Order Summary (desktop) */}
+            {/* RIGHT: Order Summary */}
             <div className="hidden lg:block w-[360px] xl:w-[400px] shrink-0 sticky top-24">
-              <OrderSummary />
+              <OrderSummary shippingFee={step >= 1 ? shippingFee : undefined} shipOption={step >= 1 ? selectedShip.id : undefined} />
             </div>
           </div>
 

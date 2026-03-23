@@ -15,6 +15,11 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  const getRedirectPath = (userType: string) => {
+    if (userType === "MANAGER" || userType === "ADMIN") return "/manager";
+    return "/";
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -22,7 +27,7 @@ export default function LoginPage() {
     try {
       const res = await authService.login(username, password);
       login(res.accessToken, res.refreshToken, res.user);
-      navigate("/");
+      navigate(getRedirectPath(res.user.userType));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Đăng nhập thất bại");
     } finally {
@@ -37,7 +42,7 @@ export default function LoginPage() {
     try {
       const res = await authService.googleLogin(credentialResponse.credential);
       login(res.accessToken, res.refreshToken, res.user);
-      navigate("/");
+      navigate(getRedirectPath(res.user.userType));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Đăng nhập bằng Google thất bại");
     } finally {
