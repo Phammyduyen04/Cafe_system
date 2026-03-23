@@ -54,4 +54,21 @@ export const authService = {
 
   changePassword: (oldPassword: string, newPassword: string) =>
     api.put<void>("/api/auth/change-password", { oldPassword, newPassword }),
+
+  forgotPassword: (email: string) =>
+    api.post<{ message: string }>("/api/auth/forgot-password", { email }),
+
+  resetPassword: (email: string, code: string, newPassword: string) =>
+    api.post<void>("/api/auth/reset-password", { email, code, newPassword }),
+
+  googleLogin: async (credential: string) => {
+    const res = await api.post<LoginResponse>("/api/auth/google", {
+      idToken: credential,
+    });
+    return {
+      accessToken: res.accessToken,
+      refreshToken: res.refreshToken,
+      user: res.account,
+    };
+  },
 };

@@ -19,20 +19,21 @@ async function request<T>(
 
   const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
 
-  if (res.status === 401) {
-    // Token expired – clear auth and redirect
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("user");
-    window.dispatchEvent(new Event("auth:logout"));
-  }
-
   if (!res.ok) {
     let message = `HTTP ${res.status}`;
     try {
       const body = await res.json();
       message = body.message ?? message;
     } catch {}
+
+    // Chỉ auto-logout khi 401 từ API có token (không phải login/register)
+    if (res.status === 401 && token) {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      localStorage.removeItem("user");
+      window.dispatchEvent(new Event("auth:logout"));
+    }
+
     throw new Error(message);
   }
 

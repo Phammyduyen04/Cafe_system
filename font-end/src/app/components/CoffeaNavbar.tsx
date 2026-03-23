@@ -267,9 +267,6 @@ export default function CoffeaNavbar() {
                     <p className="font-body text-cafe-primary" style={{ fontWeight: 600, fontSize: 13 }}>
                       {user?.username}
                     </p>
-                    <p className="font-body" style={{ fontSize: 11, color: "rgba(48,38,28,0.5)" }}>
-                      {user?.userType}
-                    </p>
                   </div>
                   {(user?.roles?.includes("CUSTOMER") || user?.userType === "CUSTOMER") && (
                     <Link

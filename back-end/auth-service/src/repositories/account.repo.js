@@ -33,9 +33,24 @@ const getAccountRoles = async (accountId) => {
   });
 };
 
+const findByGoogleId = async (googleId) => {
+  return await prisma.account.findUnique({ where: { google_id: googleId } });
+};
+
+const findByEmail = async (email) => {
+  return await prisma.account.findFirst({ where: { email } });
+};
+
+const findAllByEmail = async (email) => {
+  return await prisma.account.findMany({ where: { email } });
+};
+
 module.exports = {
   findByUsername,
   findById,
+  findByGoogleId,
+  findByEmail,
+  findAllByEmail,
   create,
   updateLastLogin,
   updatePassword,

@@ -4,9 +4,15 @@ export interface AuthUser {
   accountId: string;
   username: string;
   userType: string;
+  fullName?: string | null;
+  email?: string | null;
   userId?: string | null;
   roles?: string[];
-  fullName?: string;
+  status?: string;
+  hasPassword?: boolean;
+  isGoogleAccount?: boolean;
+  lastLoginAt?: string | null;
+  createdAt?: string | null;
 }
 
 interface AuthContextValue {
