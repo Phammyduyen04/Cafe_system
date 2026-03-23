@@ -269,6 +269,8 @@ const getAccountById = async (accountId) => {
     userId: account.user_id,
     status: account.account_status,
     roles: accountRoles.map((r) => r.role.role_name),
+    hasPassword: !!account.password_hash,
+    isGoogleAccount: !!account.google_id,
     lastLoginAt: account.last_login_at,
     createdAt: account.created_at,
   };
