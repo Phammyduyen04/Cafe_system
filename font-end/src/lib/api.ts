@@ -41,8 +41,11 @@ async function request<T>(
 
   const json = await res.json();
 
-  // Unwrap backend { success, data, message } envelope
+  // Unwrap backend { success, data, message, pagination? } envelope
   if (json && typeof json === "object" && "success" in json && "data" in json) {
+    if ("pagination" in json) {
+      return { data: json.data, pagination: json.pagination } as T;
+    }
     return json.data as T;
   }
 

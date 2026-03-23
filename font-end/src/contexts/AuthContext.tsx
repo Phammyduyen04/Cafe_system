@@ -6,6 +6,7 @@ export interface AuthUser {
   userType: string;
   userId?: string | null;
   roles?: string[];
+  fullName?: string;
 }
 
 interface AuthContextValue {
