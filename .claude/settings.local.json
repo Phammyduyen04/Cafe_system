@@ -6,7 +6,9 @@
       "Bash(npm install:*)",
       "Bash(docker compose:*)",
       "Bash(DATABASE_URL=\"mysql://root:root123@localhost:3306/auth_db\" npx prisma migrate dev)",
-      "Bash(docker exec coffee_auth_service node -e \":*)"
+      "Bash(docker exec coffee_auth_service node -e \":*)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(npm run:*)"
     ]
   }
 }

@@ -9,7 +9,7 @@ router.use(authMiddleware);
 router.get('/by-account/:accountId', employeeController.getEmployeeByAccountId);
 router.get('/', employeeController.getAllEmployees);
 router.get('/:id', employeeController.getEmployeeById);
-router.post('/', authorizeMiddleware('MANAGER'), employeeController.createEmployee);
+router.post('/', authorizeMiddleware('MANAGER', 'ADMIN'), employeeController.createEmployee);
 router.put('/:id', authorizeMiddleware('MANAGER'), employeeController.updateEmployee);
 router.delete('/:id', authorizeMiddleware('MANAGER'), employeeController.deleteEmployee);
 

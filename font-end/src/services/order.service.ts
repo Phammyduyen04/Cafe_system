@@ -32,8 +32,21 @@ export interface Order {
   status: string;
   total: number;
   total_amount?: number;
+  subtotal?: number;
+  shipping_fee?: number;
+  shippingFee?: number;
   items: OrderItem[];
-  createdAt: string;
+  order_items?: OrderItem[];
+  createdAt?: string;
+  created_at?: string;
+  payment_status?: string;
+  paymentStatus?: string;
+  payment_method?: string;
+  paymentMethod?: string;
+  customer_name?: string;
+  customerName?: string;
+  order_type?: string;
+  delivery_type?: string;
 }
 
 export interface PaymentInfo {
