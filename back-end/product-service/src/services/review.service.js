@@ -3,7 +3,7 @@ const reviewRepo = require('../repositories/review.repo');
 const crypto = require('crypto');
 
 const createReview = async (data) => {
-  const { customerName, rating, comment, customerRole, avatar, productId } = data;
+  const { customerName, rating, comment, customerRole, avatar, productId, orderId } = data;
   if (!customerName || !rating || !comment) {
     throw new AppError('customerName, rating và comment là bắt buộc', 400);
   }
@@ -15,6 +15,7 @@ const createReview = async (data) => {
     rating: Number(rating),
     comment,
     productId: productId || null,
+    orderId: orderId || null,
   });
 };
 
@@ -42,4 +43,12 @@ const deleteReview = async (reviewId) => {
   return await reviewRepo.remove(reviewId);
 };
 
-module.exports = { createReview, getStoreReviews, getProductReviews, getAllReviews, updateReview, deleteReview };
+const getReviewsByOrderId = async (orderId) => {
+  return await reviewRepo.findByOrderId(orderId);
+};
+
+const checkOrderReviewed = async (orderId) => {
+  return await reviewRepo.existsByOrderId(orderId);
+};
+
+module.exports = { createReview, getStoreReviews, getProductReviews, getAllReviews, getReviewsByOrderId, checkOrderReviewed, updateReview, deleteReview };

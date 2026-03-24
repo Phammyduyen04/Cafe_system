@@ -20,11 +20,13 @@ import ManagerEmployeesPage from "./components/manager/ManagerEmployeesPage";
 import ManagerShiftsPage from "./components/manager/ManagerShiftsPage";
 import ManagerPromotionsPage from "./components/manager/ManagerPromotionsPage";
 import ManagerDiscountsPage from "./components/manager/ManagerDiscountsPage";
+import ManagerReviewsPage from "./components/manager/ManagerReviewsPage";
 import ManagerBeveragesPage from "./components/manager/ManagerBeveragesPage";
 import ManagerIngredientsPage from "./components/manager/ManagerIngredientsPage";
 import ManagerCategoriesPage from "./components/manager/ManagerCategoriesPage";
 import StaffLayout from "./components/staff/StaffLayout";
 import StaffShiftsPage from "./components/staff/StaffShiftsPage";
+import StaffSchedulePage from "./components/staff/StaffSchedulePage";
 import StaffOrdersPage from "./components/staff/StaffOrdersPage";
 import AdminLayout from "./components/admin/AdminLayout";
 import AdminAccountsPage from "./components/admin/AdminAccountsPage";
@@ -60,6 +62,7 @@ export const router = createBrowserRouter([
       { path: "categories", Component: ManagerCategoriesPage },
       { path: "promotions", Component: ManagerPromotionsPage },
       { path: "discounts", Component: ManagerDiscountsPage },
+      { path: "reviews", Component: ManagerReviewsPage },
     ],
   },
   {
@@ -68,6 +71,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: StaffOrdersPage },
       { path: "shifts", Component: StaffShiftsPage },
+      { path: "schedule", Component: StaffSchedulePage },
       { path: "orders", Component: StaffOrdersPage },
     ],
   },

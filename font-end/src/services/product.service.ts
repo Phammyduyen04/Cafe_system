@@ -335,6 +335,15 @@ export const productService = {
   },
 
   // ── Reviews ──
+  getAllReviews: async (): Promise<Review[]> => {
+    const res = await api.get<any>("/api/products/reviews/all");
+    return Array.isArray(res) ? res : (res?.data ?? []);
+  },
+
+  deleteReview: async (reviewId: string): Promise<void> => {
+    await api.delete(`/api/products/reviews/${reviewId}`);
+  },
+
   getStoreReviews: async (): Promise<Review[]> => {
     const res = await api.get<any>("/api/products/reviews");
     return Array.isArray(res) ? res : (res?.data ?? []);
@@ -351,8 +360,23 @@ export const productService = {
     rating: number;
     comment: string;
     productId?: string;
+    orderId?: string;
   }): Promise<Review> => {
     return await api.post<Review>("/api/products/reviews", data);
+  },
+
+  getOrderReviews: async (orderId: string): Promise<Review[]> => {
+    const res = await api.get<any>(`/api/products/reviews/order/${orderId}`);
+    return Array.isArray(res) ? res : (res?.data ?? []);
+  },
+
+  checkOrderReviewed: async (orderId: string): Promise<boolean> => {
+    try {
+      const res = await api.get<any>(`/api/products/reviews/order/${orderId}/checked`);
+      return res?.reviewed ?? false;
+    } catch {
+      return false;
+    }
   },
 };
 

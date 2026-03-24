@@ -26,6 +26,18 @@ export interface CheckoutPayload {
   note?: string;
 }
 
+export interface OrderDetail {
+  order_detail_id?: string;
+  product_id?: string;
+  product_name?: string;
+  size?: string;
+  unit_price?: number;
+  quantity?: number;
+  item_note?: string;
+  line_total?: number;
+  toppings?: { topping_name?: string; name?: string }[];
+}
+
 export interface Order {
   _id: string;
   order_id?: string;
@@ -38,6 +50,7 @@ export interface Order {
   shippingFee?: number;
   items: OrderItem[];
   order_items?: OrderItem[];
+  order_details?: OrderDetail[];
   createdAt?: string;
   created_at?: string;
   payment_status?: string;

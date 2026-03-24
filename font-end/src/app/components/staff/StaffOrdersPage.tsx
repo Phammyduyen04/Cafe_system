@@ -7,7 +7,7 @@ import {
   type Topping,
   getProductImage,
 } from "../../../services/product.service";
-import type { Order, PaymentInfo } from "../../../services/order.service";
+import type { Order, OrderItem, PaymentInfo } from "../../../services/order.service";
 
 /* ─── Types ─────────────────────────────────────────────── */
 
@@ -112,8 +112,17 @@ export default function StaffOrdersPage() {
 function orderId(order: Order) {
   return order._id ?? order.order_id ?? "";
 }
-function orderItems(order: Order) {
-  return order.items?.length ? order.items : (order.order_items ?? []);
+function orderItems(order: Order): OrderItem[] {
+  if (order.items?.length) return order.items;
+  if (order.order_items?.length) return order.order_items;
+  return (order.order_details ?? []).map((d) => ({
+    productId: d.product_id ?? "",
+    name: d.product_name ?? "",
+    size: d.size ?? "",
+    quantity: d.quantity ?? 0,
+    price: Number(d.unit_price ?? 0),
+    toppings: (d.toppings ?? []).map((t) => t.topping_name ?? t.name ?? ""),
+  }));
 }
 function orderDate(order: Order) {
   const raw = order.createdAt ?? order.created_at ?? "";
