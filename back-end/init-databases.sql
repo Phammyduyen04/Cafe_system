@@ -42,9 +42,16 @@ CREATE TABLE IF NOT EXISTS customers (
   updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
-INSERT IGNORE INTO customers (customer_id, full_name, email, phone_number, points, customer_type, customer_status) VALUES
-  (UUID(), 'Nguyễn Minh Anh',  'minhanh@gmail.com',   '0901234567', 150, 'REGULAR', 'ACTIVE'),
-  (UUID(), 'Trần Thanh Huy',   'thanhhuy@gmail.com',   '0912345678', 80,  'REGULAR', 'ACTIVE'),
-  (UUID(), 'Lê Bảo Châu',      'baochau@gmail.com',    '0923456789', 320, 'VIP',     'ACTIVE'),
-  (UUID(), 'Phạm Thị Hồng',    'hong.pham@gmail.com',  '0934567890', 50,  'REGULAR', 'ACTIVE'),
-  (UUID(), 'Võ Hoàng Dũng',    'hoangdung@gmail.com',  '0945678901', 200, 'VIP',     'ACTIVE');
+-- Khách hàng mẫu (không có account liên kết)
+INSERT IGNORE INTO customers (customer_id, full_name, email, phone_number, points, customer_type, account_id, customer_status) VALUES
+  ('271b98ec-26a0-11f1-b826-fedf79f60332', 'Nguyễn Minh Anh', 'minhanh@gmail.com',   '0901234567', 150, 'REGULAR', NULL, 'ACTIVE'),
+  ('271b9e4a-26a0-11f1-b826-fedf79f60332', 'Trần Thanh Huy',  'thanhhuy@gmail.com',  '0912345678', 80,  'REGULAR', NULL, 'ACTIVE'),
+  ('271bb35f-26a0-11f1-b826-fedf79f60332', 'Lê Bảo Châu',     'baochau@gmail.com',   '0923456789', 320, 'VIP',     NULL, 'ACTIVE'),
+  ('271bb5fb-26a0-11f1-b826-fedf79f60332', 'Phạm Thị Hồng',   'hong.pham@gmail.com', '0934567890', 50,  'REGULAR', NULL, 'ACTIVE'),
+  ('271bb734-26a0-11f1-b826-fedf79f60332', 'Võ Hoàng Dũng',   'hoangdung@gmail.com', '0945678901', 200, 'VIP',     NULL, 'ACTIVE');
+
+-- Khách hàng đã đăng ký qua Google/Email (account_id liên kết với auth_db)
+INSERT IGNORE INTO customers (customer_id, full_name, email, phone_number, points, customer_type, account_id, customer_status) VALUES
+  ('849af837-b432-4e74-929b-c49cec7583fa', 'Phạm Mỹ Dung',   'tdlop10a8pmdung@gmail.com', NULL, 0, 'REGULAR', '1d5fcc83-3b84-4967-b598-61ad4dca356c', 'ACTIVE'),
+  ('e8d481e6-09a7-4531-bda2-4de491840490', 'Mỹ Duyên Phạm',  'pmd20040412@gmail.com',     NULL, 0, 'REGULAR', '531a2d5b-0eea-4bec-a992-a2a5b9775e3b', 'ACTIVE'),
+  ('ed83bdc8-f8bd-4f77-be0d-bbd6872099d2', 'Tú Vy Lê',       'letuvy399@gmail.com',       NULL, 0, 'REGULAR', '529816ca-8ff8-4c60-b460-8243524f01f5', 'ACTIVE');

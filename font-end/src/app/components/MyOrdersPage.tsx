@@ -339,7 +339,7 @@ export default function MyOrdersPage() {
 
                   <div className="flex items-center justify-between">
                     <span className="font-body" style={{ fontSize: 12, color: "rgba(48,38,28,0.6)" }}>
-                      {(order.items ?? []).length} sản phẩm
+                      {(order.items ?? (order as any).order_details ?? []).length} sản phẩm
                     </span>
                     <span className="font-body text-cafe-primary" style={{ fontSize: 14, fontWeight: 700 }}>
                       {formatVND(Number(total))}
