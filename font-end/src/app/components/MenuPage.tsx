@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Link, useSearchParams } from "react-router";
 import { productService, getCategoryName } from "../../services/product.service";
 import type { Product, Category } from "../../services/product.service";
@@ -18,8 +18,9 @@ function priceInRange(price: number, range: string | null): boolean {
 const ITEMS_PER_PAGE = 9;
 
 export default function MenuPage() {
-  const [searchParams] = useSearchParams();
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get("search") ?? "");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [activeCategory, setActiveCategory] = useState("Tất cả");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -55,11 +56,27 @@ export default function MenuPage() {
     load();
   }, []);
 
-  // Sync category from URL query param
+  // Sync category + search từ URL query param (khi URL thay đổi từ bên ngoài)
   useEffect(() => {
     const cat = searchParams.get("category");
     setActiveCategory(cat ?? "Tất cả");
+    const searchParam = searchParams.get("search") ?? "";
+    setSearchQuery(searchParam);
   }, [searchParams]);
+
+  // Hàm cập nhật search — đồng thời cập nhật URL
+  const updateSearch = useCallback((value: string) => {
+    setSearchQuery(value);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (value) {
+        next.set("search", value);
+      } else {
+        next.delete("search");
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   const toggleDrinkType = (v: string) =>
     setSelectedDrinkTypes((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]);
@@ -79,6 +96,7 @@ export default function MenuPage() {
     setSelectedRating(null);
     setSearchQuery("");
     setCurrentPage(1);
+    setSearchParams({}, { replace: true });
   };
 
   const filtered = useMemo(() => {
@@ -168,27 +186,45 @@ export default function MenuPage() {
           <div className="flex-1 min-w-0">
             {/* Search Bar */}
             <div className="mb-4">
-              <div className="flex items-center gap-3 bg-cafe-accent rounded-lg px-4 py-3 w-full">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <div className={`flex items-center gap-3 bg-cafe-accent rounded-lg px-4 py-3 w-full transition-shadow ${searchQuery ? "ring-2 ring-cafe-primary/30" : ""}`}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0">
                   <circle cx="11" cy="11" r="8" stroke="#30261c" strokeWidth="2" />
                   <path d="M21 21l-4.35-4.35" stroke="#30261c" strokeLinecap="round" strokeWidth="2" />
                 </svg>
                 <input
+                  ref={searchInputRef}
                   type="text"
                   placeholder="Tìm kiếm thức uống..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => updateSearch(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Escape") updateSearch(""); }}
                   className="font-body bg-transparent outline-none flex-1 text-cafe-primary placeholder-cafe-primary/50"
                   style={{ fontWeight: 400, fontSize: 13, letterSpacing: "1.5px" }}
                 />
-                {searchQuery && (
-                  <button onClick={() => setSearchQuery("")} className="text-cafe-primary/50 hover:text-cafe-primary">
+                {searchQuery ? (
+                  <button
+                    onClick={() => { updateSearch(""); searchInputRef.current?.focus(); }}
+                    className="text-cafe-primary/50 hover:text-cafe-primary transition-colors shrink-0"
+                    aria-label="Xóa tìm kiếm"
+                  >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                       <path d="M18 6L6 18M6 6l12 12" />
                     </svg>
                   </button>
+                ) : (
+                  <span className="font-body shrink-0" style={{ fontSize: 11, color: "rgba(48,38,28,0.35)", letterSpacing: "0.5px" }}>
+                    Enter để tìm
+                  </span>
                 )}
               </div>
+              {/* Search result hint */}
+              {searchQuery && (
+                <p className="font-body mt-1.5 px-1" style={{ fontSize: 12, color: "rgba(48,38,28,0.5)" }}>
+                  Kết quả cho{" "}
+                  <span className="font-semibold text-cafe-primary">"{searchQuery}"</span>
+                  {" "}— {filtered.length} món
+                </p>
+              )}
             </div>
 
             {/* Mobile filter toggle */}

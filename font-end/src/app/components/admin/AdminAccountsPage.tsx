@@ -124,7 +124,8 @@ function AccountListTab() {
 
   // Reset password modal
   const [resetAcc, setResetAcc] = useState<AccountInfo | null>(null);
-  const [newPass, setNewPass] = useState("");
+  const [manualPass, setManualPass] = useState("");
+  const [resetDone, setResetDone] = useState(false);
   const [resetting, setResetting] = useState(false);
 
   const [successMsg, setSuccessMsg] = useState("");
@@ -201,13 +202,16 @@ function AccountListTab() {
 
   const handleResetPassword = async () => {
     if (!resetAcc) return;
+    if (!manualPass || manualPass.length < 6) {
+      alert("Mật khẩu phải có ít nhất 6 ký tự");
+      return;
+    }
     try {
       setResetting(true);
-      const res = await adminService.resetPassword(resetAcc.accountId);
-      setNewPass(res.newPassword);
+      await adminService.resetPassword(resetAcc.accountId, manualPass);
+      setResetDone(true);
     } catch (err: any) {
       alert(err.message || "Lỗi khi đặt lại mật khẩu");
-      setResetAcc(null);
     } finally {
       setResetting(false);
     }
@@ -368,7 +372,7 @@ function AccountListTab() {
                           {acc.status === "ACTIVE" ? "Vô hiệu hoá" : "Kích hoạt"}
                         </button>
                         <button
-                          onClick={() => { setResetAcc(acc); setNewPass(""); }}
+                          onClick={() => { setResetAcc(acc); setManualPass(""); setResetDone(false); }}
                           className="font-body text-blue-500 hover:underline"
                           style={{ fontSize: 12 }}
                         >
@@ -470,9 +474,9 @@ function AccountListTab() {
 
       {/* Reset Password Modal */}
       {resetAcc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { setResetAcc(null); setNewPass(""); }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { setResetAcc(null); setManualPass(""); setResetDone(false); }}>
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
-            {newPass ? (
+            {resetDone ? (
               <>
                 <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round">
@@ -483,18 +487,10 @@ function AccountListTab() {
                   Đặt lại thành công
                 </h2>
                 <p className="font-body text-[var(--cafe-primary)]/60 text-center mb-4" style={{ fontSize: 13 }}>
-                  Mật khẩu mới cho @{resetAcc.username}
-                </p>
-                <div className="bg-[var(--cafe-bg)] rounded-xl px-4 py-3 text-center mb-4">
-                  <p className="font-heading text-[var(--cafe-primary)]" style={{ fontSize: 20, fontWeight: 700, letterSpacing: 1 }}>
-                    {newPass}
-                  </p>
-                </div>
-                <p className="font-body text-[var(--cafe-primary)]/50 text-center mb-4" style={{ fontSize: 12 }}>
-                  Lưu lại mật khẩu này và thông báo cho nhân viên
+                  Mật khẩu mới đã được cập nhật cho @{resetAcc.username}
                 </p>
                 <button
-                  onClick={() => { setResetAcc(null); setNewPass(""); }}
+                  onClick={() => { setResetAcc(null); setManualPass(""); setResetDone(false); }}
                   className="font-body w-full py-2.5 bg-[var(--cafe-primary)] text-white rounded-lg hover:opacity-90"
                   style={{ fontSize: 14, fontWeight: 500 }}
                 >
@@ -506,13 +502,25 @@ function AccountListTab() {
                 <h2 className="font-heading text-[var(--cafe-primary)] mb-2" style={{ fontSize: 20, fontWeight: 700 }}>
                   Đặt lại mật khẩu
                 </h2>
-                <p className="font-body text-[var(--cafe-primary)]/70 mb-6" style={{ fontSize: 14 }}>
-                  Đặt lại mật khẩu cho tài khoản <strong>@{resetAcc.username}</strong>?
-                  Mật khẩu mới sẽ được tạo tự động.
+                <p className="font-body text-[var(--cafe-primary)]/70 mb-4" style={{ fontSize: 14 }}>
+                  Nhập mật khẩu mới cho tài khoản <strong>@{resetAcc.username}</strong>
                 </p>
+                <div className="mb-6">
+                  <label className="font-body text-[var(--cafe-primary)] block mb-1" style={{ fontSize: 13, fontWeight: 500 }}>
+                    Mật khẩu mới (tối thiểu 6 ký tự)
+                  </label>
+                  <input
+                    type="password"
+                    value={manualPass}
+                    onChange={(e) => setManualPass(e.target.value)}
+                    placeholder="Nhập mật khẩu mới..."
+                    className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)]"
+                    style={{ fontSize: 14 }}
+                  />
+                </div>
                 <div className="flex gap-3">
                   <button
-                    onClick={() => { setResetAcc(null); setNewPass(""); }}
+                    onClick={() => { setResetAcc(null); setManualPass(""); setResetDone(false); }}
                     className="font-body flex-1 py-2.5 border border-[var(--cafe-border)] rounded-lg hover:bg-[var(--cafe-bg)]"
                     style={{ fontSize: 14, fontWeight: 500 }}
                   >
@@ -520,7 +528,7 @@ function AccountListTab() {
                   </button>
                   <button
                     onClick={handleResetPassword}
-                    disabled={resetting}
+                    disabled={resetting || manualPass.length < 6}
                     className="font-body flex-1 py-2.5 bg-[var(--cafe-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50"
                     style={{ fontSize: 14, fontWeight: 500 }}
                   >

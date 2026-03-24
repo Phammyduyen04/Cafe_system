@@ -32,12 +32,12 @@ const STATUS_COLORS: Record<string, string> = {
 
 const REVIEWED_KEY = "coffea_reviewed_orders";
 
-function getReviewedOrders(): Set<string> {
+function getLocalReviewedOrders(): Set<string> {
   try { return new Set(JSON.parse(localStorage.getItem(REVIEWED_KEY) || "[]")); }
   catch { return new Set(); }
 }
-function markReviewed(orderId: string) {
-  const set = getReviewedOrders();
+function markLocalReviewed(orderId: string) {
+  const set = getLocalReviewedOrders();
   set.add(orderId);
   localStorage.setItem(REVIEWED_KEY, JSON.stringify([...set]));
 }
@@ -109,10 +109,11 @@ function ReviewModal({
             rating: reviews[it.productId]?.rating ?? 5,
             comment: reviews[it.productId]?.comment || "",
             productId: it.productId,
+            orderId: oid,
           })
         )
       );
-      markReviewed(oid);
+      markLocalReviewed(oid);
       setSuccess(true);
       setTimeout(() => { onSubmitted(oid); onClose(); }, 1800);
     } catch {
@@ -123,7 +124,7 @@ function ReviewModal({
   };
 
   const handleSkip = () => {
-    markReviewed(oid);
+    markLocalReviewed(oid);
     onSubmitted(oid);
     onClose();
   };
@@ -238,15 +239,32 @@ export default function MyOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [cancelling, setCancelling] = useState<string | null>(null);
-  const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(getReviewedOrders);
+  const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(getLocalReviewedOrders);
   const [reviewingOrder, setReviewingOrder] = useState<Order | null>(null);
 
   useEffect(() => {
     if (!isLoggedIn) { navigate("/login"); return; }
     orderService.getMyOrders()
-      .then(res => {
+      .then(async res => {
         const list: Order[] = Array.isArray(res) ? res : ((res as any)?.data ?? []);
         setOrders(list);
+        // Kiểm tra server-side review status cho các đơn đã hoàn thành
+        const completedIds = list
+          .filter(o => o.status === "COMPLETED")
+          .map(o => o._id ?? o.order_id ?? "")
+          .filter(Boolean);
+        if (completedIds.length > 0) {
+          const checks = await Promise.allSettled(
+            completedIds.map(id => productService.checkOrderReviewed(id))
+          );
+          const serverReviewed = new Set<string>();
+          checks.forEach((result, i) => {
+            if (result.status === "fulfilled" && result.value) {
+              serverReviewed.add(completedIds[i]);
+            }
+          });
+          setReviewedOrders(prev => new Set([...prev, ...serverReviewed]));
+        }
       })
       .catch(() => setError("Không thể tải danh sách đơn hàng."))
       .finally(() => setLoading(false));

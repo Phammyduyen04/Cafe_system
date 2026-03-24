@@ -199,7 +199,7 @@ export default function ManagerEmployeesPage() {
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
                       <button onClick={() => openEdit(emp)} className="font-body text-[var(--cafe-gold)] hover:underline" style={{ fontSize: 12 }}>Sửa</button>
-                      <button onClick={() => setDeleteEmp(emp)} className="font-body text-[var(--cafe-red)] hover:underline" style={{ fontSize: 12 }}>Xóa</button>
+                      <button onClick={() => setDeleteEmp(emp)} className="font-body text-[var(--cafe-red)] hover:underline" style={{ fontSize: 12 }}>Vô hiệu hóa</button>
                       <button onClick={() => openAvailability(emp)} className="font-body text-[var(--cafe-primary)] hover:underline" style={{ fontSize: 12 }}>Lịch rảnh</button>
                     </div>
                   </td>

@@ -10,6 +10,8 @@ const reviewSchema = new mongoose.Schema(
     comment: { type: String, required: true },
     // productId nếu là đánh giá sản phẩm, để trống nếu là đánh giá cửa hàng
     productId: { type: String, default: null },
+    // orderId để liên kết đánh giá với đơn hàng
+    orderId: { type: String, default: null },
     isApproved: { type: Boolean, default: true },
   },
   {

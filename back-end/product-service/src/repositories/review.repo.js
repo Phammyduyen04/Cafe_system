@@ -14,10 +14,16 @@ const findStoreReviews = async () =>
 const findByReviewId = async (reviewId) =>
   await Review.findOne({ reviewId });
 
+const findByOrderId = async (orderId) =>
+  await Review.find({ orderId }).sort({ createdAt: -1 });
+
+const existsByOrderId = async (orderId) =>
+  !!(await Review.findOne({ orderId }));
+
 const update = async (reviewId, data) =>
   await Review.findOneAndUpdate({ reviewId }, data, { new: true });
 
 const remove = async (reviewId) =>
   await Review.findOneAndDelete({ reviewId });
 
-module.exports = { create, findAll, findByProductId, findStoreReviews, findByReviewId, update, remove };
+module.exports = { create, findAll, findByProductId, findStoreReviews, findByReviewId, findByOrderId, existsByOrderId, update, remove };

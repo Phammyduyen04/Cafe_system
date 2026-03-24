@@ -213,15 +213,18 @@ const toggleAccountStatus = async (accountId) => {
 
 /* ── Reset password (admin resets for a user) ─────────────── */
 
-const resetAccountPassword = async (accountId) => {
+const resetAccountPassword = async (accountId, newPassword) => {
   const acc = await accountRepo.findById(accountId);
   if (!acc) throw new AppError('Không tìm thấy tài khoản', 404);
 
-  const newPassword = generatePassword();
+  if (!newPassword || newPassword.length < 6) {
+    throw new AppError('Mật khẩu mới phải có ít nhất 6 ký tự', 400);
+  }
+
   const passwordHash = await bcrypt.hash(newPassword, 10);
   await accountRepo.updatePassword(accountId, passwordHash);
 
-  return { accountId, username: acc.username, newPassword };
+  return { accountId, username: acc.username };
 };
 
 module.exports = {

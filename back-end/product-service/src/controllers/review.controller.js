@@ -49,4 +49,20 @@ const deleteReview = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-module.exports = { getStoreReviews, getAllReviews, getProductReviews, createReview, updateReview, deleteReview };
+// GET /api/products/reviews/order/:orderId — đánh giá theo đơn hàng (auth required)
+const getReviewsByOrderId = async (req, res, next) => {
+  try {
+    const reviews = await reviewService.getReviewsByOrderId(req.params.orderId);
+    return responseHelper.success(res, reviews);
+  } catch (error) { next(error); }
+};
+
+// GET /api/products/reviews/order/:orderId/checked — kiểm tra đã đánh giá chưa (auth required)
+const checkOrderReviewed = async (req, res, next) => {
+  try {
+    const reviewed = await reviewService.checkOrderReviewed(req.params.orderId);
+    return responseHelper.success(res, { reviewed });
+  } catch (error) { next(error); }
+};
+
+module.exports = { getStoreReviews, getAllReviews, getProductReviews, createReview, getReviewsByOrderId, checkOrderReviewed, updateReview, deleteReview };

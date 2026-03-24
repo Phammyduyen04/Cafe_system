@@ -1,11 +1,13 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import svgPaths from "../../constants/svg-paths";
 import { useAuth } from "../../contexts/AuthContext";
 import { useCart } from "../../contexts/CartContext";
 import { authService } from "../../services/auth.service";
-import { productService } from "../../services/product.service";
-import type { Category } from "../../services/product.service";
+import { productService, getProductImage } from "../../services/product.service";
+import type { Category, Product } from "../../services/product.service";
+
+const MAX_SUGGESTIONS = 6;
 
 export default function CoffeaNavbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -14,6 +16,7 @@ export default function CoffeaNavbar() {
   const [searchQuery, setSearchQuery] = useState("");
   const [accountOpen, setAccountOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [highlightedIdx, setHighlightedIdx] = useState(-1);
 
   const { isLoggedIn, user, logout } = useAuth();
   const { cartCount } = useCart();
@@ -22,14 +25,42 @@ export default function CoffeaNavbar() {
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const isMenuPage = location.pathname === "/menu";
 
   const [categories, setCategories] = useState<Category[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [productsLoaded, setProductsLoaded] = useState(false);
 
   useEffect(() => {
     productService.getCategories().then(setCategories).catch(() => {});
   }, []);
+
+  // Lazy-load products khi user mở search
+  const loadProductsIfNeeded = () => {
+    if (!productsLoaded) {
+      productService.getProducts().then(p => {
+        setAllProducts(p);
+        setProductsLoaded(true);
+      }).catch(() => {});
+    }
+  };
+
+  // Kết quả gợi ý
+  const suggestions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q || !productsLoaded) return [];
+    return allProducts
+      .filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        (p.description ?? "").toLowerCase().includes(q)
+      )
+      .slice(0, MAX_SUGGESTIONS);
+  }, [allProducts, searchQuery, productsLoaded]);
+
+  const showSuggestions = searchOpen && searchQuery.trim().length > 0;
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -38,6 +69,11 @@ export default function CoffeaNavbar() {
       }
       if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
         setAccountOpen(false);
+      }
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchOpen(false);
+        setSearchQuery("");
+        setHighlightedIdx(-1);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -51,6 +87,44 @@ export default function CoffeaNavbar() {
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  const submitSearch = (q: string) => {
+    if (!q.trim()) return;
+    navigate(`/menu?search=${encodeURIComponent(q.trim())}`);
+    setSearchOpen(false);
+    setSearchQuery("");
+    setHighlightedIdx(-1);
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Escape") {
+      setSearchOpen(false);
+      setSearchQuery("");
+      setHighlightedIdx(-1);
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIdx(prev => Math.min(prev + 1, suggestions.length));
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIdx(prev => Math.max(prev - 1, -1));
+      return;
+    }
+    if (e.key === "Enter") {
+      if (highlightedIdx >= 0 && highlightedIdx < suggestions.length) {
+        const product = suggestions[highlightedIdx];
+        navigate(`/product/${product.slug ?? product._id}`);
+        setSearchOpen(false);
+        setSearchQuery("");
+        setHighlightedIdx(-1);
+      } else {
+        submitSearch(searchQuery);
+      }
+    }
+  };
 
   const handleLogout = async () => {
     try { await authService.logout(); } catch {}
@@ -179,42 +253,102 @@ export default function CoffeaNavbar() {
         <div className="hidden lg:flex items-center gap-2">
 
           {/* Search */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" ref={searchRef}>
             {searchOpen && (
-              <div className="flex items-center bg-white/90 rounded-full px-4 py-2 gap-2 shadow-sm">
-                <svg width="16" height="16" viewBox="0 0 26.5 26.5" fill="none">
-                  <path d={svgPaths.searchCircle} stroke="var(--cafe-primary)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
-                  <path d="M25.25 25.25L19.45 19.45" stroke="var(--cafe-primary)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
-                </svg>
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder="Tìm tên đồ uống..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="font-body bg-transparent outline-none text-cafe-primary placeholder-cafe-primary/50 w-44"
-                  style={{ fontSize: 13 }}
-                  onBlur={() => { if (!searchQuery) setSearchOpen(false); }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") setSearchOpen(false);
-                    if (e.key === "Enter" && searchQuery) {
-                      navigate(`/menu?search=${encodeURIComponent(searchQuery)}`);
-                      setSearchOpen(false);
-                      setSearchQuery("");
-                    }
-                  }}
-                />
-                {searchQuery && (
-                  <button onClick={() => setSearchQuery("")} className="text-cafe-primary/50 hover:text-cafe-primary transition-colors">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                      <path d="M18 6L6 18M6 6l12 12" />
-                    </svg>
-                  </button>
+              <div className="relative">
+                <div className="flex items-center bg-white/90 rounded-full px-4 py-2 gap-2 shadow-sm" style={{ minWidth: 220 }}>
+                  <svg width="16" height="16" viewBox="0 0 26.5 26.5" fill="none">
+                    <path d={svgPaths.searchCircle} stroke="var(--cafe-primary)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
+                    <path d="M25.25 25.25L19.45 19.45" stroke="var(--cafe-primary)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
+                  </svg>
+                  <input
+                    ref={searchInputRef}
+                    autoFocus
+                    type="text"
+                    placeholder="Tìm tên đồ uống..."
+                    value={searchQuery}
+                    onChange={(e) => { setSearchQuery(e.target.value); setHighlightedIdx(-1); loadProductsIfNeeded(); }}
+                    className="font-body bg-transparent outline-none text-cafe-primary placeholder-cafe-primary/50 w-40"
+                    style={{ fontSize: 13 }}
+                    onKeyDown={handleSearchKeyDown}
+                  />
+                  {searchQuery && (
+                    <button onClick={() => { setSearchQuery(""); setHighlightedIdx(-1); searchInputRef.current?.focus(); }} className="text-cafe-primary/50 hover:text-cafe-primary transition-colors shrink-0">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <path d="M18 6L6 18M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+
+                {/* Autocomplete dropdown */}
+                {showSuggestions && (
+                  <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-2xl overflow-hidden z-50 border border-cafe-accent">
+                    {suggestions.length > 0 ? (
+                      <>
+                        <div className="py-1">
+                          {suggestions.map((product, idx) => (
+                            <button
+                              key={product._id}
+                              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-cafe-bg transition-colors text-left"
+                              style={{ background: idx === highlightedIdx ? "var(--cafe-bg)" : undefined }}
+                              onMouseEnter={() => setHighlightedIdx(idx)}
+                              onClick={() => {
+                                navigate(`/product/${product.slug ?? product._id}`);
+                                setSearchOpen(false);
+                                setSearchQuery("");
+                                setHighlightedIdx(-1);
+                              }}
+                            >
+                              <img
+                                src={getProductImage(product)}
+                                alt={product.name}
+                                className="w-10 h-10 object-cover rounded-lg shrink-0 border border-cafe-accent"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="font-body text-cafe-primary truncate" style={{ fontSize: 13, fontWeight: 600 }}>
+                                  {product.name}
+                                </p>
+                                <p className="font-body" style={{ fontSize: 12, color: "rgba(48,38,28,0.5)" }}>
+                                  {product.price.toLocaleString("vi-VN")}đ
+                                </p>
+                              </div>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "rgba(48,38,28,0.3)", shrink: 0 }}>
+                                <path d="M9 18l6-6-6-6" />
+                              </svg>
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          className="w-full flex items-center justify-between px-4 py-3 border-t border-cafe-accent hover:bg-cafe-bg transition-colors"
+                          style={{ background: highlightedIdx === suggestions.length ? "var(--cafe-bg)" : undefined }}
+                          onMouseEnter={() => setHighlightedIdx(suggestions.length)}
+                          onClick={() => submitSearch(searchQuery)}
+                        >
+                          <span className="font-body text-cafe-primary" style={{ fontSize: 12, fontWeight: 600 }}>
+                            Xem tất cả kết quả cho "{searchQuery}"
+                          </span>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--cafe-primary)" }}>
+                            <path d="M9 18l6-6-6-6" />
+                          </svg>
+                        </button>
+                      </>
+                    ) : (
+                      <div className="px-4 py-4 flex items-center gap-3">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: "rgba(48,38,28,0.3)" }}>
+                          <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" strokeLinecap="round" />
+                        </svg>
+                        <p className="font-body" style={{ fontSize: 13, color: "rgba(48,38,28,0.45)" }}>
+                          Không tìm thấy kết quả cho "{searchQuery}"
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             )}
             <button
-              onClick={() => setSearchOpen(!searchOpen)}
+              onClick={() => { setSearchOpen(s => { if (!s) loadProductsIfNeeded(); return !s; }); setSearchQuery(""); setHighlightedIdx(-1); }}
               className="w-9 h-9 flex items-center justify-center rounded-full text-white hover:bg-white/20 transition-colors"
               aria-label="Tìm kiếm"
             >

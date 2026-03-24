@@ -74,10 +74,10 @@ export const adminService = {
       {}
     ),
 
-  resetPassword: (id: string) =>
-    api.put<{ accountId: string; username: string; newPassword: string }>(
+  resetPassword: (id: string, newPassword: string) =>
+    api.put<{ accountId: string; username: string }>(
       `/api/auth/admin/accounts/${id}/reset-password`,
-      {}
+      { newPassword }
     ),
 
   /* ── Roles ── */

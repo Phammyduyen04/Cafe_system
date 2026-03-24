@@ -49,7 +49,8 @@ const toggleStatus = async (req, res, next) => {
 
 const resetPassword = async (req, res, next) => {
   try {
-    const result = await adminService.resetAccountPassword(req.params.id);
+    const { newPassword } = req.body;
+    const result = await adminService.resetAccountPassword(req.params.id, newPassword);
     return responseHelper.success(res, result, 'Đặt lại mật khẩu thành công');
   } catch (error) {
     next(error);
