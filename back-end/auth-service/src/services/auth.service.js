@@ -148,7 +148,11 @@ const login = async (username, password) => {
     throw new AppError('Vui lòng nhập tên đăng nhập và mật khẩu', 400);
   }
 
-  const account = await accountRepo.findByUsername(username);
+  // Hỗ trợ đăng nhập bằng username hoặc email
+  let account = await accountRepo.findByUsername(username);
+  if (!account && username.includes('@')) {
+    account = await accountRepo.findByEmail(username);
+  }
   if (!account) {
     throw new AppError('Tên đăng nhập hoặc mật khẩu không đúng', 401);
   }

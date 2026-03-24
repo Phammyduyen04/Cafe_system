@@ -33,6 +33,14 @@ const ACCOUNTS = [
     role_name: 'ADMIN',
   },
   {
+    username: 'admin',
+    password: 'Admin@2024',
+    full_name: 'Admin Coffea',
+    email: 'admin2@coffea.vn',
+    user_type: 'ADMIN',
+    role_name: 'ADMIN',
+  },
+  {
     username: 'manager01',
     password: 'Man@123',
     full_name: 'Nguyễn Văn Quản Lý',

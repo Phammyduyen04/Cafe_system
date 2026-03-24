@@ -98,13 +98,13 @@ export default function LoginPage() {
             {/* Username */}
             <div className="flex flex-col gap-1.5">
               <label className="font-body text-cafe-primary" style={{ fontSize: 11, fontWeight: 500, letterSpacing: "1.5px", textTransform: "uppercase" }}>
-                Tên đăng nhập
+                Tên đăng nhập hoặc Email
               </label>
               <input
                 type="text"
                 value={username}
                 onChange={e => setUsername(e.target.value)}
-                placeholder="username"
+                placeholder="username hoặc email@example.com"
                 required
                 className="font-body w-full border border-cafe-border bg-white px-4 py-3 outline-none focus:border-cafe-primary transition-colors placeholder:text-[rgba(48,38,28,0.3)] text-cafe-primary"
                 style={{ fontSize: 13, borderRadius: 0 }}
