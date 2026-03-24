@@ -201,7 +201,7 @@ services:
       MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/product_db?authSource=admin
       JWT_SECRET: ${JWT_SECRET}
     volumes:
-      - uploads_data:/app/product-service/uploads
+      - ./uploads:/app/product-service/uploads
     depends_on:
       mongodb:
         condition: service_healthy
@@ -256,4 +256,3 @@ volumes:
   mysql_data:
   mongo_data:
   rabbitmq_data:
-  uploads_data:

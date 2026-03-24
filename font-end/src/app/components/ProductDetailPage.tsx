@@ -85,8 +85,8 @@ export default function ProductDetailPage() {
     }
     setAdding(true);
     try {
-      const sizes = product.sizes ?? [];
-      const sizeLabel = sizes[selectedSize]?.label ?? "M";
+      const sizes = product.sizes ?? [{ label: "S" }, { label: "M" }, { label: "L" }];
+      const sizeLabel = sizes[selectedSize]?.label ?? "S";
       const imageUrl = getProductImage(product);
       await addToCart({
         productId: product._id,

@@ -110,13 +110,10 @@ const createOrder = async (data, user, authToken) => {
   let initialStatus;
   let statusNote;
   if (orderChannel === 'ONLINE') {
-    if (pm === 'MOMO' || pm === 'QR') {
-      initialStatus = 'PENDING_PAYMENT'; // Chờ hoàn tất thanh toán online
-      statusNote = 'Khách hàng đặt đơn online, chờ thanh toán';
-    } else {
-      initialStatus = 'PENDING'; // COD — chờ xác nhận
-      statusNote = 'Khách hàng đặt đơn online (COD)';
-    }
+    initialStatus = 'PENDING_PAYMENT'; // Chờ thanh toán (mọi hình thức)
+    statusNote = pm === 'MOMO' || pm === 'QR'
+      ? 'Khách hàng đặt đơn online, chờ thanh toán'
+      : 'Khách hàng đặt đơn online (COD), chờ xác nhận thanh toán';
   } else {
     initialStatus = 'CONFIRMED';
     statusNote = 'Nhân viên tạo đơn tại quầy';
