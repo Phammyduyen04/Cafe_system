@@ -185,6 +185,7 @@ export default function CheckoutPage() {
           country: "Việt Nam",
         },
         shippingMethod: shipMethod,
+        shippingFee: selectedShip.feeIsDynamic ? 0 : shippingFee,
         paymentMethod: selectedPayMethod,
       });
       const order = (res as any)?.order ?? res;

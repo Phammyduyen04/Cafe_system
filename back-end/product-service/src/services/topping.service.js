@@ -1,11 +1,5 @@
 const toppingRepo = require('../repositories/topping.repo');
-
-class AppError extends Error {
-  constructor(message, statusCode) {
-    super(message);
-    this.statusCode = statusCode;
-  }
-}
+const { AppError } = require('../../../shared');
 
 const getAllToppings = async (onlyAvailable = false) => {
   const filter = onlyAvailable ? { status: 'ACTIVE', isAvailable: true } : {};

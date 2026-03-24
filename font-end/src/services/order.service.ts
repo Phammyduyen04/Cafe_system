@@ -21,6 +21,7 @@ export interface CheckoutPayload {
     country: string;
   };
   shippingMethod: string;
+  shippingFee?: number;
   paymentMethod?: string;
   note?: string;
 }

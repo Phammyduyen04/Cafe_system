@@ -68,6 +68,7 @@ const createOrder = async (data, user, authToken) => {
     note,
     discounts = [],
     promotions = [],
+    shippingFee = 0,
   } = data;
 
   if (!items || items.length === 0) {
@@ -103,7 +104,8 @@ const createOrder = async (data, user, authToken) => {
     };
   });
 
-  const totalAmount = subtotalAmount - discountAmount - promotionAmount;
+  const shippingAmount = Number(shippingFee) || 0;
+  const totalAmount = subtotalAmount - discountAmount - promotionAmount + shippingAmount;
 
   // Xác định trạng thái ban đầu dựa vào kênh và phương thức thanh toán
   const pm = (paymentMethod || 'CASH').toUpperCase();
@@ -221,6 +223,7 @@ const createOrderFromCart = async (data, user, authToken) => {
     note: data.note || null,
     discounts: data.discounts || [],
     promotions: data.promotions || [],
+    shippingFee: data.shippingFee || 0,
   };
 
   const order = await createOrder(orderData, user, authToken);

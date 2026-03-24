@@ -125,7 +125,7 @@ const listAccounts = async (params) => {
     email: acc.email,
     userType: acc.user_type,
     status: acc.account_status,
-    roles: acc.accountRoles.map((ar) => ar.role.role_name),
+    roles: (acc.account_roles || []).map((ar) => ar.role.role_name),
     hasPassword: !!acc.password_hash,
     isGoogleAccount: !!acc.google_id,
     lastLoginAt: acc.last_login_at,

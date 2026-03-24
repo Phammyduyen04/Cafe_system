@@ -51,9 +51,9 @@ const findAll = async ({ page = 1, limit = 20, search, userType, status } = {}) 
   if (status) where.account_status = status;
   if (search) {
     where.OR = [
-      { username: { contains: search, mode: 'insensitive' } },
-      { full_name: { contains: search, mode: 'insensitive' } },
-      { email: { contains: search, mode: 'insensitive' } },
+      { username: { contains: search } },
+      { full_name: { contains: search } },
+      { email: { contains: search } },
     ];
   }
   const skip = (page - 1) * limit;
@@ -63,7 +63,7 @@ const findAll = async ({ page = 1, limit = 20, search, userType, status } = {}) 
       skip,
       take: limit,
       orderBy: { created_at: 'desc' },
-      include: { accountRoles: { include: { role: true } } },
+      include: { account_roles: { include: { role: true } } },
     }),
     prisma.account.count({ where }),
   ]);
