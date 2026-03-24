@@ -23,6 +23,12 @@ import ManagerDiscountsPage from "./components/manager/ManagerDiscountsPage";
 import ManagerBeveragesPage from "./components/manager/ManagerBeveragesPage";
 import ManagerIngredientsPage from "./components/manager/ManagerIngredientsPage";
 import ManagerCategoriesPage from "./components/manager/ManagerCategoriesPage";
+import StaffLayout from "./components/staff/StaffLayout";
+import StaffShiftsPage from "./components/staff/StaffShiftsPage";
+import StaffOrdersPage from "./components/staff/StaffOrdersPage";
+import AdminLayout from "./components/admin/AdminLayout";
+import AdminAccountsPage from "./components/admin/AdminAccountsPage";
+import AdminRolesPage from "./components/admin/AdminRolesPage";
 
 export const router = createBrowserRouter([
   {
@@ -54,6 +60,24 @@ export const router = createBrowserRouter([
       { path: "categories", Component: ManagerCategoriesPage },
       { path: "promotions", Component: ManagerPromotionsPage },
       { path: "discounts", Component: ManagerDiscountsPage },
+    ],
+  },
+  {
+    path: "/staff",
+    Component: StaffLayout,
+    children: [
+      { index: true, Component: StaffOrdersPage },
+      { path: "shifts", Component: StaffShiftsPage },
+      { path: "orders", Component: StaffOrdersPage },
+    ],
+  },
+  {
+    path: "/admin",
+    Component: AdminLayout,
+    children: [
+      { index: true, Component: AdminAccountsPage },
+      { path: "accounts", Component: AdminAccountsPage },
+      { path: "roles", Component: AdminRolesPage },
     ],
   },
   { path: "/login", Component: LoginPage },

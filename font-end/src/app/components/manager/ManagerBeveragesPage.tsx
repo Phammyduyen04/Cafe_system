@@ -415,7 +415,7 @@ function ToppingsSection() {
       }
       const payload = { name: form.name, price: form.price, image: imageUrl, status: form.status, isAvailable: form.status === "ACTIVE" };
       if (editing) {
-        await productService.updateTopping(editing._id, payload);
+        await productService.updateTopping(editing.toppingId, payload);
       } else {
         await productService.createTopping(payload);
       }
@@ -428,7 +428,7 @@ function ToppingsSection() {
     if (!toggleTarget) return;
     try {
       const newStatus = toggleTarget.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
-      await productService.deactivateTopping(toggleTarget._id, newStatus);
+      await productService.deactivateTopping(toggleTarget.toppingId, newStatus);
       setToggleTarget(null);
       load();
     } catch (e: any) { alert(e.message); }

@@ -15,11 +15,14 @@ function priceInRange(price: number, range: string | null): boolean {
   return true;
 }
 
+const ITEMS_PER_PAGE = 9;
+
 export default function MenuPage() {
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("Tất cả");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Filter states
   const [selectedDrinkTypes, setSelectedDrinkTypes] = useState<string[]>([]);
@@ -75,6 +78,7 @@ export default function MenuPage() {
     setSelectedTags([]);
     setSelectedRating(null);
     setSearchQuery("");
+    setCurrentPage(1);
   };
 
   const filtered = useMemo(() => {
@@ -97,6 +101,17 @@ export default function MenuPage() {
       return matchCategory && matchSearch && matchPrice && matchDrinkType && matchCollection && matchTags && matchRating;
     });
   }, [products, categories, activeCategory, searchQuery, selectedPriceRange, selectedDrinkTypes, selectedCollections, selectedTags, selectedRating]);
+
+  // Reset page when filters/search change
+  useEffect(() => { setCurrentPage(1); }, [activeCategory, searchQuery, selectedPriceRange, selectedDrinkTypes, selectedCollections, selectedTags, selectedRating]);
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  const paginated = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  const goToPage = (p: number) => {
+    setCurrentPage(p);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const hasActiveFilters =
     activeCategory !== "Tất cả" ||
@@ -210,7 +225,11 @@ export default function MenuPage() {
             {/* Desktop result count */}
             <div className="hidden lg:flex items-center justify-between mb-4">
               <p className="font-body" style={{ fontWeight: 400, fontSize: 12, color: "rgba(48,38,28,0.6)" }}>
-                Hiển thị <span className="text-cafe-primary" style={{ fontWeight: 700 }}>{filtered.length}</span> món
+                Hiển thị{" "}
+                <span className="text-cafe-primary" style={{ fontWeight: 700 }}>
+                  {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)}
+                </span>{" "}
+                / <span className="text-cafe-primary" style={{ fontWeight: 700 }}>{filtered.length}</span> món
               </p>
               {hasActiveFilters && (
                 <button
@@ -241,11 +260,71 @@ export default function MenuPage() {
 
             {/* Product Grid */}
             {!loading && filtered.length > 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
-                {filtered.map((item) => (
-                  <MenuCard key={item._id} item={item} categories={categories} />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+                  {paginated.map((item) => (
+                    <MenuCard key={item._id} item={item} categories={categories} />
+                  ))}
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-1.5 mt-10">
+                    {/* Prev */}
+                    <button
+                      onClick={() => goToPage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="w-9 h-9 flex items-center justify-center rounded-lg border border-cafe-border bg-white hover:border-cafe-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M15 18l-6-6 6-6" />
+                      </svg>
+                    </button>
+
+                    {/* Page numbers */}
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                      .reduce<(number | "...")[]>((acc, p, idx, arr) => {
+                        if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push("...");
+                        acc.push(p);
+                        return acc;
+                      }, [])
+                      .map((item, idx) =>
+                        item === "..." ? (
+                          <span key={`ellipsis-${idx}`} className="font-body w-9 h-9 flex items-center justify-center" style={{ fontSize: 13, color: "rgba(48,38,28,0.4)" }}>
+                            …
+                          </span>
+                        ) : (
+                          <button
+                            key={item}
+                            onClick={() => goToPage(item as number)}
+                            className="font-body w-9 h-9 flex items-center justify-center rounded-lg border transition-colors"
+                            style={{
+                              fontSize: 13,
+                              fontWeight: currentPage === item ? 700 : 400,
+                              borderColor: currentPage === item ? "var(--cafe-primary)" : "var(--cafe-border)",
+                              backgroundColor: currentPage === item ? "var(--cafe-primary)" : "white",
+                              color: currentPage === item ? "white" : "var(--cafe-primary)",
+                            }}
+                          >
+                            {item}
+                          </button>
+                        )
+                      )}
+
+                    {/* Next */}
+                    <button
+                      onClick={() => goToPage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="w-9 h-9 flex items-center justify-center rounded-lg border border-cafe-border bg-white hover:border-cafe-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9 18l6-6-6-6" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Empty state */}

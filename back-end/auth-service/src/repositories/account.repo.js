@@ -45,13 +45,52 @@ const findAllByEmail = async (email) => {
   return await prisma.account.findMany({ where: { email } });
 };
 
+const findAll = async ({ page = 1, limit = 20, search, userType, status } = {}) => {
+  const where = {};
+  if (userType) where.user_type = userType;
+  if (status) where.account_status = status;
+  if (search) {
+    where.OR = [
+      { username: { contains: search } },
+      { full_name: { contains: search } },
+      { email: { contains: search } },
+    ];
+  }
+  const skip = (page - 1) * limit;
+  const [items, total] = await Promise.all([
+    prisma.account.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { created_at: 'desc' },
+      include: { account_roles: { include: { role: true } } },
+    }),
+    prisma.account.count({ where }),
+  ]);
+  return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+};
+
+const update = async (id, data) => {
+  return await prisma.account.update({ where: { account_id: id }, data });
+};
+
+const updateStatus = async (id, status) => {
+  return await prisma.account.update({
+    where: { account_id: id },
+    data: { account_status: status },
+  });
+};
+
 module.exports = {
   findByUsername,
   findById,
   findByGoogleId,
   findByEmail,
   findAllByEmail,
+  findAll,
   create,
+  update,
+  updateStatus,
   updateLastLogin,
   updatePassword,
   getAccountRoles,

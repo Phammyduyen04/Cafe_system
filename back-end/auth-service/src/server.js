@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const { errorHandler } = require('../../shared');
 const authRoutes = require('./routes/auth.routes');
 const roleRoutes = require('./routes/role.routes');
+const adminRoutes = require('./routes/admin.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -22,6 +23,7 @@ app.get('/api/health', (req, res) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/auth/roles', roleRoutes);
+app.use('/api/auth/admin', adminRoutes);
 
 // Internal API (không cần auth, chỉ dùng giữa các service)
 const accountRepo = require('./repositories/account.repo');

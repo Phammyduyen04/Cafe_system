@@ -16,7 +16,9 @@ export default function LoginPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
 
   const getRedirectPath = (userType: string) => {
-    if (userType === "MANAGER" || userType === "ADMIN") return "/manager";
+    if (userType === "ADMIN") return "/admin";
+    if (userType === "MANAGER") return "/manager";
+    if (userType === "STAFF" || userType === "EMPLOYEE") return "/staff";
     return "/";
   };
 
