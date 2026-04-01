@@ -9,6 +9,11 @@ const createEmployee = async (data) => {
     throw new AppError('Full name, position, and employee type are required', 400);
   }
 
+  if (accountId) {
+    const existing = await employeeRepo.findByAccountId(accountId);
+    if (existing) throw new AppError('This accountId is already linked to another employee', 409);
+  }
+
   const employeeId = crypto.randomUUID();
   const employee = await employeeRepo.create({
     employeeId,
@@ -29,6 +34,9 @@ const getAllEmployees = async (filters, page = 1, limit = 10) => {
   const query = {};
   if (filters.status) query.status = filters.status;
   if (filters.position) query.position = filters.position;
+  if (filters.employeeType) query.employeeType = filters.employeeType;
+  if (filters.hasAccount === 'false') query.accountId = null;
+  if (filters.hasAccount === 'true') query.accountId = { $ne: null };
   const [employees, total] = await Promise.all([
     employeeRepo.findMany(query, skip, limit),
     employeeRepo.count(query),
@@ -45,13 +53,30 @@ const getEmployeeById = async (id) => {
 const updateEmployee = async (id, data) => {
   const employee = await employeeRepo.findByEmployeeId(id);
   if (!employee) throw new AppError('Employee not found', 404);
+
+  if (data.accountId) {
+    const existing = await employeeRepo.findByAccountId(data.accountId);
+    if (existing && existing.employeeId !== id) {
+      throw new AppError('This accountId is already linked to another employee', 409);
+    }
+  }
+
   return await employeeRepo.update(employee._id, data);
 };
 
-const deleteEmployee = async (id) => {
+const deleteEmployee = async (id, reason) => {
+  if (!reason || !reason.trim()) throw new AppError('Reason is required when deactivating an employee', 400);
   const employee = await employeeRepo.findByEmployeeId(id);
   if (!employee) throw new AppError('Employee not found', 404);
-  return await employeeRepo.update(employee._id, { status: 'INACTIVE' });
+  if (employee.status === 'INACTIVE') throw new AppError('Employee is already inactive', 400);
+  return await employeeRepo.update(employee._id, { status: 'INACTIVE', inactiveReason: reason.trim() });
+};
+
+const reactivateEmployee = async (id) => {
+  const employee = await employeeRepo.findByEmployeeId(id);
+  if (!employee) throw new AppError('Employee not found', 404);
+  if (employee.status === 'ACTIVE') throw new AppError('Employee is already active', 400);
+  return await employeeRepo.update(employee._id, { status: 'ACTIVE', inactiveReason: null });
 };
 
 const getAvailability = async (employeeId) => {
@@ -67,6 +92,10 @@ const updateAvailability = async (employeeId, data, requester) => {
     throw new AppError('You can only update your own availability', 403);
   }
 
+  if (employee.employeeType === 'FULL_TIME') {
+    throw new AppError('Full-time employees do not need to set availability as they work all week', 400);
+  }
+
   return await availabilityRepo.createOrUpdate(employeeId, { ...data, employeeId });
 };
 
@@ -76,4 +105,4 @@ const getEmployeeByAccountId = async (accountId) => {
   return employee;
 };
 
-module.exports = { createEmployee, getAllEmployees, getEmployeeById, updateEmployee, deleteEmployee, getAvailability, updateAvailability, getEmployeeByAccountId };
+module.exports = { createEmployee, getAllEmployees, getEmployeeById, updateEmployee, deleteEmployee, reactivateEmployee, getAvailability, updateAvailability, getEmployeeByAccountId };

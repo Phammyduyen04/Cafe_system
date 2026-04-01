@@ -11,8 +11,8 @@ const createEmployee = async (req, res, next) => {
 
 const getAllEmployees = async (req, res, next) => {
   try {
-    const { status, position, page = 1, limit = 10 } = req.query;
-    const result = await employeeService.getAllEmployees({ status, position }, parseInt(page), parseInt(limit));
+    const { status, position, employeeType, hasAccount, page = 1, limit = 10 } = req.query;
+    const result = await employeeService.getAllEmployees({ status, position, employeeType, hasAccount }, parseInt(page), parseInt(limit));
     return responseHelper.paginated(res, result.employees, result.pagination);
   } catch (error) { next(error); }
 };
@@ -33,8 +33,16 @@ const updateEmployee = async (req, res, next) => {
 
 const deleteEmployee = async (req, res, next) => {
   try {
-    const employee = await employeeService.deleteEmployee(req.params.id);
+    const { reason } = req.body;
+    const employee = await employeeService.deleteEmployee(req.params.id, reason);
     return responseHelper.success(res, employee, 'Employee deactivated successfully');
+  } catch (error) { next(error); }
+};
+
+const reactivateEmployee = async (req, res, next) => {
+  try {
+    const employee = await employeeService.reactivateEmployee(req.params.id);
+    return responseHelper.success(res, employee, 'Employee reactivated successfully');
   } catch (error) { next(error); }
 };
 
@@ -67,4 +75,4 @@ const getEmployeeShifts = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-module.exports = { createEmployee, getAllEmployees, getEmployeeById, updateEmployee, deleteEmployee, getAvailability, updateAvailability, getEmployeeByAccountId, getEmployeeShifts };
+module.exports = { createEmployee, getAllEmployees, getEmployeeById, updateEmployee, deleteEmployee, reactivateEmployee, getAvailability, updateAvailability, getEmployeeByAccountId, getEmployeeShifts };
