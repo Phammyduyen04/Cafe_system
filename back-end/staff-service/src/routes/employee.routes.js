@@ -9,13 +9,14 @@ router.use(authMiddleware);
 router.get('/by-account/:accountId', employeeController.getEmployeeByAccountId);
 router.get('/', employeeController.getAllEmployees);
 router.get('/:id', employeeController.getEmployeeById);
-router.post('/', authorizeMiddleware('MANAGER', 'ADMIN'), employeeController.createEmployee);
+router.post('/', authorizeMiddleware('MANAGER'), employeeController.createEmployee);
 router.put('/:id', authorizeMiddleware('MANAGER'), employeeController.updateEmployee);
-router.delete('/:id', authorizeMiddleware('MANAGER'), employeeController.deleteEmployee);
+router.put('/:id/deactivate', authorizeMiddleware('MANAGER'), employeeController.deleteEmployee);
+router.put('/:id/activate', authorizeMiddleware('MANAGER'), employeeController.reactivateEmployee);
 
 // Availability
 router.get('/:id/availability', employeeController.getAvailability);
-router.put('/:id/availability', authorizeMiddleware('STAFF'), employeeController.updateAvailability);
+router.put('/:id/availability', authorizeMiddleware('STAFF', 'MANAGER'), employeeController.updateAvailability);
 
 // Assigned shifts
 router.get('/:id/shifts', employeeController.getEmployeeShifts);
