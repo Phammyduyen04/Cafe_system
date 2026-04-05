@@ -1,9 +1,22 @@
-const crypto = require('crypto');
 const { AppError } = require('../../../shared');
 const employeeRepo = require('../repositories/employee.repo');
 const availabilityRepo = require('../repositories/availability.repo');
 
-const createEmployee = async (data) => {
+// Sinh employeeId dạng EMP-001, EMP-002, ...
+const generateEmployeeId = async () => {
+  const all = await employeeRepo.findAll({ employeeId: { $regex: '^EMP-' } });
+  let maxNum = 0;
+  for (const emp of all) {
+    const match = emp.employeeId.match(/^EMP-(\d+)$/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxNum) maxNum = num;
+    }
+  }
+  return `EMP-${String(maxNum + 1).padStart(3, '0')}`;
+};
+
+const createEmployee = async (data, user) => {
   const { fullName, position, employeeType, maxWorkingHours, accountId, managerId } = data;
   if (!fullName || !position || !employeeType) {
     throw new AppError('Full name, position, and employee type are required', 400);
@@ -14,17 +27,35 @@ const createEmployee = async (data) => {
     if (existing) throw new AppError('This accountId is already linked to another employee', 409);
   }
 
-  const employeeId = crypto.randomUUID();
+  // Auto-populate managerId từ token nếu không được cung cấp
+  let resolvedManagerId = managerId || null;
+  if (!resolvedManagerId && user && user.accountId) {
+    const managerEmployee = await employeeRepo.findByAccountId(user.accountId);
+    if (managerEmployee) resolvedManagerId = managerEmployee.employeeId;
+  }
+
+  // FULL_TIME mặc định 40 tiếng/tuần nếu không chỉ định
+  const resolvedMaxHours = employeeType === 'FULL_TIME'
+    ? (maxWorkingHours || 40)
+    : (maxWorkingHours || null);
+
+  const employeeId = await generateEmployeeId();
   const employee = await employeeRepo.create({
     employeeId,
-    fullName, position, employeeType,
-    maxWorkingHours: maxWorkingHours || null,
+    fullName,
+    position,
+    employeeType,
+    maxWorkingHours: resolvedMaxHours,
     accountId: accountId || null,
-    managerId: managerId || null,
+    managerId: resolvedManagerId,
   });
 
-  // Create empty availability
-  await availabilityRepo.createOrUpdate(employee.employeeId, { employeeId: employee.employeeId, availableDays: [], availableTimeRanges: [] });
+  // Tạo availability rỗng
+  await availabilityRepo.createOrUpdate(employee.employeeId, {
+    employeeId: employee.employeeId,
+    availableDays: [],
+    availableTimeRanges: [],
+  });
 
   return employee;
 };
@@ -72,26 +103,33 @@ const deleteEmployee = async (id, reason) => {
   return await employeeRepo.update(employee._id, { status: 'INACTIVE', inactiveReason: reason.trim() });
 };
 
-const reactivateEmployee = async (id) => {
+const reactivateEmployee = async (id, reason) => {
+  if (!reason || !reason.trim()) throw new AppError('Reason is required when reactivating an employee', 400);
   const employee = await employeeRepo.findByEmployeeId(id);
   if (!employee) throw new AppError('Employee not found', 404);
   if (employee.status === 'ACTIVE') throw new AppError('Employee is already active', 400);
-  return await employeeRepo.update(employee._id, { status: 'ACTIVE', inactiveReason: null });
+  return await employeeRepo.update(employee._id, {
+    status: 'ACTIVE',
+    inactiveReason: null,
+    reactivateReason: reason.trim(),
+  });
 };
 
 const getAvailability = async (employeeId) => {
   return await availabilityRepo.findByEmployeeId(employeeId);
 };
 
+// Chỉ STAFF PART_TIME mới được cập nhật lịch rảnh
 const updateAvailability = async (employeeId, data, requester) => {
   const employee = await employeeRepo.findByEmployeeId(employeeId);
   if (!employee) throw new AppError('Employee not found', 404);
 
-  const isStaff = requester.roles && requester.roles.includes('STAFF');
-  if (isStaff && employee.accountId !== requester.accountId) {
+  // Staff chỉ được cập nhật lịch rảnh của bản thân
+  if (String(employee.accountId) !== String(requester.accountId)) {
     throw new AppError('You can only update your own availability', 403);
   }
 
+  // FULL_TIME không cần lịch rảnh — manager có thể gán ca bất kỳ
   if (employee.employeeType === 'FULL_TIME') {
     throw new AppError('Full-time employees do not need to set availability as they work all week', 400);
   }
@@ -105,4 +143,14 @@ const getEmployeeByAccountId = async (accountId) => {
   return employee;
 };
 
-module.exports = { createEmployee, getAllEmployees, getEmployeeById, updateEmployee, deleteEmployee, reactivateEmployee, getAvailability, updateAvailability, getEmployeeByAccountId };
+module.exports = {
+  createEmployee,
+  getAllEmployees,
+  getEmployeeById,
+  updateEmployee,
+  deleteEmployee,
+  reactivateEmployee,
+  getAvailability,
+  updateAvailability,
+  getEmployeeByAccountId,
+};

@@ -1,323 +1,337 @@
-import React, { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 import { useAuth } from "../../../contexts/AuthContext";
-import { staffService, type Shift, type Assignment, type Employee } from "../../../services/staff.service";
+import { staffService, type Shift, type Employee } from "../../../services/staff.service";
 
-const HOURS = Array.from({ length: 17 }, (_, i) => i + 6); // 6:00 → 22:00
-const CELL_H = 80;
+// ── helpers ──────────────────────────────────────────────────────────────────
+const DAY_KEYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+const DAY_LABELS_FULL: Record<string, string> = {
+  MON: "Thứ 2", TUE: "Thứ 3", WED: "Thứ 4", THU: "Thứ 5",
+  FRI: "Thứ 6", SAT: "Thứ 7", SUN: "Chủ nhật",
+};
+const MONTH_NAMES = ["Tháng 1","Tháng 2","Tháng 3","Tháng 4","Tháng 5","Tháng 6","Tháng 7","Tháng 8","Tháng 9","Tháng 10","Tháng 11","Tháng 12"];
 
-const getWeekStart = (date: Date): Date => {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  const day = d.getDay();
+function getWeekDates(anchor: Date): Date[] {
+  const d = new Date(anchor);
+  const day = d.getDay(); // 0=Sun
   d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
-  return d;
-};
-
-const timeToY = (t: string) => {
-  const [h, m] = t.split(":").map(Number);
-  return (h + m / 60 - 6) * CELL_H;
-};
-
-const DAY_SHORT: Record<number, string> = { 0: "CN", 1: "T2", 2: "T3", 3: "T4", 4: "T5", 5: "T6", 6: "T7" };
-
-const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  PLANNED:   { bg: "#dbeafe", text: "#2563eb" },
-  ACTIVE:    { bg: "#dcfce7", text: "#16a34a" },
-  COMPLETED: { bg: "#f3f4f6", text: "#6b7280" },
-  CANCELLED: { bg: "#fef2f2", text: "#dc2626" },
-};
-
-const DAY_LABELS_VN = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
-function formatDateVN(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return `${DAY_LABELS_VN[d.getDay()]}, ${dateStr}`;
+  d.setHours(0, 0, 0, 0);
+  return Array.from({ length: 7 }, (_, i) => {
+    const dt = new Date(d);
+    dt.setDate(d.getDate() + i);
+    return dt;
+  });
 }
 
+function toDateStr(d: Date) { return d.toISOString().split("T")[0]; }
+function formatDayHeader(d: Date) {
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}`;
+}
+function formatWeekRange(dates: Date[]) {
+  const s = dates[0], e = dates[6];
+  return `${formatDayHeader(s)} — ${formatDayHeader(e)}/${e.getFullYear()}`;
+}
+
+const STATUS_STYLE: Record<string, { bg: string; border: string; text: string }> = {
+  PLANNED:   { bg: "#eff6ff", border: "#93c5fd", text: "#1d4ed8" },
+  ACTIVE:    { bg: "#f0fdf4", border: "#86efac", text: "#15803d" },
+  COMPLETED: { bg: "#f3f4f6", border: "#d1d5db", text: "#6b7280" },
+  CANCELLED: { bg: "#fef2f2", border: "#fca5a5", text: "#dc2626" },
+};
+
+// ── Mini Calendar component ───────────────────────────────────────────────────
+function MiniCalendar({ selectedDate, onSelect, onClose }: {
+  selectedDate: Date;
+  onSelect: (d: Date) => void;
+  onClose: () => void;
+}) {
+  const [viewYear, setViewYear] = useState(selectedDate.getFullYear());
+  const [viewMonth, setViewMonth] = useState(selectedDate.getMonth());
+
+  const firstDay = new Date(viewYear, viewMonth, 1);
+  const startOffset = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1; // Mon=0
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
+  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
+
+  const today = toDateStr(new Date());
+  const selectedStr = toDateStr(selectedDate);
+
+  return (
+    <div className="absolute z-50 bg-white rounded-2xl border border-[var(--cafe-border)] p-3 shadow-xl"
+      style={{ width: 256, top: "calc(100% + 6px)", left: 0 }}>
+      {/* Month nav */}
+      <div className="flex items-center justify-between mb-2">
+        <button onClick={prevMonth} className="font-body w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[var(--cafe-bg)] text-[var(--cafe-primary)]" style={{ fontSize: 16 }}>‹</button>
+        <span className="font-body text-[var(--cafe-primary)]" style={{ fontSize: 13, fontWeight: 600 }}>
+          {MONTH_NAMES[viewMonth]} {viewYear}
+        </span>
+        <button onClick={nextMonth} className="font-body w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[var(--cafe-bg)] text-[var(--cafe-primary)]" style={{ fontSize: 16 }}>›</button>
+      </div>
+      {/* Day labels */}
+      <div className="grid grid-cols-7 mb-1">
+        {["T2","T3","T4","T5","T6","T7","CN"].map(d => (
+          <div key={d} className="font-body text-center text-[var(--cafe-primary)]/40" style={{ fontSize: 10, fontWeight: 600, padding: "2px 0" }}>{d}</div>
+        ))}
+      </div>
+      {/* Days grid */}
+      <div className="grid grid-cols-7 gap-0.5">
+        {Array.from({ length: startOffset }).map((_, i) => <div key={`e${i}`} />)}
+        {Array.from({ length: daysInMonth }, (_, i) => {
+          const day = i + 1;
+          const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+          const isToday = dateStr === today;
+          const isSelected = dateStr === selectedStr;
+          return (
+            <button
+              key={day}
+              onClick={() => { onSelect(new Date(viewYear, viewMonth, day)); onClose(); }}
+              className="font-body w-full aspect-square flex items-center justify-center rounded-lg transition-colors"
+              style={{
+                fontSize: 12,
+                fontWeight: isToday || isSelected ? 700 : 400,
+                backgroundColor: isSelected ? "var(--cafe-primary)" : isToday ? "var(--cafe-gold)" : "transparent",
+                color: isSelected || isToday ? "#fff" : "var(--cafe-primary)",
+              }}
+            >
+              {day}
+            </button>
+          );
+        })}
+      </div>
+      <button onClick={onClose} className="font-body w-full mt-2 py-1.5 text-center text-[var(--cafe-primary)]/50 hover:text-[var(--cafe-primary)] border-t border-[var(--cafe-border)]" style={{ fontSize: 12 }}>
+        Đóng
+      </button>
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function StaffSchedulePage() {
   const { user, isLoggedIn } = useAuth();
   const navigate = useNavigate();
 
   const [employee, setEmployee] = useState<Employee | null>(null);
-  const [tab, setTab] = useState<"all" | "mine">("all");
-  const [allShifts, setAllShifts] = useState<Shift[]>([]);
-  const [myShifts, setMyShifts] = useState<Shift[]>([]);
+  const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState("");
-  const [currentWeekStart, setCurrentWeekStart] = useState(() => getWeekStart(new Date()));
-  const [selectedShift, setSelectedShift] = useState<(Shift & { assignments?: Assignment[] }) | null>(null);
-  const [popoverPos, setPopoverPos] = useState<{ x: number; y: number } | null>(null);
+  const [error, setError] = useState("");
+  const [anchor, setAnchor] = useState(() => new Date());
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
+  const calendarRef = useRef<HTMLDivElement>(null);
+
+  const weekDates = getWeekDates(anchor);
+  const weekStart = toDateStr(weekDates[0]);
+  const weekEnd = toDateStr(weekDates[6]);
 
   useEffect(() => {
     if (!isLoggedIn) { navigate("/login"); return; }
-    loadData();
+    loadEmployee();
   }, [isLoggedIn]);
 
-  const loadData = async () => {
+  useEffect(() => {
+    if (employee) loadShifts();
+  }, [employee, weekStart]);
+
+  // Close calendar on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (calendarRef.current && !calendarRef.current.contains(e.target as Node)) {
+        setShowCalendar(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const loadEmployee = async () => {
     try {
-      setLoading(true);
       const emp = await staffService.getEmployeeByAccountId(user!.accountId);
       setEmployee(emp);
-      const [res, myRes] = await Promise.all([
-        staffService.getShifts({ limit: 200 }),
-        staffService.getEmployeeShifts(emp.employeeId, {}),
-      ]);
-      const allList = Array.isArray(res) ? res : (res as any)?.data ?? (res as any)?.shifts ?? [];
-      const myList = (myRes as any)?.shifts ?? (myRes as any)?.data ?? [];
-      setAllShifts(allList);
-      setMyShifts(Array.isArray(myList) ? myList : []);
-    } catch {} finally {
+    } catch {
+      setError("Không tìm thấy thông tin nhân viên. Vui lòng liên hệ quản lý.");
       setLoading(false);
     }
   };
 
-  const handleShiftClick = async (shift: Shift, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const loadShifts = async () => {
+    if (!employee) return;
     try {
-      const detail = await staffService.getShiftById(shift.shiftId);
-      setSelectedShift(detail as Shift & { assignments?: Assignment[] });
-      setPopoverPos({ x: e.clientX, y: e.clientY });
-    } catch {
-      setSelectedShift(shift);
-      setPopoverPos({ x: e.clientX, y: e.clientY });
-    }
+      setLoading(true);
+      // Get employee's own shifts then filter by week
+      const res = await staffService.getEmployeeShifts(employee.employeeId, { limit: 200 });
+      const all: Shift[] = (res as any)?.data ?? (res as any)?.shifts ?? [];
+      setShifts(all.filter(s => s.workingDate >= weekStart && s.workingDate <= weekEnd));
+    } catch { setShifts([]); }
+    finally { setLoading(false); }
   };
 
-  // Week helpers
-  const weekDates = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(currentWeekStart);
-    d.setDate(d.getDate() + i);
-    return d;
-  });
+  const prevWeek = () => setAnchor(d => { const n = new Date(d); n.setDate(n.getDate() - 7); return n; });
+  const nextWeek = () => setAnchor(d => { const n = new Date(d); n.setDate(n.getDate() + 7); return n; });
+  const goToday = () => setAnchor(new Date());
 
-  const toDateStr = (d: Date) => d.toISOString().split("T")[0];
   const isToday = (d: Date) => toDateStr(d) === toDateStr(new Date());
-
-  const myShiftIds = new Set(myShifts.map((s) => s.shiftId));
-  const activeList = tab === "all" ? allShifts : myShifts;
-
-  const visibleShifts = activeList.filter((s) =>
-    weekDates.some((d) => toDateStr(d) === s.workingDate) &&
-    (!filterStatus || s.status === filterStatus)
-  );
-
-  const shiftsForDate = (d: Date) => visibleShifts.filter((s) => s.workingDate === toDateStr(d));
-
-  const formatWeekRange = () =>
-    `${String(weekDates[0].getDate()).padStart(2, "0")}/${String(weekDates[0].getMonth() + 1).padStart(2, "0")} — ` +
-    `${String(weekDates[6].getDate()).padStart(2, "0")}/${String(weekDates[6].getMonth() + 1).padStart(2, "0")}/${weekDates[6].getFullYear()}`;
-
-  const prevWeek = () => { const d = new Date(currentWeekStart); d.setDate(d.getDate() - 7); setCurrentWeekStart(d); };
-  const nextWeek = () => { const d = new Date(currentWeekStart); d.setDate(d.getDate() + 7); setCurrentWeekStart(d); };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[var(--cafe-bg)] flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-[var(--cafe-gold)] border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  const shiftsForDate = (dateStr: string) =>
+    shifts.filter(s => s.workingDate === dateStr).sort((a, b) => a.startTime.localeCompare(b.startTime));
 
   return (
-    <div className="min-h-screen bg-[var(--cafe-bg)] pt-24">
-      <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-10">
+    <div className="flex flex-col" style={{ minHeight: "calc(100vh - 120px)" }}>
+      {/* Header */}
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+        <div>
+          <h1 className="font-heading text-[var(--cafe-primary)]" style={{ fontSize: 28, fontWeight: 700 }}>Lịch làm việc</h1>
+          {employee && (
+            <p className="font-body text-[var(--cafe-primary)]/60 mt-0.5" style={{ fontSize: 13 }}>
+              {employee.fullName} · {employee.position} · {employee.employeeType}
+            </p>
+          )}
+        </div>
+      </div>
 
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="font-heading text-[var(--cafe-primary)]" style={{ fontSize: 28, fontWeight: 700 }}>Lịch làm việc</h1>
-            {employee && (
-              <p className="font-body text-[var(--cafe-primary)] mt-1" style={{ fontSize: 13, opacity: 0.6 }}>
-                Xin chào <strong>{employee.fullName}</strong> — {employee.position}
-              </p>
-            )}
-          </div>
-          <Link
-            to="/staff/availability"
-            className="font-body px-4 py-2 bg-[var(--cafe-primary)] text-white rounded-lg hover:opacity-90 transition-opacity"
-            style={{ fontSize: 13, fontWeight: 500 }}
+      {error && (
+        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-700 font-body text-sm">{error}</div>
+      )}
+
+      {/* Week navigation */}
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <button onClick={prevWeek} className="font-body p-2 border border-[var(--cafe-border)] rounded-lg hover:bg-white bg-white" style={{ fontSize: 16 }}>‹</button>
+
+        {/* Date picker button */}
+        <div className="relative" ref={calendarRef}>
+          <button
+            onClick={() => setShowCalendar(v => !v)}
+            className="font-body flex items-center gap-2 px-4 py-2 border border-[var(--cafe-border)] rounded-lg bg-white hover:border-[var(--cafe-gold)] transition-colors"
+            style={{ fontSize: 13, fontWeight: 500, color: "var(--cafe-primary)" }}
           >
-            Cập nhật lịch rảnh
-          </Link>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex gap-1 mb-4 bg-white border border-[var(--cafe-border)] rounded-xl p-1 w-fit">
-          {(["all", "mine"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className="font-body px-5 py-2 rounded-lg transition-colors"
-              style={{
-                fontSize: 13, fontWeight: 600,
-                backgroundColor: tab === t ? "var(--cafe-primary)" : "transparent",
-                color: tab === t ? "#fff" : "var(--cafe-primary)",
-              }}
-            >
-              {t === "all" ? "Tất cả ca" : "Ca của tôi"}
-            </button>
-          ))}
-        </div>
-
-        {/* Week nav + filter */}
-        <div className="flex flex-wrap items-center gap-3 mb-4">
-          <div className="flex items-center gap-1">
-            <button onClick={prevWeek} className="font-body w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--cafe-border)] bg-white hover:bg-[var(--cafe-accent)] text-[var(--cafe-primary)]" style={{ fontSize: 18 }}>‹</button>
-            <span className="font-body text-[var(--cafe-primary)] px-3 py-1.5 bg-white border border-[var(--cafe-border)] rounded-lg" style={{ fontSize: 13, fontWeight: 500, minWidth: 170, textAlign: "center" }}>
-              {formatWeekRange()}
-            </span>
-            <button onClick={nextWeek} className="font-body w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--cafe-border)] bg-white hover:bg-[var(--cafe-accent)] text-[var(--cafe-primary)]" style={{ fontSize: 18 }}>›</button>
-          </div>
-          <button onClick={() => setCurrentWeekStart(getWeekStart(new Date()))} className="font-body px-3 py-1.5 border border-[var(--cafe-border)] rounded-lg bg-white hover:bg-[var(--cafe-accent)] text-[var(--cafe-primary)]" style={{ fontSize: 12, fontWeight: 500 }}>
-            Hôm nay
+            {/* Calendar icon */}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            {formatWeekRange(weekDates)}
           </button>
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="font-body px-3 py-1.5 border border-[var(--cafe-border)] rounded-lg bg-white focus:outline-none focus:border-[var(--cafe-gold)] text-[var(--cafe-primary)]" style={{ fontSize: 13 }}>
-            <option value="">Tất cả trạng thái</option>
-            <option value="PLANNED">PLANNED</option>
-            <option value="ACTIVE">ACTIVE</option>
-            <option value="COMPLETED">COMPLETED</option>
-            <option value="CANCELLED">CANCELLED</option>
-          </select>
+          {showCalendar && (
+            <MiniCalendar
+              selectedDate={anchor}
+              onSelect={(d) => setAnchor(d)}
+              onClose={() => setShowCalendar(false)}
+            />
+          )}
         </div>
 
-        {/* Calendar */}
-        <div className="bg-white rounded-2xl border border-[var(--cafe-border)] overflow-hidden">
-          {/* Day header */}
-          <div style={{ display: "grid", gridTemplateColumns: "44px repeat(7, 1fr)", borderBottom: "1px solid var(--cafe-border)" }}>
-            <div />
-            {weekDates.map((d, i) => (
-              <div key={i} className="font-body text-center py-3" style={{ borderLeft: "1px solid var(--cafe-border)" }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: isToday(d) ? "var(--cafe-gold)" : "var(--cafe-primary)", opacity: isToday(d) ? 1 : 0.5 }}>
-                  {DAY_SHORT[d.getDay()]}
+        <button onClick={nextWeek} className="font-body p-2 border border-[var(--cafe-border)] rounded-lg hover:bg-white bg-white" style={{ fontSize: 16 }}>›</button>
+        <button onClick={goToday} className="font-body px-3 py-2 border border-[var(--cafe-border)] rounded-lg hover:bg-white bg-white text-[var(--cafe-primary)]" style={{ fontSize: 12, fontWeight: 500 }}>
+          Hôm nay
+        </button>
+      </div>
+
+      {/* Calendar grid */}
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <div className="w-8 h-8 border-4 border-[var(--cafe-gold)] border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        <div className="grid min-w-[600px]" style={{ gridTemplateColumns: "repeat(7, 1fr)", gap: 8 }}>
+          {weekDates.map((date, idx) => {
+            const dateStr = toDateStr(date);
+            const dayKey = DAY_KEYS[idx];
+            const dayShifts = shiftsForDate(dateStr);
+            const today = isToday(date);
+
+            return (
+              <div key={dateStr} className="flex flex-col" style={{ minHeight: 300 }}>
+                {/* Day header — shows full date */}
+                <div
+                  className="text-center py-2 mb-2 rounded-xl font-body"
+                  style={{
+                    fontSize: 12, fontWeight: 600,
+                    backgroundColor: today ? "var(--cafe-primary)" : "var(--cafe-bg)",
+                    color: today ? "#fff" : "var(--cafe-primary)",
+                  }}
+                >
+                  <div style={{ fontSize: 10, opacity: 0.75 }}>{DAY_LABELS_FULL[dayKey]}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, marginTop: 1 }}>{formatDayHeader(date)}</div>
                 </div>
-                <div style={{
-                  fontSize: 20, fontWeight: 700, marginTop: 2,
-                  width: 34, height: 34,
-                  display: "inline-flex", alignItems: "center", justifyContent: "center",
-                  borderRadius: "50%",
-                  backgroundColor: isToday(d) ? "var(--cafe-gold)" : "transparent",
-                  color: isToday(d) ? "#fff" : "var(--cafe-primary)",
-                  fontFamily: "inherit",
-                }}>
-                  {d.getDate()}
+
+                {/* Shift cards */}
+                <div className="flex flex-col gap-2 flex-1">
+                  {dayShifts.length === 0 ? (
+                    <div className="flex-1 flex items-center justify-center rounded-xl border border-dashed border-[var(--cafe-border)]" style={{ minHeight: 60 }}>
+                      <span className="font-body text-[var(--cafe-primary)]/20" style={{ fontSize: 11 }}>Không có ca</span>
+                    </div>
+                  ) : (
+                    dayShifts.map((shift) => {
+                      const st = STATUS_STYLE[shift.status] || STATUS_STYLE.PLANNED;
+                      return (
+                        <div
+                          key={shift.shiftId}
+                          onClick={() => setSelectedShift(selectedShift?.shiftId === shift.shiftId ? null : shift)}
+                          className="rounded-xl border cursor-pointer transition-all hover:shadow-sm"
+                          style={{
+                            backgroundColor: st.bg, borderColor: st.border,
+                            borderWidth: 1, padding: "8px 10px",
+                          }}
+                        >
+                          <div className="font-body" style={{ fontSize: 11, fontWeight: 700, color: st.text }}>{shift.shiftName}</div>
+                          <div className="font-body" style={{ fontSize: 10, color: st.text, opacity: 0.8 }}>{shift.startTime}–{shift.endTime}</div>
+                          <span className="font-body inline-block mt-1 px-1.5 py-0.5 rounded" style={{ fontSize: 9, fontWeight: 600, backgroundColor: st.border + "55", color: st.text }}>
+                            {shift.status}
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
-            ))}
-          </div>
-
-          {/* Scrollable grid */}
-          <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 360px)" }}>
-            {/* Background grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "44px repeat(7, 1fr)" }}>
-              {HOURS.map((hour) => (
-                <React.Fragment key={hour}>
-                  <div className="font-body text-[var(--cafe-primary)] select-none"
-                    style={{ fontSize: 10, height: CELL_H, lineHeight: `${CELL_H}px`, textAlign: "right", paddingRight: 8, opacity: 0.35, borderTop: "1px solid var(--cafe-border)" }}>
-                    {hour}:00
-                  </div>
-                  {weekDates.map((d, di) => (
-                    <div key={`${di}-${hour}`} style={{
-                      height: CELL_H,
-                      borderTop: "1px solid var(--cafe-border)",
-                      borderLeft: "1px solid var(--cafe-border)",
-                      backgroundColor: isToday(d) ? "rgba(196,163,90,0.06)" : "transparent",
-                    }} />
-                  ))}
-                </React.Fragment>
-              ))}
-            </div>
-
-            {/* Shift blocks overlay */}
-            <div style={{ display: "grid", gridTemplateColumns: "44px repeat(7, 1fr)", marginTop: `-${HOURS.length * CELL_H}px`, pointerEvents: "none" }}>
-              <div />
-              {weekDates.map((d, di) => (
-                <div key={di} style={{ position: "relative", height: HOURS.length * CELL_H, pointerEvents: "auto" }}>
-                  {shiftsForDate(d).map((shift) => {
-                    const sc = STATUS_COLORS[shift.status] || STATUS_COLORS.PLANNED;
-                    const top = timeToY(shift.startTime);
-                    const height = Math.max(timeToY(shift.endTime) - top, 24);
-                    const isMyShift = myShiftIds.has(shift.shiftId);
-                    return (
-                      <div
-                        key={shift.shiftId}
-                        onClick={(e) => handleShiftClick(shift, e)}
-                        style={{
-                          position: "absolute", top, height, left: 4, right: 4,
-                          borderRadius: 8,
-                          backgroundColor: sc.bg, color: sc.text,
-                          border: isMyShift ? `2px solid ${sc.text}` : `1.5px solid ${sc.text}44`,
-                          cursor: "pointer", padding: "6px 10px", overflow: "hidden", zIndex: 1,
-                        }}
-                      >
-                        <p className="font-body" style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {shift.shiftName}
-                        </p>
-                        <p className="font-body" style={{ fontSize: 12, opacity: 0.8 }}>{shift.startTime}–{shift.endTime}</p>
-                        {isMyShift && (
-                          <p className="font-body" style={{ fontSize: 11, fontWeight: 700, color: "var(--cafe-gold)" }}>★ Của bạn</p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          </div>
+            );
+          })}
         </div>
+      )}
 
-        {/* Shift detail popover */}
-        {selectedShift && popoverPos && (
-          <>
-            <div className="fixed inset-0 z-30" onClick={() => setSelectedShift(null)} />
-            <div
-              className="fixed z-40 bg-white rounded-xl border border-[var(--cafe-border)]"
-              style={{
-                width: 224,
-                boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                top: Math.min(popoverPos.y + 8, window.innerHeight - 220),
-                left: Math.min(popoverPos.x + 8, window.innerWidth - 240),
-                padding: 16,
-              }}
-            >
-              <button onClick={() => setSelectedShift(null)} className="absolute top-2 right-3 font-body text-[var(--cafe-primary)] hover:opacity-80" style={{ fontSize: 18, lineHeight: 1, opacity: 0.4 }}>×</button>
-
-              <p className="font-heading text-[var(--cafe-primary)]" style={{ fontSize: 14, fontWeight: 600, paddingRight: 20 }}>{selectedShift.shiftName}</p>
-              <p className="font-body text-[var(--cafe-primary)] mt-1" style={{ fontSize: 11, opacity: 0.6 }}>{selectedShift.startTime} – {selectedShift.endTime}</p>
-              <p className="font-body text-[var(--cafe-primary)]" style={{ fontSize: 11, opacity: 0.6 }}>{formatDateVN(selectedShift.workingDate)}</p>
-
+      {/* Shift detail side panel */}
+      {selectedShift && (
+        <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/30" onClick={() => setSelectedShift(null)}>
+          <div className="bg-white h-full w-full max-w-xs shadow-xl flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-5 border-b border-[var(--cafe-border)]" style={{ backgroundColor: "var(--cafe-primary)" }}>
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="font-heading text-white" style={{ fontSize: 18, fontWeight: 700 }}>{selectedShift.shiftName}</h2>
+                  <p className="font-body text-white/70 mt-1" style={{ fontSize: 12 }}>
+                    {selectedShift.workingDate} · {selectedShift.startTime}–{selectedShift.endTime}
+                  </p>
+                </div>
+                <button onClick={() => setSelectedShift(null)} className="text-white/60 hover:text-white" style={{ fontSize: 22, lineHeight: 1 }}>×</button>
+              </div>
               {(() => {
-                const sc = STATUS_COLORS[selectedShift.status] || STATUS_COLORS.PLANNED;
+                const st = STATUS_STYLE[selectedShift.status] || STATUS_STYLE.PLANNED;
                 return (
-                  <span className="font-body inline-block mt-1.5 px-2 py-0.5 rounded-full" style={{ fontSize: 10, fontWeight: 600, backgroundColor: sc.bg, color: sc.text }}>
+                  <span className="font-body inline-block mt-2 px-2.5 py-0.5 rounded-full" style={{ fontSize: 11, fontWeight: 600, backgroundColor: st.bg, color: st.text }}>
                     {selectedShift.status}
                   </span>
                 );
               })()}
-
-              {selectedShift.assignments && selectedShift.assignments.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-[var(--cafe-border)]">
-                  <p className="font-body text-[var(--cafe-primary)] mb-1.5" style={{ fontSize: 11, fontWeight: 600, opacity: 0.7 }}>
-                    Nhân viên ({selectedShift.assignments.length})
-                  </p>
-                  {selectedShift.assignments.map((a, i) => {
-                    const isMe = a.employeeId === employee?.employeeId;
-                    return (
-                      <p key={a.employeeId} className="font-body" style={{
-                        fontSize: 12, fontWeight: isMe ? 600 : 400,
-                        color: isMe ? "var(--cafe-gold)" : "var(--cafe-primary)",
-                        opacity: isMe ? 1 : 0.65,
-                      }}>
-                        {isMe ? "★ Bạn" : `Nhân viên ${i + 1}`}
-                      </p>
-                    );
-                  })}
+              {selectedShift.cancelReason && (
+                <p className="font-body text-white/60 mt-1" style={{ fontSize: 11 }}>Lý do hủy: {selectedShift.cancelReason}</p>
+              )}
+            </div>
+            <div className="flex-1 p-5">
+              <p className="font-body text-[var(--cafe-primary)]/50" style={{ fontSize: 13 }}>
+                Đây là ca làm của bạn. Hãy có mặt đúng giờ!
+              </p>
+              {selectedShift.status === "ACTIVE" && (
+                <div className="mt-4 px-4 py-3 bg-green-50 border border-green-200 rounded-xl">
+                  <p className="font-body text-green-700" style={{ fontSize: 13, fontWeight: 600 }}>Ca đang diễn ra</p>
+                  <p className="font-body text-green-600" style={{ fontSize: 12 }}>Hôm nay {selectedShift.startTime} – {selectedShift.endTime}</p>
                 </div>
               )}
             </div>
-          </>
-        )}
-
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

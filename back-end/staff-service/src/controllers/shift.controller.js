@@ -32,7 +32,8 @@ const updateShift = async (req, res, next) => {
 
 const deleteShift = async (req, res, next) => {
   try {
-    const shift = await shiftService.deleteShift(req.params.id);
+    const { reason } = req.body;
+    const shift = await shiftService.deleteShift(req.params.id, reason);
     return responseHelper.success(res, shift, 'Shift cancelled successfully');
   } catch (error) { next(error); }
 };
