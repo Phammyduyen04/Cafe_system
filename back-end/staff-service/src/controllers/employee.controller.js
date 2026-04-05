@@ -4,7 +4,7 @@ const { responseHelper } = require('../../../shared');
 
 const createEmployee = async (req, res, next) => {
   try {
-    const employee = await employeeService.createEmployee(req.body);
+    const employee = await employeeService.createEmployee(req.body, req.user);
     return responseHelper.created(res, employee, 'Employee created successfully');
   } catch (error) { next(error); }
 };
@@ -41,7 +41,8 @@ const deleteEmployee = async (req, res, next) => {
 
 const reactivateEmployee = async (req, res, next) => {
   try {
-    const employee = await employeeService.reactivateEmployee(req.params.id);
+    const { reason } = req.body;
+    const employee = await employeeService.reactivateEmployee(req.params.id, reason);
     return responseHelper.success(res, employee, 'Employee reactivated successfully');
   } catch (error) { next(error); }
 };

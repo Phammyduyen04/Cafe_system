@@ -17,7 +17,7 @@ import ManagerLayout from "./components/manager/ManagerLayout";
 import ManagerDashboard from "./components/manager/ManagerDashboard";
 import ManagerCustomersPage from "./components/manager/ManagerCustomersPage";
 import ManagerEmployeesPage from "./components/manager/ManagerEmployeesPage";
-import ManagerShiftsPage from "./components/manager/ManagerShiftsPage";
+import ManagerSchedulePage from "./components/manager/ManagerSchedulePage";
 import ManagerPromotionsPage from "./components/manager/ManagerPromotionsPage";
 import ManagerDiscountsPage from "./components/manager/ManagerDiscountsPage";
 import ManagerReviewsPage from "./components/manager/ManagerReviewsPage";
@@ -25,9 +25,9 @@ import ManagerBeveragesPage from "./components/manager/ManagerBeveragesPage";
 import ManagerIngredientsPage from "./components/manager/ManagerIngredientsPage";
 import ManagerCategoriesPage from "./components/manager/ManagerCategoriesPage";
 import StaffLayout from "./components/staff/StaffLayout";
-import StaffShiftsPage from "./components/staff/StaffShiftsPage";
 import StaffSchedulePage from "./components/staff/StaffSchedulePage";
 import StaffOrdersPage from "./components/staff/StaffOrdersPage";
+import StaffAvailabilityPage from "./components/staff/StaffAvailabilityPage";
 import AdminLayout from "./components/admin/AdminLayout";
 import AdminAccountsPage from "./components/admin/AdminAccountsPage";
 import AdminRolesPage from "./components/admin/AdminRolesPage";
@@ -56,7 +56,7 @@ export const router = createBrowserRouter([
       { index: true, Component: ManagerDashboard },
       { path: "customers", Component: ManagerCustomersPage },
       { path: "employees", Component: ManagerEmployeesPage },
-      { path: "shifts", Component: ManagerShiftsPage },
+      { path: "schedule", Component: ManagerSchedulePage },
       { path: "beverages", Component: ManagerBeveragesPage },
       { path: "ingredients", Component: ManagerIngredientsPage },
       { path: "categories", Component: ManagerCategoriesPage },
@@ -70,8 +70,8 @@ export const router = createBrowserRouter([
     Component: StaffLayout,
     children: [
       { index: true, Component: StaffOrdersPage },
-      { path: "shifts", Component: StaffShiftsPage },
       { path: "schedule", Component: StaffSchedulePage },
+      { path: "availability", Component: StaffAvailabilityPage },
       { path: "orders", Component: StaffOrdersPage },
     ],
   },

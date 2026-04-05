@@ -16,7 +16,7 @@ router.put('/:id/activate', authorizeMiddleware('MANAGER'), employeeController.r
 
 // Availability
 router.get('/:id/availability', employeeController.getAvailability);
-router.put('/:id/availability', authorizeMiddleware('STAFF', 'MANAGER'), employeeController.updateAvailability);
+router.put('/:id/availability', authorizeMiddleware('STAFF'), employeeController.updateAvailability);
 
 // Assigned shifts
 router.get('/:id/shifts', employeeController.getEmployeeShifts);

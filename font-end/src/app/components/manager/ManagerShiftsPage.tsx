@@ -20,9 +20,11 @@ export default function ManagerShiftsPage() {
   const [formDate, setFormDate] = useState("");
   const [formSaving, setFormSaving] = useState(false);
 
-  // Delete confirm
+  // Cancel confirm
   const [deleteShift, setDeleteShift] = useState<Shift | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [cancelError, setCancelError] = useState("");
 
   // Assignment dialog
   const [assignShift, setAssignShift] = useState<Shift | null>(null);
@@ -106,15 +108,18 @@ export default function ManagerShiftsPage() {
 
   const handleDelete = async () => {
     if (!deleteShift) return;
+    if (!cancelReason.trim()) { setCancelError("Vui lòng nhập lý do hủy ca"); return; }
     try {
       setDeleting(true);
-      await staffService.deleteShift(deleteShift.shiftId);
+      setCancelError("");
+      await staffService.cancelShift(deleteShift.shiftId, cancelReason.trim());
       setDeleteShift(null);
+      setCancelReason("");
       setSuccessMsg("Đã hủy ca!");
       setTimeout(() => setSuccessMsg(""), 3000);
       loadShifts();
     } catch (err: any) {
-      setError(err.message || "Lỗi khi hủy ca");
+      setCancelError(err.message || "Lỗi khi hủy ca");
     } finally {
       setDeleting(false);
     }
@@ -250,7 +255,12 @@ export default function ManagerShiftsPage() {
                 const sc = statusColors[shift.status] || statusColors.PLANNED;
                 return (
                   <tr key={shift.shiftId} className="border-b border-[var(--cafe-bg)] last:border-0">
-                    <td className="font-body px-4 py-3 text-[var(--cafe-primary)]" style={{ fontSize: 13, fontWeight: 500 }}>{shift.shiftName}</td>
+                    <td className="px-4 py-3">
+                      <div>
+                        <span className="font-body text-[var(--cafe-primary)]" style={{ fontSize: 13, fontWeight: 500 }}>{shift.shiftName}</span>
+                        {shift.cancelReason && <p className="font-body text-red-400 mt-0.5" style={{ fontSize: 11 }}>Lý do: {shift.cancelReason}</p>}
+                      </div>
+                    </td>
                     <td className="font-body px-4 py-3 text-[var(--cafe-primary)]/70" style={{ fontSize: 13 }}>{shift.startTime} — {shift.endTime}</td>
                     <td className="font-body px-4 py-3 text-[var(--cafe-primary)]/70" style={{ fontSize: 13 }}>{formatDateVN(shift.workingDate)}</td>
                     <td className="px-4 py-3">
@@ -259,7 +269,9 @@ export default function ManagerShiftsPage() {
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
                         <button onClick={() => openEdit(shift)} className="font-body text-[var(--cafe-gold)] hover:underline" style={{ fontSize: 12 }}>Sửa</button>
-                        <button onClick={() => setDeleteShift(shift)} className="font-body text-[var(--cafe-red)] hover:underline" style={{ fontSize: 12 }}>Hủy ca</button>
+                        {shift.status !== "CANCELLED" && shift.status !== "COMPLETED" && (
+                          <button onClick={() => { setDeleteShift(shift); setCancelReason(""); setCancelError(""); }} className="font-body text-red-500 hover:underline" style={{ fontSize: 12 }}>Hủy ca</button>
+                        )}
                         <button onClick={() => openAssignment(shift)} className="font-body text-[var(--cafe-primary)] hover:underline" style={{ fontSize: 12 }}>Phân công</button>
                       </div>
                     </td>
@@ -318,17 +330,29 @@ export default function ManagerShiftsPage() {
         </div>
       )}
 
-      {/* Delete Dialog */}
+      {/* Cancel Dialog */}
       {deleteShift && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setDeleteShift(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { setDeleteShift(null); setCancelReason(""); setCancelError(""); }}>
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
             <h2 className="font-heading text-[var(--cafe-red)] mb-2" style={{ fontSize: 20, fontWeight: 600 }}>Hủy ca</h2>
-            <p className="font-body text-[var(--cafe-primary)]/70 mb-6" style={{ fontSize: 14 }}>
-              Bạn có chắc muốn hủy ca <strong>{deleteShift.shiftName}</strong> ngày {formatDateVN(deleteShift.workingDate)}?
+            <p className="font-body text-[var(--cafe-primary)]/70 mb-4" style={{ fontSize: 14 }}>
+              Ca <strong>{deleteShift.shiftName}</strong> — {formatDateVN(deleteShift.workingDate)}
             </p>
+            {cancelError && <p className="font-body text-red-500 mb-3 text-sm">{cancelError}</p>}
+            <div className="mb-4">
+              <label className="font-body text-[var(--cafe-primary)] block mb-1" style={{ fontSize: 13, fontWeight: 500 }}>Lý do hủy ca <span className="text-red-500">*</span></label>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                rows={3}
+                placeholder="Nhập lý do hủy ca..."
+                className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)] resize-none"
+                style={{ fontSize: 14 }}
+              />
+            </div>
             <div className="flex gap-3">
-              <button onClick={() => setDeleteShift(null)} className="font-body flex-1 py-2.5 border border-[var(--cafe-border)] rounded-lg hover:bg-[var(--cafe-bg)]" style={{ fontSize: 14, fontWeight: 500 }}>Quay lại</button>
-              <button onClick={handleDelete} disabled={deleting} className="font-body flex-1 py-2.5 bg-[var(--cafe-red)] text-white rounded-lg hover:opacity-90 disabled:opacity-50" style={{ fontSize: 14, fontWeight: 500 }}>
+              <button onClick={() => { setDeleteShift(null); setCancelReason(""); setCancelError(""); }} className="font-body flex-1 py-2.5 border border-[var(--cafe-border)] rounded-lg hover:bg-[var(--cafe-bg)]" style={{ fontSize: 14, fontWeight: 500 }}>Quay lại</button>
+              <button onClick={handleDelete} disabled={deleting} className="font-body flex-1 py-2.5 bg-[var(--cafe-red,#dc2626)] text-white rounded-lg hover:opacity-90 disabled:opacity-50" style={{ fontSize: 14, fontWeight: 500 }}>
                 {deleting ? "Đang xử lý..." : "Hủy ca"}
               </button>
             </div>

@@ -9,6 +9,7 @@ const shiftSchema = new mongoose.Schema(
     endTime: { type: String, required: true },
     workingDate: { type: String, required: true }, // YYYY-MM-DD
     status: { type: String, enum: ['PLANNED', 'ACTIVE', 'COMPLETED', 'CANCELLED'], default: 'PLANNED' },
+    cancelReason: { type: String, default: null },
     createdByManagerId: { type: String },
   },
   {

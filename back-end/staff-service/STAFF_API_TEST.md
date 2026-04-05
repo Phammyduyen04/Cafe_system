@@ -304,19 +304,41 @@ Content-Type: application/json
 
 ---
 
-### 2.4 Activate lại nhân viên (MANAGER)
+### 2.4 Activate lại nhân viên - có lý do (MANAGER)
 ```
 PUT http://localhost:3000/api/staff/employees/<inactiveEmployeeId>/activate
 Authorization: Bearer <manager_token>
+Content-Type: application/json
+
+{
+  "reason": "Đã xử lý xong vi phạm, nhân viên được quay trở lại làm việc"
+}
 ```
-**Kết quả mong đợi**: `200 OK`, `status: "ACTIVE"`, `inactiveReason: null`
+**Kết quả mong đợi**: `200 OK`, `status: "ACTIVE"`, `inactiveReason: null`, `reactivateReason: "Đã xử lý xong..."`
 
 ---
 
-### 2.5 Activate nhân viên đã ACTIVE
+### 2.5 Activate nhân viên - không có lý do
+```
+PUT http://localhost:3000/api/staff/employees/<inactiveEmployeeId>/activate
+Authorization: Bearer <manager_token>
+Content-Type: application/json
+
+{}
+```
+**Kết quả mong đợi**: `400 Bad Request` — "Reason is required when reactivating an employee"
+
+---
+
+### 2.6 Activate nhân viên đã ACTIVE
 ```
 PUT http://localhost:3000/api/staff/employees/<activeEmployeeId>/activate
 Authorization: Bearer <manager_token>
+Content-Type: application/json
+
+{
+  "reason": "Test"
+}
 ```
 **Kết quả mong đợi**: `400 Bad Request` — "Employee is already active"
 
@@ -606,12 +628,43 @@ Content-Type: application/json
 
 ---
 
-### 5.13 Xóa mềm ca (PLANNED → CANCELLED)
+### 5.13 Hủy ca - có lý do (MANAGER)
 ```
 DELETE http://localhost:3000/api/staff/shifts/<shiftId>
 Authorization: Bearer <manager_token>
+Content-Type: application/json
+
+{
+  "reason": "Thiếu nhân lực, không thể tổ chức ca này"
+}
 ```
-**Kết quả mong đợi**: `200 OK`, `status: "CANCELLED"`
+**Kết quả mong đợi**: `200 OK`, `status: "CANCELLED"`, `cancelReason: "Thiếu nhân lực..."`
+
+---
+
+### 5.14 Hủy ca - không có lý do
+```
+DELETE http://localhost:3000/api/staff/shifts/<shiftId>
+Authorization: Bearer <manager_token>
+Content-Type: application/json
+
+{}
+```
+**Kết quả mong đợi**: `400 Bad Request` — "Reason is required when cancelling a shift"
+
+---
+
+### 5.15 Hủy ca đã COMPLETED
+```
+DELETE http://localhost:3000/api/staff/shifts/<completedShiftId>
+Authorization: Bearer <manager_token>
+Content-Type: application/json
+
+{
+  "reason": "Thử hủy ca đã hoàn thành"
+}
+```
+**Kết quả mong đợi**: `400 Bad Request` — "Cannot cancel a shift that has already been completed"
 
 ---
 
@@ -677,7 +730,22 @@ Content-Type: application/json
 
 ---
 
-### 6.5 Phân công - nhân viên chưa có tài khoản
+### 6.5 Phân công FULL_TIME - vượt 40h/tuần
+```
+POST http://localhost:3000/api/staff/shifts/<shiftId>/assignments
+Authorization: Bearer <manager_token>
+Content-Type: application/json
+
+{
+  "employeeId": "<fullTimeEmployeeId>"
+}
+```
+> Trước đó đã assign nhân viên FULL_TIME này vào các ca trong cùng tuần với tổng ≥ 40h
+**Kết quả mong đợi**: `400 Bad Request` — "Cannot assign: employee would exceed 40h/week (current: 40.0h, new shift: 4.0h)"
+
+---
+
+### 6.6 Phân công - nhân viên chưa có tài khoản
 ```
 POST http://localhost:3000/api/staff/shifts/<shiftId>/assignments
 Authorization: Bearer <manager_token>
@@ -934,9 +1002,9 @@ Authorization: Bearer <manager_token>
 | GET | `/api/staff/employees/by-account/:accountId` | Auth | Tìm theo accountId |
 | PUT | `/api/staff/employees/:id` | MANAGER | Cập nhật thông tin |
 | PUT | `/api/staff/employees/:id/deactivate` | MANAGER | Vô hiệu hóa (bắt buộc `reason`) |
-| PUT | `/api/staff/employees/:id/activate` | MANAGER | Kích hoạt lại |
+| PUT | `/api/staff/employees/:id/activate` | MANAGER | Kích hoạt lại (bắt buộc `reason`) |
 | GET | `/api/staff/employees/:id/availability` | Auth | Xem lịch rảnh |
-| PUT | `/api/staff/employees/:id/availability` | STAFF(PART_TIME)/MANAGER | Cập nhật lịch rảnh |
+| PUT | `/api/staff/employees/:id/availability` | STAFF (PART_TIME only) | Tự cập nhật lịch rảnh |
 | GET | `/api/staff/employees/:id/shifts` | Auth | Ca làm của nhân viên |
 | POST | `/api/staff/shifts` | MANAGER | Tạo ca |
 | GET | `/api/staff/shifts` | Auth | Danh sách ca |
@@ -956,9 +1024,10 @@ Authorization: Bearer <manager_token>
 ## Ghi chú quan trọng
 
 - **Dang nhap**: Dung `username` + `password` (khong phai email)
-- **FULL_TIME**: Khong can va khong duoc phep set availability (lam ca tuan)
-- **PART_TIME**: Co the tu cap nhat availability cua ban than; manager cap nhat cho bat ky ai
-- **Deactivate**: Bat buoc nhap `reason`. Nhan vien INACTIVE khong the duoc phan cong hoac check-in
+- **FULL_TIME**: Không được set availability; manager gán ca tùy ý nhưng tổng giờ/tuần không vượt 40h (mặc định `maxWorkingHours=40`)
+- **PART_TIME**: Chỉ staff tự cập nhật availability của bản thân; manager không được cập nhật lịch rảnh của staff
+- **Trạng thái ca tự động**: PLANNED → ACTIVE → COMPLETED theo thời gian thực; manager hủy → CANCELLED (bắt buộc `reason`)
+- **Deactivate/Activate**: Cả hai đều bắt buộc nhập `reason`. Nhân viên INACTIVE không thể được phân công hoặc check-in
 - **Thong bao INACTIVE**: Sau khi staff dang nhap, frontend goi `/by-account/:accountId` de lay `status` va `inactiveReason` va hien thi thong bao
 - **Soft delete**: Assignment huy giu record voi `assignmentStatus: "CANCELLED"`, ca huy giu `status: "CANCELLED"`
 - **ADMIN**: Khong co quyen truy cap staff-service — chi MANAGER va STAFF
