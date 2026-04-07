@@ -2,7 +2,6 @@ const { AppError } = require('../../../shared');
 const promotionRepo = require('../repositories/promotion.repo');
 const conditionRepo = require('../repositories/promotionCondition.repo');
 
-// Tính trạng thái dựa vào ngày bắt đầu và kết thúc
 const computeStatus = (startDate, endDate) => {
   const now = new Date();
   if (endDate && now > new Date(endDate)) return 'EXPIRED';
@@ -10,36 +9,50 @@ const computeStatus = (startDate, endDate) => {
   return 'ACTIVE';
 };
 
-// Tự động sinh mã khuyến mãi theo format PROMOTION_001, PROMOTION_002, ...
 const generateNextPromotionId = async () => {
-  const existing = await promotionRepo.findAll({ promotionId: /^PROMOTION_\d+$/ });
+  const existing = await promotionRepo.findAll({ promotionId: /^PROMO_\d+$/ });
   let maxNum = 0;
   for (const p of existing) {
-    const match = p.promotionId.match(/^PROMOTION_(\d+)$/);
+    const match = p.promotionId.match(/^PROMO_(\d+)$/);
     if (match) {
       const num = parseInt(match[1], 10);
       if (num > maxNum) maxNum = num;
     }
   }
-  return `PROMOTION_${String(maxNum + 1).padStart(3, '0')}`;
+  return `PROMO_${String(maxNum + 1).padStart(3, '0')}`;
 };
 
 const createPromotion = async (data, user) => {
-  const { promotionName, benefitType, description, startDate, endDate } = data;
+  const { promotionName, benefitType, description, startDate, endDate, couponCode, maxUsage } = data;
   if (!promotionName || !benefitType) {
-    throw new AppError('Promotion name and benefit type are required', 400);
+    throw new AppError('Tên chương trình và loại ưu đãi là bắt buộc', 400);
   }
   if (!startDate || !endDate) {
     throw new AppError('Ngày bắt đầu và kết thúc là bắt buộc', 400);
+  }
+  if (new Date(endDate) <= new Date(startDate)) {
+    throw new AppError('Ngày kết thúc phải sau ngày bắt đầu', 400);
+  }
+
+  // Kiểm tra couponCode trùng lặp
+  if (couponCode) {
+    const normalizedCode = couponCode.trim().toUpperCase();
+    const existing = await promotionRepo.findByCouponCode(normalizedCode);
+    if (existing) throw new AppError('Mã coupon này đã được sử dụng', 409);
   }
 
   const promotionId = await generateNextPromotionId();
 
   const promotion = await promotionRepo.create({
-    promotionId, promotionName, benefitType,
+    promotionId,
+    promotionName,
+    benefitType,
     description: description || '',
-    startDate: startDate ? new Date(startDate) : null,
-    endDate: endDate ? new Date(endDate) : null,
+    couponCode: couponCode ? couponCode.trim().toUpperCase() : null,
+    maxUsage: maxUsage || null,
+    usageCount: 0,
+    startDate: new Date(startDate),
+    endDate: new Date(endDate),
     status: computeStatus(startDate, endDate),
     createdBy: user.username,
   });
@@ -64,51 +77,79 @@ const getAllPromotions = async (status, page = 1, limit = 10) => {
 
 const getPromotionById = async (id) => {
   const promotion = await promotionRepo.findByPromotionId(id);
-  if (!promotion) throw new AppError('Promotion not found', 404);
+  if (!promotion) throw new AppError('Không tìm thấy chương trình khuyến mãi', 404);
   const conditions = await conditionRepo.findByPromotionId(id);
+  return { ...promotion.toObject(), conditions };
+};
+
+const getPromotionByCoupon = async (code) => {
+  if (!code) throw new AppError('Mã coupon là bắt buộc', 400);
+  const promotion = await promotionRepo.findByCouponCode(code.trim().toUpperCase());
+  if (!promotion) throw new AppError('Mã coupon không hợp lệ hoặc không tồn tại', 404);
+  if (promotion.status !== 'ACTIVE') {
+    throw new AppError('Chương trình khuyến mãi này không còn hoạt động', 400);
+  }
+  if (promotion.maxUsage !== null && promotion.usageCount >= promotion.maxUsage) {
+    throw new AppError('Chương trình khuyến mãi đã đạt giới hạn sử dụng', 400);
+  }
+  const conditions = await conditionRepo.findByPromotionId(promotion.promotionId);
   return { ...promotion.toObject(), conditions };
 };
 
 const updatePromotion = async (id, data) => {
   const promotion = await promotionRepo.findByPromotionId(id);
-  if (!promotion) throw new AppError('Promotion not found', 404);
+  if (!promotion) throw new AppError('Không tìm thấy chương trình khuyến mãi', 404);
   if (['EXPIRED', 'CANCELLED'].includes(promotion.status)) {
-    throw new AppError('Không thể sửa chương trình khuyến mãi đã hết hạn hoặc đã hủy', 400);
+    throw new AppError('Không thể sửa chương trình đã hết hạn hoặc đã hủy', 400);
   }
   if (promotion.status === 'ACTIVE' && ('startDate' in data || 'endDate' in data)) {
-    throw new AppError('Không thể sửa ngày khi khuyến mãi đang hoạt động', 400);
+    throw new AppError('Không thể sửa ngày khi chương trình đang hoạt động', 400);
   }
+
+  // Kiểm tra couponCode trùng lặp khi cập nhật
+  if (data.couponCode) {
+    const normalizedCode = data.couponCode.trim().toUpperCase();
+    const existing = await promotionRepo.findByCouponCode(normalizedCode);
+    if (existing && existing.promotionId !== id) {
+      throw new AppError('Mã coupon này đã được sử dụng bởi chương trình khác', 409);
+    }
+    data.couponCode = normalizedCode;
+  }
+
   if (promotion.status === 'PLANNED') {
     const newStartDate = 'startDate' in data ? data.startDate : promotion.startDate;
     const newEndDate   = 'endDate'   in data ? data.endDate   : promotion.endDate;
     data.status = computeStatus(newStartDate, newEndDate);
   }
+
   return await promotionRepo.update(id, data);
 };
 
 const deletePromotion = async (id) => {
   const promotion = await promotionRepo.findByPromotionId(id);
-  if (!promotion) throw new AppError('Promotion not found', 404);
-  // Xóa mềm: chỉ đổi trạng thái, không xóa document khỏi DB
+  if (!promotion) throw new AppError('Không tìm thấy chương trình khuyến mãi', 404);
   return await promotionRepo.update(id, { status: 'CANCELLED' });
 };
 
 const updateConditions = async (promotionId, data) => {
   const promotion = await promotionRepo.findByPromotionId(promotionId);
-  if (!promotion) throw new AppError('Promotion not found', 404);
+  if (!promotion) throw new AppError('Không tìm thấy chương trình khuyến mãi', 404);
   if (['EXPIRED', 'CANCELLED'].includes(promotion.status)) {
     throw new AppError('Không thể cập nhật điều kiện của chương trình đã hết hạn hoặc đã hủy', 400);
   }
   return await conditionRepo.createOrUpdate(promotionId, { ...data, promotionId });
 };
 
-const checkApplicablePromotions = async ({ productIds, orderAmount, customerType }) => {
+const checkApplicablePromotions = async ({ productIds = [], orderAmount = 0, customerType }) => {
   const activePromotions = await promotionRepo.findAll({ status: 'ACTIVE' });
 
   const applicable = [];
   for (const promotion of activePromotions) {
+    // Bỏ qua nếu đã đạt giới hạn sử dụng
+    if (promotion.maxUsage !== null && promotion.usageCount >= promotion.maxUsage) continue;
+
     const condition = await conditionRepo.findByPromotionId(promotion.promotionId);
-    if (!condition) { applicable.push(promotion); continue; }
+    if (!condition) { applicable.push(promotion.toObject()); continue; }
 
     let passes = true;
     if (condition.minimumOrderAmount && orderAmount < condition.minimumOrderAmount) passes = false;
@@ -125,4 +166,13 @@ const checkApplicablePromotions = async ({ productIds, orderAmount, customerType
   return applicable;
 };
 
-module.exports = { createPromotion, getAllPromotions, getPromotionById, updatePromotion, deletePromotion, updateConditions, checkApplicablePromotions };
+module.exports = {
+  createPromotion,
+  getAllPromotions,
+  getPromotionById,
+  getPromotionByCoupon,
+  updatePromotion,
+  deletePromotion,
+  updateConditions,
+  checkApplicablePromotions,
+};
