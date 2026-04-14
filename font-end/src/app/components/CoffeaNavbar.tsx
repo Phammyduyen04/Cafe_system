@@ -153,7 +153,7 @@ export default function CoffeaNavbar() {
     },
     {
       label: "Khuyến mãi",
-      href: "#",
+      href: "/promotions",
       children: [] as { label: string; href: string }[],
     },
     { label: "Giới thiệu", href: "/about", children: [] as { label: string; href: string }[] },
@@ -428,6 +428,47 @@ export default function CoffeaNavbar() {
                     </svg>
                     Đơn hàng của tôi
                   </Link>
+                  {(user?.userType === "ADMIN" || user?.roles?.includes("ADMIN")) && (
+                    <Link
+                      to="/admin"
+                      className="font-body flex items-center gap-3 w-full px-4 py-3 text-cafe-primary hover:bg-cafe-bg transition-colors border-t border-cafe-accent"
+                      style={{ fontWeight: 500, fontSize: 14 }}
+                      onClick={() => setAccountOpen(false)}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                      </svg>
+                      Trang Admin
+                    </Link>
+                  )}
+                  {(user?.userType === "MANAGER" || user?.roles?.includes("MANAGER")) && (
+                    <Link
+                      to="/manager"
+                      className="font-body flex items-center gap-3 w-full px-4 py-3 text-cafe-primary hover:bg-cafe-bg transition-colors border-t border-cafe-accent"
+                      style={{ fontWeight: 500, fontSize: 14 }}
+                      onClick={() => setAccountOpen(false)}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
+                        <rect x="14" y="14" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" />
+                      </svg>
+                      Trang Quản lý
+                    </Link>
+                  )}
+                  {(user?.userType === "STAFF" || user?.roles?.includes("STAFF")) && (
+                    <Link
+                      to="/staff"
+                      className="font-body flex items-center gap-3 w-full px-4 py-3 text-cafe-primary hover:bg-cafe-bg transition-colors border-t border-cafe-accent"
+                      style={{ fontWeight: 500, fontSize: 14 }}
+                      onClick={() => setAccountOpen(false)}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" />
+                        <line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                      </svg>
+                      Trang Nhân viên
+                    </Link>
+                  )}
                   <button
                     className="font-body flex items-center gap-3 w-full px-4 py-3 text-cafe-red hover:bg-red-50 transition-colors"
                     style={{ fontWeight: 500, fontSize: 14 }}

@@ -4,10 +4,12 @@ const cors = require('cors');
 const morgan = require('morgan');
 const mongoose = require('mongoose');
 const cron = require('node-cron');
+const path = require('path');
 const { errorHandler } = require('../../shared');
 const discountRoutes = require('./routes/discount.routes');
 const promotionRoutes = require('./routes/promotion.routes');
 const calculateRoutes = require('./routes/calculate.routes');
+const uploadRoutes = require('./routes/upload.routes');
 const Promotion = require('./models/promotion.model');
 const Discount = require('./models/discount.model');
 
@@ -17,6 +19,9 @@ const PORT = process.env.PORT || 3006;
 app.use(cors());
 app.use(morgan('dev'));
 app.use(express.json());
+
+// Serve uploaded images as static files
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 mongoose
   .connect(process.env.MONGODB_URI)
@@ -55,6 +60,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Thứ tự quan trọng: calculate trước discounts trước promotions
+app.use('/api/promotions/upload', uploadRoutes);
 app.use('/api/promotions', calculateRoutes);
 app.use('/api/promotions/discounts', discountRoutes);
 app.use('/api/promotions', promotionRoutes);

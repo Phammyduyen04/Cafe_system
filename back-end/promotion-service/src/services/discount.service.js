@@ -23,7 +23,7 @@ const generateNextDiscountId = async () => {
 };
 
 const createDiscount = async (data, user) => {
-  const { discountName, discountType, discountValue, description, startDate, endDate, couponCode, maxUsage } = data;
+  const { discountName, discountType, discountValue, description, startDate, endDate, couponCode, maxUsage, image } = data;
   if (!discountName || !discountType || discountValue == null) {
     throw new AppError('Tên, loại và giá trị giảm giá là bắt buộc', 400);
   }
@@ -60,6 +60,7 @@ const createDiscount = async (data, user) => {
     discountType,
     discountValue,
     description: description || '',
+    image: image || '',
     couponCode: couponCode ? couponCode.trim().toUpperCase() : null,
     maxUsage: maxUsage || null,
     usageCount: 0,

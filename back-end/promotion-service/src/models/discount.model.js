@@ -14,6 +14,7 @@ const discountSchema = new mongoose.Schema(
     status: { type: String, enum: ['PLANNED', 'ACTIVE', 'EXPIRED', 'CANCELLED'], default: 'ACTIVE' },
     startDate: { type: Date },
     endDate: { type: Date },
+    image: { type: String, default: '' },
     createdBy: { type: String },
   },
   {
