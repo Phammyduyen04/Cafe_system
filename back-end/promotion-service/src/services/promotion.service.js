@@ -23,7 +23,7 @@ const generateNextPromotionId = async () => {
 };
 
 const createPromotion = async (data, user) => {
-  const { promotionName, benefitType, description, startDate, endDate, couponCode, maxUsage } = data;
+  const { promotionName, benefitType, description, startDate, endDate, couponCode, maxUsage, image } = data;
   if (!promotionName || !benefitType) {
     throw new AppError('Tên chương trình và loại ưu đãi là bắt buộc', 400);
   }
@@ -48,6 +48,7 @@ const createPromotion = async (data, user) => {
     promotionName,
     benefitType,
     description: description || '',
+    image: image || '',
     couponCode: couponCode ? couponCode.trim().toUpperCase() : null,
     maxUsage: maxUsage || null,
     usageCount: 0,

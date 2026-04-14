@@ -8,6 +8,7 @@ import RegisterPage from "./components/RegisterPage";
 import ForgotPasswordPage from "./components/ForgotPasswordPage";
 import AboutPage from "./components/AboutPage";
 import ContactPage from "./components/ContactPage";
+import PromotionsPage from "./components/PromotionsPage";
 import CheckoutPage from "./components/CheckoutPage";
 import CartPage from "./components/CartPage";
 import ProfilePage from "./components/ProfilePage";
@@ -47,6 +48,7 @@ export const router = createBrowserRouter([
       { path: "profile", Component: ProfilePage },
       { path: "my-orders", Component: MyOrdersPage },
       { path: "payment/result", Component: PaymentResultPage },
+      { path: "promotions", Component: PromotionsPage },
     ],
   },
   {
