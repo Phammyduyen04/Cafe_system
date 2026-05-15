@@ -23,6 +23,7 @@ const PAYMENT_URL   = process.env.PAYMENT_SERVICE_URL   || 'http://localhost:300
 const PRODUCT_URL   = process.env.PRODUCT_SERVICE_URL   || 'http://localhost:3005';
 const PROMOTION_URL = process.env.PROMOTION_SERVICE_URL || 'http://localhost:3006';
 const STAFF_URL     = process.env.STAFF_SERVICE_URL      || 'http://localhost:3007';
+const CHATBOT_URL   = process.env.CHATBOT_SERVICE_URL    || 'http://localhost:3008';
 
 // Proxy options: forward Authorization header + preserve full path
 const proxyOptions = {
@@ -71,6 +72,7 @@ app.use('/uploads',        proxy(PRODUCT_URL,   {
 }));
 app.use('/api/promotions', proxy(PROMOTION_URL, proxyOptions));
 app.use('/api/staff',      proxy(STAFF_URL,     proxyOptions));
+app.use('/api/chat',       proxy(CHATBOT_URL,   proxyOptions));
 
 // 404
 app.use((req, res) => {
@@ -86,4 +88,5 @@ app.listen(PORT, () => {
   console.log(`  /api/products   -> ${PRODUCT_URL}`);
   console.log(`  /api/promotions -> ${PROMOTION_URL}`);
   console.log(`  /api/staff      -> ${STAFF_URL}`);
+  console.log(`  /api/chat       -> ${CHATBOT_URL}`);
 });

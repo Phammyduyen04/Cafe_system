@@ -1,5 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { staffService, type Employee, type Availability } from "../../../services/staff.service";
+
+interface ToastItem { id: number; type: "success" | "error"; message: string; }
+
+function ToastContainer({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: number) => void }) {
+  if (toasts.length === 0) return null;
+  return (
+    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-2" style={{ minWidth: 280, maxWidth: 380 }}>
+      {toasts.map((t) => (
+        <div key={t.id} className="flex items-start gap-3 px-4 py-3 rounded-xl shadow-lg border font-body"
+          style={{ backgroundColor: t.type === "success" ? "#f0fdf4" : "#fef2f2", borderColor: t.type === "success" ? "#86efac" : "#fca5a5", color: t.type === "success" ? "#15803d" : "#dc2626", fontSize: 13 }}>
+          <span style={{ fontSize: 16, lineHeight: 1.2, flexShrink: 0 }}>{t.type === "success" ? "✓" : "✕"}</span>
+          <span className="flex-1" style={{ lineHeight: 1.5 }}>{t.message}</span>
+          <button onClick={() => onDismiss(t.id)} className="shrink-0 hover:opacity-60 transition-opacity" style={{ fontSize: 16, lineHeight: 1, marginTop: 1 }} aria-label="Đóng">×</button>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const POSITIONS = ["BARISTA", "CASHIER", "WAITER", "KITCHEN_STAFF", "MANAGER", "CLEANER", "OTHER"];
 const EMP_TYPES = ["FULL_TIME", "PART_TIME"];
@@ -13,7 +31,14 @@ export default function ManagerEmployeesPage() {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterPosition, setFilterPosition] = useState("");
   const [filterHasAccount, setFilterHasAccount] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const toastCounter = useRef(0);
+  const addToast = (type: "success" | "error", message: string) => {
+    const id = ++toastCounter.current;
+    setToasts((prev) => [...prev, { id, type, message }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), type === "success" ? 3000 : 5000);
+  };
+  const dismissToast = (id: number) => setToasts((prev) => prev.filter((t) => t.id !== id));
 
   // Create/Edit dialog
   const [formOpen, setFormOpen] = useState(false);
@@ -60,7 +85,7 @@ export default function ManagerEmployeesPage() {
     } catch {} finally { setLoading(false); }
   };
 
-  const showSuccess = (msg: string) => { setSuccessMsg(msg); setTimeout(() => setSuccessMsg(""), 3000); };
+  const showSuccess = (msg: string) => addToast("success", msg);
 
   const openCreate = () => {
     setEditingId(null); setFormName(""); setFormPosition("BARISTA");
@@ -151,9 +176,7 @@ export default function ManagerEmployeesPage() {
         </button>
       </div>
 
-      {successMsg && (
-        <div className="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-xl text-green-700 font-body text-sm">{successMsg}</div>
-      )}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-6">

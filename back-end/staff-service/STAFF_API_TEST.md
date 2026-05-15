@@ -7,6 +7,16 @@ Staff Service trực tiếp: `http://localhost:3007`
 
 ---
 
+## Tài khoản thực tế
+
+| Username | Password | Role | Loại | employeeId |
+|---|---|---|---|---|
+| `manager01` | `Man@123` | MANAGER | — | — |
+| `nhanvien01` | `123456` | EMPLOYEE | FULL_TIME | EMP-007 |
+| `parttime01` | `123456` | EMPLOYEE | PART_TIME | EMP-013 |
+
+---
+
 ## Nhóm 0: Xác thực (Lấy token)
 
 ### 0.1 Login MANAGER
@@ -29,7 +39,7 @@ POST http://localhost:3000/api/auth/login
 Content-Type: application/json
 
 {
-  "username": "staff_parttime01",
+  "username": "parttime01",
   "password": "123456"
 }
 ```
@@ -43,7 +53,7 @@ POST http://localhost:3000/api/auth/login
 Content-Type: application/json
 
 {
-  "username": "staff_fulltime01",
+  "username": "nhanvien01",
   "password": "123456"
 }
 ```
@@ -65,7 +75,7 @@ Authorization: Bearer <manager_token>
 Content-Type: application/json
 
 {
-  "fullName": "Nguyen Van A",
+  "fullName": "Nguyen Van B",
   "position": "BARISTA",
   "employeeType": "FULL_TIME",
   "maxWorkingHours": 40
@@ -82,7 +92,7 @@ Authorization: Bearer <manager_token>
 Content-Type: application/json
 
 {
-  "fullName": "Tran Thi B",
+  "fullName": "Tran Thi D",
   "position": "CASHIER",
   "employeeType": "PART_TIME",
   "maxWorkingHours": 20
@@ -92,10 +102,10 @@ Content-Type: application/json
 
 ---
 
-### 1.3 Tạo nhân viên - STAFF không có quyền
+### 1.3 Tạo nhân viên - EMPLOYEE không có quyền
 ```
 POST http://localhost:3000/api/staff/employees
-Authorization: Bearer <staff_token>
+Authorization: Bearer <nhanvien01_token>
 Content-Type: application/json
 
 {
@@ -108,19 +118,17 @@ Content-Type: application/json
 
 ---
 
-### 1.4 Tạo nhân viên - position không hợp lệ
+### 1.4 Tạo nhân viên - thiếu trường bắt buộc
 ```
 POST http://localhost:3000/api/staff/employees
 Authorization: Bearer <manager_token>
 Content-Type: application/json
 
 {
-  "fullName": "Le Van D",
-  "position": "INVALID_ROLE",
-  "employeeType": "FULL_TIME"
+  "fullName": "Le Van D"
 }
 ```
-**Kết quả mong đợi**: `400 Bad Request` (Mongoose validation error)
+**Kết quả mong đợi**: `400 Bad Request` — `"Họ tên, vị trí và loại nhân viên là bắt buộc"`
 
 ---
 
@@ -160,7 +168,7 @@ Authorization: Bearer <manager_token>
 
 ---
 
-### 1.9 Filter nhân viên chưa có tài khoản (admin cần biết để tạo account)
+### 1.9 Filter nhân viên chưa có tài khoản
 ```
 GET http://localhost:3000/api/staff/employees?hasAccount=false
 Authorization: Bearer <manager_token>
@@ -174,16 +182,16 @@ Authorization: Bearer <manager_token>
 GET http://localhost:3000/api/staff/employees?hasAccount=true
 Authorization: Bearer <manager_token>
 ```
-**Kết quả mong đợi**: `200 OK`, chỉ trả về nhân viên có `accountId` khác null
+**Kết quả mong đợi**: `200 OK`, chỉ trả về EMP-007 (nhanvien01) và EMP-013 (parttime01)
 
 ---
 
 ### 1.11 Lấy chi tiết nhân viên
 ```
-GET http://localhost:3000/api/staff/employees/<employeeId>
+GET http://localhost:3000/api/staff/employees/EMP-007
 Authorization: Bearer <manager_token>
 ```
-**Kết quả mong đợi**: `200 OK` với thông tin đầy đủ, bao gồm `accountId: null`, `inactiveReason: null`
+**Kết quả mong đợi**: `200 OK` — thông tin Nguyen Van A, `employeeType: "FULL_TIME"`
 
 ---
 
@@ -192,18 +200,17 @@ Authorization: Bearer <manager_token>
 GET http://localhost:3000/api/staff/employees/nonexistent-id
 Authorization: Bearer <manager_token>
 ```
-**Kết quả mong đợi**: `404 Not Found`
+**Kết quả mong đợi**: `404 Not Found` — `"Không tìm thấy nhân viên"`
 
 ---
 
 ### 1.13 Cập nhật thông tin nhân viên (MANAGER)
 ```
-PUT http://localhost:3000/api/staff/employees/<employeeId>
+PUT http://localhost:3000/api/staff/employees/EMP-007
 Authorization: Bearer <manager_token>
 Content-Type: application/json
 
 {
-  "fullName": "Nguyen Van A Updated",
   "position": "WAITER"
 }
 ```
@@ -211,7 +218,7 @@ Content-Type: application/json
 
 ---
 
-### 1.14 Gắn accountId vào hồ sơ nhân viên (sau khi admin tạo tài khoản)
+### 1.14 Gắn accountId vào hồ sơ nhân viên
 ```
 PUT http://localhost:3000/api/staff/employees/<employeeId>
 Authorization: Bearer <manager_token>
@@ -221,28 +228,28 @@ Content-Type: application/json
   "accountId": "<accountId nhận từ auth-service>"
 }
 ```
-**Kết quả mong đợi**: `200 OK`, `accountId` được cập nhật — nhân viên có thể được phân công ca
+**Kết quả mong đợi**: `200 OK`, `accountId` được cập nhật
 
 ---
 
-### 1.15 Gắn accountId trùng với nhân viên khác
+### 1.15 Gắn accountId đã thuộc nhân viên khác
 ```
 PUT http://localhost:3000/api/staff/employees/<employeeId2>
 Authorization: Bearer <manager_token>
 Content-Type: application/json
 
 {
-  "accountId": "<accountId đã gắn cho nhân viên khác>"
+  "accountId": "2e2e5688-477f-11f1-9d16-1e906c3b3997"
 }
 ```
-**Kết quả mong đợi**: `409 Conflict` — "This accountId is already linked to another employee"
+**Kết quả mong đợi**: `409 Conflict` — `"Tài khoản này đã được liên kết với nhân viên khác"`
 
 ---
 
-### 1.16 Cập nhật nhân viên - STAFF không có quyền
+### 1.16 Cập nhật nhân viên - EMPLOYEE không có quyền
 ```
-PUT http://localhost:3000/api/staff/employees/<employeeId>
-Authorization: Bearer <staff_token>
+PUT http://localhost:3000/api/staff/employees/EMP-013
+Authorization: Bearer <parttime01_token>
 Content-Type: application/json
 
 {
@@ -255,10 +262,10 @@ Content-Type: application/json
 
 ### 1.17 Lấy nhân viên theo accountId
 ```
-GET http://localhost:3000/api/staff/employees/by-account/<accountId>
+GET http://localhost:3000/api/staff/employees/by-account/2e2e5688-477f-11f1-9d16-1e906c3b3997
 Authorization: Bearer <manager_token>
 ```
-**Kết quả mong đợi**: `200 OK`. Nếu nhân viên đang INACTIVE, response sẽ có `status: "INACTIVE"` và `inactiveReason: "<lý do>"` — frontend dùng field này để hiển thị thông báo khi staff đăng nhập.
+**Kết quả mong đợi**: `200 OK` — trả về EMP-007 Nguyen Van A
 
 ---
 
@@ -286,7 +293,7 @@ Content-Type: application/json
 
 {}
 ```
-**Kết quả mong đợi**: `400 Bad Request` — "Reason is required when deactivating an employee"
+**Kết quả mong đợi**: `400 Bad Request` — `"Vui lòng nhập lý do khi vô hiệu hóa nhân viên"`
 
 ---
 
@@ -300,7 +307,7 @@ Content-Type: application/json
   "reason": "Lý do khác"
 }
 ```
-**Kết quả mong đợi**: `400 Bad Request` — "Employee is already inactive"
+**Kết quả mong đợi**: `400 Bad Request` — `"Nhân viên đã ở trạng thái không hoạt động"`
 
 ---
 
@@ -314,7 +321,7 @@ Content-Type: application/json
   "reason": "Đã xử lý xong vi phạm, nhân viên được quay trở lại làm việc"
 }
 ```
-**Kết quả mong đợi**: `200 OK`, `status: "ACTIVE"`, `inactiveReason: null`, `reactivateReason: "Đã xử lý xong..."`
+**Kết quả mong đợi**: `200 OK`, `status: "ACTIVE"`, `inactiveReason: null`
 
 ---
 
@@ -326,13 +333,13 @@ Content-Type: application/json
 
 {}
 ```
-**Kết quả mong đợi**: `400 Bad Request` — "Reason is required when reactivating an employee"
+**Kết quả mong đợi**: `400 Bad Request` — `"Vui lòng nhập lý do khi kích hoạt lại nhân viên"`
 
 ---
 
 ### 2.6 Activate nhân viên đã ACTIVE
 ```
-PUT http://localhost:3000/api/staff/employees/<activeEmployeeId>/activate
+PUT http://localhost:3000/api/staff/employees/EMP-007/activate
 Authorization: Bearer <manager_token>
 Content-Type: application/json
 
@@ -340,41 +347,42 @@ Content-Type: application/json
   "reason": "Test"
 }
 ```
-**Kết quả mong đợi**: `400 Bad Request` — "Employee is already active"
+**Kết quả mong đợi**: `400 Bad Request` — `"Nhân viên đã ở trạng thái hoạt động"`
 
 ---
 
-### 2.6 Kiểm tra thông báo INACTIVE khi staff đăng nhập
+### 2.7 Kiểm tra thông báo INACTIVE khi staff đăng nhập
 
-Sau khi deactivate nhân viên, staff đó đăng nhập bình thường (auth-service không chặn), rồi frontend gọi:
+Sau khi deactivate nhân viên, staff đăng nhập bình thường rồi frontend gọi:
 ```
 GET http://localhost:3000/api/staff/employees/by-account/<accountId>
 Authorization: Bearer <staff_token>
 ```
 **Kết quả mong đợi**: `200 OK` với `status: "INACTIVE"` và `inactiveReason: "<lý do manager nhập>"`.
-Frontend đọc hai field này và hiển thị thông báo: *"Tài khoản của bạn bị vô hiệu hóa. Lý do: ..."*
+Frontend đọc hai field này và hiển thị thông báo cho nhân viên.
 
 ---
 
 ## Nhóm 3: Employee Availability
 
 > **Quy tắc**:
-> - Chỉ nhân viên **PART_TIME** mới được cập nhật lịch rảnh
-> - **FULL_TIME** làm cả tuần nên không cần và không được phép set availability
+> - Chỉ nhân viên **PART_TIME** mới được cập nhật lịch rảnh (role EMPLOYEE)
+> - **FULL_TIME** không cần và không được phép set availability
+> - EMPLOYEE chỉ được cập nhật lịch rảnh của **chính mình**
 
 ### 3.1 Xem lịch rảnh của nhân viên
 ```
-GET http://localhost:3000/api/staff/employees/<employeeId>/availability
+GET http://localhost:3000/api/staff/employees/EMP-013/availability
 Authorization: Bearer <manager_token>
 ```
 **Kết quả mong đợi**: `200 OK` với `availableDays` và `availableTimeRanges`
 
 ---
 
-### 3.2 PART_TIME STAFF tự cập nhật lịch rảnh của bản thân
+### 3.2 PART_TIME tự cập nhật lịch rảnh của bản thân
 ```
-PUT http://localhost:3000/api/staff/employees/<partTimeEmployeeId>/availability
-Authorization: Bearer <parttime_staff_token>
+PUT http://localhost:3000/api/staff/employees/EMP-013/availability
+Authorization: Bearer <parttime01_token>
 Content-Type: application/json
 
 {
@@ -385,14 +393,14 @@ Content-Type: application/json
   ]
 }
 ```
-**Kết quả mong đợi**: `200 OK`
+**Kết quả mong đợi**: `200 OK` — `"Cập nhật lịch rảnh thành công"`
 
 ---
 
-### 3.3 PART_TIME STAFF cập nhật lịch rảnh của người khác - bị từ chối
+### 3.3 PART_TIME cập nhật lịch rảnh của người khác - bị từ chối
 ```
-PUT http://localhost:3000/api/staff/employees/<otherEmployeeId>/availability
-Authorization: Bearer <parttime_staff_token>
+PUT http://localhost:3000/api/staff/employees/EMP-007/availability
+Authorization: Bearer <parttime01_token>
 Content-Type: application/json
 
 {
@@ -400,14 +408,14 @@ Content-Type: application/json
   "availableTimeRanges": []
 }
 ```
-**Kết quả mong đợi**: `403 Forbidden` — "You can only update your own availability"
+**Kết quả mong đợi**: `403 Forbidden` — `"Bạn chỉ có thể cập nhật lịch rảnh của bản thân"`
 
 ---
 
-### 3.4 FULL_TIME STAFF cập nhật lịch rảnh - bị từ chối
+### 3.4 FULL_TIME cập nhật lịch rảnh - bị từ chối
 ```
-PUT http://localhost:3000/api/staff/employees/<fullTimeEmployeeId>/availability
-Authorization: Bearer <fulltime_staff_token>
+PUT http://localhost:3000/api/staff/employees/EMP-007/availability
+Authorization: Bearer <nhanvien01_token>
 Content-Type: application/json
 
 {
@@ -415,13 +423,13 @@ Content-Type: application/json
   "availableTimeRanges": []
 }
 ```
-**Kết quả mong đợi**: `400 Bad Request` — "Full-time employees do not need to set availability as they work all week"
+**Kết quả mong đợi**: `400 Bad Request` — `"Nhân viên toàn thời gian không cần đặt lịch rảnh"`
 
 ---
 
-### 3.5 MANAGER cập nhật lịch rảnh cho PART_TIME nhân viên bất kỳ
+### 3.5 MANAGER cập nhật lịch rảnh cho PART_TIME
 ```
-PUT http://localhost:3000/api/staff/employees/<partTimeEmployeeId>/availability
+PUT http://localhost:3000/api/staff/employees/EMP-013/availability
 Authorization: Bearer <manager_token>
 Content-Type: application/json
 
@@ -438,7 +446,7 @@ Content-Type: application/json
 
 ### 3.6 MANAGER cập nhật lịch rảnh cho FULL_TIME - bị từ chối
 ```
-PUT http://localhost:3000/api/staff/employees/<fullTimeEmployeeId>/availability
+PUT http://localhost:3000/api/staff/employees/EMP-007/availability
 Authorization: Bearer <manager_token>
 Content-Type: application/json
 
@@ -447,7 +455,7 @@ Content-Type: application/json
   "availableTimeRanges": []
 }
 ```
-**Kết quả mong đợi**: `400 Bad Request` — "Full-time employees do not need to set availability as they work all week"
+**Kết quả mong đợi**: `400 Bad Request` — `"Nhân viên toàn thời gian không cần đặt lịch rảnh"`
 
 ---
 
@@ -455,7 +463,7 @@ Content-Type: application/json
 
 ### 4.1 Xem danh sách ca của nhân viên
 ```
-GET http://localhost:3000/api/staff/employees/<employeeId>/shifts
+GET http://localhost:3000/api/staff/employees/EMP-007/shifts
 Authorization: Bearer <manager_token>
 ```
 **Kết quả mong đợi**: `200 OK`, danh sách ca được phân công
@@ -464,10 +472,10 @@ Authorization: Bearer <manager_token>
 
 ### 4.2 Filter ca theo ngày
 ```
-GET http://localhost:3000/api/staff/employees/<employeeId>/shifts?date=2026-03-27
+GET http://localhost:3000/api/staff/employees/EMP-007/shifts?date=2026-05-15
 Authorization: Bearer <manager_token>
 ```
-**Kết quả mong đợi**: `200 OK`, chỉ ca ngày 27/03/2026
+**Kết quả mong đợi**: `200 OK`, chỉ ca ngày 15/05/2026
 
 ---
 
@@ -483,7 +491,7 @@ Content-Type: application/json
   "shiftName": "Ca Sáng",
   "startTime": "08:00",
   "endTime": "12:00",
-  "workingDate": "2026-03-27"
+  "workingDate": "2026-05-20"
 }
 ```
 **Kết quả mong đợi**: `201 Created` → lưu `shiftId`
@@ -497,13 +505,13 @@ Authorization: Bearer <manager_token>
 Content-Type: application/json
 
 {
-  "shiftName": "Ca loi",
+  "shiftName": "Ca lỗi",
   "startTime": "14:00",
   "endTime": "08:00",
-  "workingDate": "2026-03-27"
+  "workingDate": "2026-05-20"
 }
 ```
-**Kết quả mong đợi**: `400 Bad Request` — "startTime must be before endTime"
+**Kết quả mong đợi**: `400 Bad Request` — `"Giờ bắt đầu phải trước giờ kết thúc"`
 
 ---
 
@@ -514,27 +522,27 @@ Authorization: Bearer <manager_token>
 Content-Type: application/json
 
 {
-  "shiftName": "Ca qua khu",
+  "shiftName": "Ca quá khứ",
   "startTime": "08:00",
   "endTime": "12:00",
   "workingDate": "2025-01-01"
 }
 ```
-**Kết quả mong đợi**: `400 Bad Request` — "workingDate cannot be in the past"
+**Kết quả mong đợi**: `400 Bad Request` — `"Ngày làm việc không được là ngày trong quá khứ"`
 
 ---
 
-### 5.4 Tạo ca - STAFF không có quyền
+### 5.4 Tạo ca - EMPLOYEE không có quyền
 ```
 POST http://localhost:3000/api/staff/shifts
-Authorization: Bearer <staff_token>
+Authorization: Bearer <nhanvien01_token>
 Content-Type: application/json
 
 {
-  "shiftName": "Ca thu",
+  "shiftName": "Ca thử",
   "startTime": "08:00",
   "endTime": "12:00",
-  "workingDate": "2026-03-27"
+  "workingDate": "2026-05-20"
 }
 ```
 **Kết quả mong đợi**: `403 Forbidden`
@@ -552,10 +560,10 @@ Authorization: Bearer <manager_token>
 
 ### 5.6 Filter ca theo ngày
 ```
-GET http://localhost:3000/api/staff/shifts?date=2026-03-27
+GET http://localhost:3000/api/staff/shifts?date=2026-05-20
 Authorization: Bearer <manager_token>
 ```
-**Kết quả mong đợi**: `200 OK`, chỉ ca ngày 27/03
+**Kết quả mong đợi**: `200 OK`, chỉ ca ngày 20/05
 
 ---
 
@@ -582,7 +590,7 @@ Authorization: Bearer <manager_token>
 GET http://localhost:3000/api/staff/shifts/nonexistent-id
 Authorization: Bearer <manager_token>
 ```
-**Kết quả mong đợi**: `404 Not Found`
+**Kết quả mong đợi**: `404 Not Found` — `"Không tìm thấy ca làm việc"`
 
 ---
 
@@ -593,7 +601,7 @@ Authorization: Bearer <manager_token>
 Content-Type: application/json
 
 {
-  "shiftName": "Ca sang thu 6 (da sua)"
+  "shiftName": "Ca sáng thứ 6 (đã sửa)"
 }
 ```
 **Kết quả mong đợi**: `200 OK`
@@ -614,21 +622,7 @@ Content-Type: application/json
 
 ---
 
-### 5.12 Chuyển trạng thái ACTIVE → COMPLETED
-```
-PUT http://localhost:3000/api/staff/shifts/<shiftId>
-Authorization: Bearer <manager_token>
-Content-Type: application/json
-
-{
-  "status": "COMPLETED"
-}
-```
-**Kết quả mong đợi**: `200 OK`, `status: "COMPLETED"`
-
----
-
-### 5.13 Hủy ca - có lý do (MANAGER)
+### 5.12 Hủy ca - có lý do (MANAGER)
 ```
 DELETE http://localhost:3000/api/staff/shifts/<shiftId>
 Authorization: Bearer <manager_token>
@@ -642,7 +636,7 @@ Content-Type: application/json
 
 ---
 
-### 5.14 Hủy ca - không có lý do
+### 5.13 Hủy ca - không có lý do
 ```
 DELETE http://localhost:3000/api/staff/shifts/<shiftId>
 Authorization: Bearer <manager_token>
@@ -650,11 +644,11 @@ Content-Type: application/json
 
 {}
 ```
-**Kết quả mong đợi**: `400 Bad Request` — "Reason is required when cancelling a shift"
+**Kết quả mong đợi**: `400 Bad Request` — `"Vui lòng nhập lý do khi hủy ca làm việc"`
 
 ---
 
-### 5.15 Hủy ca đã COMPLETED
+### 5.14 Hủy ca đã COMPLETED
 ```
 DELETE http://localhost:3000/api/staff/shifts/<completedShiftId>
 Authorization: Bearer <manager_token>
@@ -664,13 +658,13 @@ Content-Type: application/json
   "reason": "Thử hủy ca đã hoàn thành"
 }
 ```
-**Kết quả mong đợi**: `400 Bad Request` — "Cannot cancel a shift that has already been completed"
+**Kết quả mong đợi**: `400 Bad Request` — `"Không thể hủy ca làm việc đã hoàn thành"`
 
 ---
 
 ## Nhóm 6: Phân công ca (Shift Assignments)
 
-> Cần 1 ca ở trạng thái PLANNED/ACTIVE và nhân viên PART_TIME đã có availability phù hợp.
+> Cần 1 ca ở trạng thái PLANNED/ACTIVE và nhân viên đã có tài khoản + availability phù hợp.
 
 ### 6.1 Phân công nhân viên vào ca - thành công
 ```
@@ -679,7 +673,7 @@ Authorization: Bearer <manager_token>
 Content-Type: application/json
 
 {
-  "employeeId": "<partTimeEmployeeId>"
+  "employeeId": "EMP-013"
 }
 ```
 **Kết quả mong đợi**: `201 Created`, `assignmentStatus: "ASSIGNED"`
@@ -693,26 +687,26 @@ Authorization: Bearer <manager_token>
 Content-Type: application/json
 
 {
-  "employeeId": "<partTimeEmployeeId>"
+  "employeeId": "EMP-013"
 }
 ```
-**Kết quả mong đợi**: `400 Bad Request` — "Employee is already assigned to this shift"
+**Kết quả mong đợi**: `400 Bad Request` — `"Nhân viên đã được gán vào ca này"`
 
 ---
 
-### 6.3 Phân công - conflict giờ (nhân viên đã có ca khác trùng giờ cùng ngày)
+### 6.3 Phân công - conflict giờ (trùng giờ cùng ngày)
 
-Tạo ca thứ 2 cùng ngày, trùng giờ, rồi assign cùng nhân viên:
+Tạo ca thứ 2 cùng ngày trùng giờ, rồi assign cùng nhân viên:
 ```
 POST http://localhost:3000/api/staff/shifts/<shiftId2>/assignments
 Authorization: Bearer <manager_token>
 Content-Type: application/json
 
 {
-  "employeeId": "<partTimeEmployeeId>"
+  "employeeId": "EMP-013"
 }
 ```
-**Kết quả mong đợi**: `400 Bad Request` — "Schedule conflict: employee already has shift..."
+**Kết quả mong đợi**: `400 Bad Request` — `"Xung đột lịch: nhân viên đã có ca \"...\" (...) vào ngày ..."`
 
 ---
 
@@ -723,10 +717,10 @@ Authorization: Bearer <manager_token>
 Content-Type: application/json
 
 {
-  "employeeId": "<partTimeEmployeeId>"
+  "employeeId": "EMP-013"
 }
 ```
-**Kết quả mong đợi**: `400 Bad Request` — "Employee is not available on ..."
+**Kết quả mong đợi**: `400 Bad Request` — `"Nhân viên không rảnh vào ... (ngày làm: ...)"`
 
 ---
 
@@ -737,11 +731,12 @@ Authorization: Bearer <manager_token>
 Content-Type: application/json
 
 {
-  "employeeId": "<fullTimeEmployeeId>"
+  "employeeId": "EMP-007"
 }
 ```
-> Trước đó đã assign nhân viên FULL_TIME này vào các ca trong cùng tuần với tổng ≥ 40h
-**Kết quả mong đợi**: `400 Bad Request` — "Cannot assign: employee would exceed 40h/week (current: 40.0h, new shift: 4.0h)"
+> Trước đó đã assign EMP-007 vào các ca trong cùng tuần với tổng ≥ 40h
+
+**Kết quả mong đợi**: `400 Bad Request` — `"Không thể gán: nhân viên sẽ vượt quá 40h/tuần (hiện tại: 40.0h, ca mới: Xh)"`
 
 ---
 
@@ -755,11 +750,11 @@ Content-Type: application/json
   "employeeId": "<employeeId chưa có accountId>"
 }
 ```
-**Kết quả mong đợi**: `400 Bad Request` — "Cannot assign employee who does not have an account yet"
+**Kết quả mong đợi**: `400 Bad Request` — `"Không thể gán nhân viên chưa có tài khoản"`
 
 ---
 
-### 6.6 Phân công - nhân viên INACTIVE
+### 6.7 Phân công - nhân viên INACTIVE
 ```
 POST http://localhost:3000/api/staff/shifts/<shiftId>/assignments
 Authorization: Bearer <manager_token>
@@ -769,25 +764,25 @@ Content-Type: application/json
   "employeeId": "<inactiveEmployeeId>"
 }
 ```
-**Kết quả mong đợi**: `400 Bad Request` — "Cannot assign an inactive employee to a shift"
+**Kết quả mong đợi**: `400 Bad Request` — `"Không thể gán nhân viên không hoạt động vào ca"`
 
 ---
 
-### 6.7 Phân công - ca đã COMPLETED hoặc CANCELLED
+### 6.8 Phân công - ca đã COMPLETED hoặc CANCELLED
 ```
 POST http://localhost:3000/api/staff/shifts/<completedShiftId>/assignments
 Authorization: Bearer <manager_token>
 Content-Type: application/json
 
 {
-  "employeeId": "<employeeId>"
+  "employeeId": "EMP-007"
 }
 ```
-**Kết quả mong đợi**: `400 Bad Request` — "Cannot assign employee to a shift that is not PLANNED or ACTIVE"
+**Kết quả mong đợi**: `400 Bad Request` — `"Không thể gán nhân viên vào ca không ở trạng thái PLANNED hoặc ACTIVE"`
 
 ---
 
-### 6.8 Xem danh sách phân công của ca
+### 6.9 Xem danh sách phân công của ca
 ```
 GET http://localhost:3000/api/staff/shifts/<shiftId>/assignments
 Authorization: Bearer <manager_token>
@@ -796,7 +791,7 @@ Authorization: Bearer <manager_token>
 
 ---
 
-### 6.9 Hủy phân công (soft delete → CANCELLED)
+### 6.10 Hủy phân công (soft delete → CANCELLED)
 ```
 DELETE http://localhost:3000/api/staff/shifts/<shiftId>/assignments/<employeeId>
 Authorization: Bearer <manager_token>
@@ -805,12 +800,12 @@ Authorization: Bearer <manager_token>
 
 ---
 
-### 6.10 Hủy phân công - không tìm thấy hoặc đã hủy
+### 6.11 Hủy phân công - không tìm thấy hoặc đã hủy
 ```
 DELETE http://localhost:3000/api/staff/shifts/<shiftId>/assignments/nonexistent-employee
 Authorization: Bearer <manager_token>
 ```
-**Kết quả mong đợi**: `404 Not Found` — "Assignment not found or already cancelled"
+**Kết quả mong đợi**: `404 Not Found` — `"Không tìm thấy phân công hoặc đã bị hủy"`
 
 ---
 
@@ -820,17 +815,17 @@ Authorization: Bearer <manager_token>
 
 ### 7.1 Check-in đúng giờ (ON_TIME)
 
-STAFF tự check-in (gọi trước hoặc trong vòng 15 phút đầu của `startTime`):
+EMPLOYEE tự check-in (trong vòng 15 phút đầu của `startTime`):
 ```
 POST http://localhost:3000/api/staff/attendance/check-in
-Authorization: Bearer <parttime_staff_token>
+Authorization: Bearer <parttime01_token>
 Content-Type: application/json
 
 {
   "shiftId": "<shiftId>"
 }
 ```
-**Kết quả mong đợi**: `201 Created`, `status: "ON_TIME"`
+**Kết quả mong đợi**: `201 Created`, `status: "ON_TIME"` — `"Chấm công vào thành công"`
 
 MANAGER check-in thay cho nhân viên:
 ```
@@ -840,7 +835,7 @@ Content-Type: application/json
 
 {
   "shiftId": "<shiftId>",
-  "employeeId": "<employeeId>"
+  "employeeId": "EMP-013"
 }
 ```
 
@@ -851,7 +846,7 @@ Content-Type: application/json
 Gọi sau 15 phút kể từ `startTime`:
 ```
 POST http://localhost:3000/api/staff/attendance/check-in
-Authorization: Bearer <parttime_staff_token>
+Authorization: Bearer <parttime01_token>
 Content-Type: application/json
 
 {
@@ -865,42 +860,42 @@ Content-Type: application/json
 ### 7.3 Check-in - chưa được phân công
 ```
 POST http://localhost:3000/api/staff/attendance/check-in
-Authorization: Bearer <parttime_staff_token>
+Authorization: Bearer <parttime01_token>
 Content-Type: application/json
 
 {
   "shiftId": "<shiftIdNotAssigned>"
 }
 ```
-**Kết quả mong đợi**: `400 Bad Request` — "Employee is not assigned to this shift"
+**Kết quả mong đợi**: `400 Bad Request` — `"Nhân viên chưa được phân công vào ca này"`
 
 ---
 
 ### 7.4 Check-in - đã check-in rồi
 ```
 POST http://localhost:3000/api/staff/attendance/check-in
-Authorization: Bearer <parttime_staff_token>
+Authorization: Bearer <parttime01_token>
 Content-Type: application/json
 
 {
   "shiftId": "<shiftId>"
 }
 ```
-**Kết quả mong đợi**: `400 Bad Request` — "Employee has already checked in for this shift"
+**Kết quả mong đợi**: `400 Bad Request` — `"Nhân viên đã chấm công vào ca này"`
 
 ---
 
 ### 7.5 Check-out thành công
 ```
 POST http://localhost:3000/api/staff/attendance/check-out
-Authorization: Bearer <parttime_staff_token>
+Authorization: Bearer <parttime01_token>
 Content-Type: application/json
 
 {
   "shiftId": "<shiftId>"
 }
 ```
-**Kết quả mong đợi**: `200 OK`, có `checkOutTime`, `actualHours` được tính tự động
+**Kết quả mong đợi**: `200 OK`, có `checkOutTime`, `actualHours` — `"Chấm công ra thành công"`
 
 ---
 
@@ -909,7 +904,7 @@ Content-Type: application/json
 Gọi trước 15 phút kể từ `endTime`:
 ```
 POST http://localhost:3000/api/staff/attendance/check-out
-Authorization: Bearer <parttime_staff_token>
+Authorization: Bearer <parttime01_token>
 Content-Type: application/json
 
 {
@@ -923,20 +918,20 @@ Content-Type: application/json
 ### 7.7 Check-out - chưa check-in
 ```
 POST http://localhost:3000/api/staff/attendance/check-out
-Authorization: Bearer <parttime_staff_token>
+Authorization: Bearer <parttime01_token>
 Content-Type: application/json
 
 {
   "shiftId": "<shiftIdNotCheckedIn>"
 }
 ```
-**Kết quả mong đợi**: `400 Bad Request` — "No check-in record found for this shift"
+**Kết quả mong đợi**: `400 Bad Request` — `"Không tìm thấy bản ghi chấm công vào cho ca này"`
 
 ---
 
 ### 7.8 Xem lịch sử chấm công của nhân viên (MANAGER)
 ```
-GET http://localhost:3000/api/staff/attendance/employee/<employeeId>
+GET http://localhost:3000/api/staff/attendance/employee/EMP-013
 Authorization: Bearer <manager_token>
 ```
 **Kết quả mong đợi**: `200 OK`, danh sách attendance records sắp xếp mới nhất trước
@@ -945,41 +940,41 @@ Authorization: Bearer <manager_token>
 
 ### 7.9 Filter lịch sử theo ngày
 ```
-GET http://localhost:3000/api/staff/attendance/employee/<employeeId>?dateFrom=2026-03-01&dateTo=2026-03-31
+GET http://localhost:3000/api/staff/attendance/employee/EMP-013?dateFrom=2026-05-01&dateTo=2026-05-31
 Authorization: Bearer <manager_token>
 ```
-**Kết quả mong đợi**: `200 OK`, chỉ records trong tháng 3/2026
+**Kết quả mong đợi**: `200 OK`, chỉ records trong tháng 5/2026
 
 ---
 
-### 7.10 STAFF xem attendance của bản thân
+### 7.10 EMPLOYEE xem attendance của bản thân
 ```
-GET http://localhost:3000/api/staff/attendance/employee/<ownEmployeeId>
-Authorization: Bearer <staff_token>
+GET http://localhost:3000/api/staff/attendance/employee/EMP-013
+Authorization: Bearer <parttime01_token>
 ```
 **Kết quả mong đợi**: `200 OK`
 
 ---
 
-### 7.11 STAFF xem attendance của người khác - bị từ chối
+### 7.11 EMPLOYEE xem attendance của người khác - bị từ chối
 ```
-GET http://localhost:3000/api/staff/attendance/employee/<otherEmployeeId>
-Authorization: Bearer <staff_token>
+GET http://localhost:3000/api/staff/attendance/employee/EMP-007
+Authorization: Bearer <parttime01_token>
 ```
-**Kết quả mong đợi**: `403 Forbidden` — "You can only view your own attendance records"
+**Kết quả mong đợi**: `403 Forbidden` — `"Bạn chỉ có thể xem lịch sử chấm công của bản thân"`
 
 ---
 
 ### 7.12 Tổng kết chấm công theo tháng (MANAGER)
 ```
-GET http://localhost:3000/api/staff/attendance/summary?employeeId=<employeeId>&month=3&year=2026
+GET http://localhost:3000/api/staff/attendance/summary?employeeId=EMP-013&month=5&year=2026
 Authorization: Bearer <manager_token>
 ```
 **Kết quả mong đợi**: `200 OK`
 ```json
 {
-  "employeeId": "...",
-  "month": 3,
+  "employeeId": "EMP-013",
+  "month": 5,
   "year": 2026,
   "totalShifts": 10,
   "totalHours": 45.5,
@@ -1004,18 +999,18 @@ Authorization: Bearer <manager_token>
 | PUT | `/api/staff/employees/:id/deactivate` | MANAGER | Vô hiệu hóa (bắt buộc `reason`) |
 | PUT | `/api/staff/employees/:id/activate` | MANAGER | Kích hoạt lại (bắt buộc `reason`) |
 | GET | `/api/staff/employees/:id/availability` | Auth | Xem lịch rảnh |
-| PUT | `/api/staff/employees/:id/availability` | STAFF (PART_TIME only) | Tự cập nhật lịch rảnh |
+| PUT | `/api/staff/employees/:id/availability` | EMPLOYEE (PART_TIME only) | Tự cập nhật lịch rảnh |
 | GET | `/api/staff/employees/:id/shifts` | Auth | Ca làm của nhân viên |
 | POST | `/api/staff/shifts` | MANAGER | Tạo ca |
 | GET | `/api/staff/shifts` | Auth | Danh sách ca |
 | GET | `/api/staff/shifts/:id` | Auth | Chi tiết ca + assignments |
 | PUT | `/api/staff/shifts/:id` | MANAGER | Cập nhật ca |
-| DELETE | `/api/staff/shifts/:id` | MANAGER | Hủy ca (soft) |
+| DELETE | `/api/staff/shifts/:id` | MANAGER | Hủy ca (soft, bắt buộc `reason`) |
 | POST | `/api/staff/shifts/:id/assignments` | MANAGER | Phân công nhân viên |
 | GET | `/api/staff/shifts/:id/assignments` | Auth | Xem phân công |
 | DELETE | `/api/staff/shifts/:id/assignments/:employeeId` | MANAGER | Hủy phân công (soft) |
-| POST | `/api/staff/attendance/check-in` | STAFF/MANAGER | Check-in |
-| POST | `/api/staff/attendance/check-out` | STAFF/MANAGER | Check-out |
+| POST | `/api/staff/attendance/check-in` | EMPLOYEE/MANAGER | Check-in |
+| POST | `/api/staff/attendance/check-out` | EMPLOYEE/MANAGER | Check-out |
 | GET | `/api/staff/attendance/employee/:id` | Auth | Lịch sử chấm công |
 | GET | `/api/staff/attendance/summary` | MANAGER | Tổng kết theo tháng |
 
@@ -1023,11 +1018,12 @@ Authorization: Bearer <manager_token>
 
 ## Ghi chú quan trọng
 
-- **Dang nhap**: Dung `username` + `password` (khong phai email)
-- **FULL_TIME**: Không được set availability; manager gán ca tùy ý nhưng tổng giờ/tuần không vượt 40h (mặc định `maxWorkingHours=40`)
-- **PART_TIME**: Chỉ staff tự cập nhật availability của bản thân; manager không được cập nhật lịch rảnh của staff
-- **Trạng thái ca tự động**: PLANNED → ACTIVE → COMPLETED theo thời gian thực; manager hủy → CANCELLED (bắt buộc `reason`)
-- **Deactivate/Activate**: Cả hai đều bắt buộc nhập `reason`. Nhân viên INACTIVE không thể được phân công hoặc check-in
-- **Thong bao INACTIVE**: Sau khi staff dang nhap, frontend goi `/by-account/:accountId` de lay `status` va `inactiveReason` va hien thi thong bao
-- **Soft delete**: Assignment huy giu record voi `assignmentStatus: "CANCELLED"`, ca huy giu `status: "CANCELLED"`
-- **ADMIN**: Khong co quyen truy cap staff-service — chi MANAGER va STAFF
+- **Đăng nhập**: Dùng `username` + `password` (không phải email)
+- **Role thực tế**: Hệ thống có ADMIN, MANAGER, EMPLOYEE, CUSTOMER — không có role STAFF
+- **FULL_TIME** (EMP-007 / nhanvien01): Không được set availability; manager gán ca tùy ý nhưng tổng giờ/tuần không vượt 40h
+- **PART_TIME** (EMP-013 / parttime01): Chỉ EMPLOYEE tự cập nhật availability của bản thân; manager không được cập nhật
+- **Trạng thái ca tự động**: PLANNED → ACTIVE → COMPLETED theo thời gian thực; hủy → CANCELLED (bắt buộc `reason`)
+- **Deactivate/Activate**: Cả hai đều bắt buộc nhập `reason`; nhân viên INACTIVE không thể được phân công hoặc check-in
+- **Thông báo INACTIVE**: Sau khi staff đăng nhập, frontend gọi `/by-account/:accountId` để lấy `status` và `inactiveReason` và hiển thị thông báo
+- **Soft delete**: Assignment hủy giữ record với `assignmentStatus: "CANCELLED"`; ca hủy giữ `status: "CANCELLED"`
+- **Tất cả thông báo lỗi trả về tiếng Việt**

@@ -6,6 +6,9 @@ CREATE TABLE `payments` (
     `paid_amount` DECIMAL(12, 2) NOT NULL DEFAULT 0,
     `remaining_amount` DECIMAL(12, 2) NOT NULL,
     `payment_status` VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    `payment_method` VARCHAR(20) NOT NULL DEFAULT 'CASH',
+    `payment_url` TEXT NULL,
+    `provider_order_id` VARCHAR(100) NULL,
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updated_at` DATETIME(3) NOT NULL,
 
@@ -16,7 +19,7 @@ CREATE TABLE `payments` (
 -- CreateTable
 CREATE TABLE `payment_sessions` (
     `payment_session_id` VARCHAR(36) NOT NULL,
-    `payment_id` VARCHAR(191) NOT NULL,
+    `payment_id` VARCHAR(36) NOT NULL,
     `session_code` VARCHAR(50) NOT NULL,
     `started_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `expired_at` DATETIME(3) NOT NULL,
@@ -33,12 +36,13 @@ CREATE TABLE `payment_sessions` (
 -- CreateTable
 CREATE TABLE `payment_transactions` (
     `transaction_id` VARCHAR(36) NOT NULL,
-    `payment_session_id` VARCHAR(191) NOT NULL,
-    `payment_method_id` VARCHAR(191) NOT NULL,
+    `payment_session_id` VARCHAR(36) NOT NULL,
+    `payment_method_id` VARCHAR(36) NOT NULL,
     `transaction_code` VARCHAR(100) NOT NULL,
     `amount` DECIMAL(12, 2) NOT NULL,
     `transaction_status` VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     `gateway_response` TEXT NULL,
+    `note` VARCHAR(255) NULL,
     `paid_at` DATETIME(3) NULL,
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 

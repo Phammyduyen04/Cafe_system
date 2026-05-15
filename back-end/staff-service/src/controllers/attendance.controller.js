@@ -4,14 +4,14 @@ const { responseHelper } = require('../../../shared');
 const checkIn = async (req, res, next) => {
   try {
     const attendance = await attendanceService.checkIn(req.body, req.user);
-    return responseHelper.created(res, attendance, 'Check-in successful');
+    return responseHelper.created(res, attendance, 'Chấm công vào thành công');
   } catch (error) { next(error); }
 };
 
 const checkOut = async (req, res, next) => {
   try {
     const attendance = await attendanceService.checkOut(req.body, req.user);
-    return responseHelper.success(res, attendance, 'Check-out successful');
+    return responseHelper.success(res, attendance, 'Chấm công ra thành công');
   } catch (error) { next(error); }
 };
 

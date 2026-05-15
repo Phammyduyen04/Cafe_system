@@ -5,7 +5,7 @@ const { responseHelper } = require('../../../shared');
 const createEmployee = async (req, res, next) => {
   try {
     const employee = await employeeService.createEmployee(req.body, req.user);
-    return responseHelper.created(res, employee, 'Employee created successfully');
+    return responseHelper.created(res, employee, 'Tạo nhân viên thành công');
   } catch (error) { next(error); }
 };
 
@@ -27,7 +27,7 @@ const getEmployeeById = async (req, res, next) => {
 const updateEmployee = async (req, res, next) => {
   try {
     const employee = await employeeService.updateEmployee(req.params.id, req.body);
-    return responseHelper.success(res, employee, 'Employee updated successfully');
+    return responseHelper.success(res, employee, 'Cập nhật nhân viên thành công');
   } catch (error) { next(error); }
 };
 
@@ -35,7 +35,7 @@ const deleteEmployee = async (req, res, next) => {
   try {
     const { reason } = req.body;
     const employee = await employeeService.deleteEmployee(req.params.id, reason);
-    return responseHelper.success(res, employee, 'Employee deactivated successfully');
+    return responseHelper.success(res, employee, 'Vô hiệu hóa nhân viên thành công');
   } catch (error) { next(error); }
 };
 
@@ -43,7 +43,7 @@ const reactivateEmployee = async (req, res, next) => {
   try {
     const { reason } = req.body;
     const employee = await employeeService.reactivateEmployee(req.params.id, reason);
-    return responseHelper.success(res, employee, 'Employee reactivated successfully');
+    return responseHelper.success(res, employee, 'Kích hoạt lại nhân viên thành công');
   } catch (error) { next(error); }
 };
 
@@ -57,7 +57,7 @@ const getAvailability = async (req, res, next) => {
 const updateAvailability = async (req, res, next) => {
   try {
     const availability = await employeeService.updateAvailability(req.params.id, req.body, req.user);
-    return responseHelper.success(res, availability, 'Availability updated successfully');
+    return responseHelper.success(res, availability, 'Cập nhật lịch rảnh thành công');
   } catch (error) { next(error); }
 };
 
