@@ -11,41 +11,41 @@ const resolveEmployeeId = async (providedEmployeeId, user) => {
   const isStaff = user.roles && user.roles.includes('STAFF') && !user.roles.includes('MANAGER');
   if (isStaff) {
     const employee = await employeeRepo.findByAccountId(user.accountId);
-    if (!employee) throw new AppError('No employee record found for your account', 404);
+    if (!employee) throw new AppError('Không tìm thấy hồ sơ nhân viên cho tài khoản này', 404);
     if (providedEmployeeId && employee.employeeId !== providedEmployeeId) {
-      throw new AppError('You can only manage your own attendance', 403);
+      throw new AppError('Bạn chỉ có thể quản lý chấm công của bản thân', 403);
     }
     return employee.employeeId;
   }
-  if (!providedEmployeeId) throw new AppError('employeeId is required', 400);
+  if (!providedEmployeeId) throw new AppError('Mã nhân viên là bắt buộc', 400);
   return providedEmployeeId;
 };
 
 const checkIn = async (data, user) => {
   const { shiftId, employeeId: bodyEmployeeId, note } = data;
-  if (!shiftId) throw new AppError('shiftId is required', 400);
+  if (!shiftId) throw new AppError('Mã ca làm việc là bắt buộc', 400);
 
   const employeeId = await resolveEmployeeId(bodyEmployeeId, user);
 
   // Verify employee exists and is active
   const employee = await employeeRepo.findByEmployeeId(employeeId);
-  if (!employee) throw new AppError('Employee not found', 404);
-  if (employee.status !== 'ACTIVE') throw new AppError('Employee is not active', 400);
-  if (!employee.accountId) throw new AppError('Employee does not have an account linked', 400);
+  if (!employee) throw new AppError('Không tìm thấy nhân viên', 404);
+  if (employee.status !== 'ACTIVE') throw new AppError('Nhân viên không ở trạng thái hoạt động', 400);
+  if (!employee.accountId) throw new AppError('Nhân viên chưa được liên kết với tài khoản', 400);
 
   // Find the shift
   const shift = await shiftRepo.findByShiftId(shiftId);
-  if (!shift) throw new AppError('Shift not found', 404);
+  if (!shift) throw new AppError('Không tìm thấy ca làm việc', 404);
 
   // Verify there is a valid assignment (ASSIGNED or CONFIRMED)
   const assignment = await assignmentRepo.findOne(shift.shiftId, employeeId);
   if (!assignment || assignment.assignmentStatus === 'CANCELLED') {
-    throw new AppError('Employee is not assigned to this shift', 400);
+    throw new AppError('Nhân viên chưa được phân công vào ca này', 400);
   }
 
   // Prevent duplicate check-in
   const existing = await Attendance.findOne({ shiftId: shift.shiftId, employeeId });
-  if (existing) throw new AppError('Employee has already checked in for this shift', 400);
+  if (existing) throw new AppError('Nhân viên đã chấm công vào ca này', 400);
 
   const checkInTime = new Date();
 
@@ -70,16 +70,16 @@ const checkIn = async (data, user) => {
 
 const checkOut = async (data, user) => {
   const { shiftId, employeeId: bodyEmployeeId, note } = data;
-  if (!shiftId) throw new AppError('shiftId is required', 400);
+  if (!shiftId) throw new AppError('Mã ca làm việc là bắt buộc', 400);
 
   const employeeId = await resolveEmployeeId(bodyEmployeeId, user);
 
   const shift = await shiftRepo.findByShiftId(shiftId);
-  if (!shift) throw new AppError('Shift not found', 404);
+  if (!shift) throw new AppError('Không tìm thấy ca làm việc', 404);
 
   const attendance = await Attendance.findOne({ shiftId: shift.shiftId, employeeId });
-  if (!attendance) throw new AppError('No check-in record found for this shift', 400);
-  if (attendance.checkOutTime) throw new AppError('Employee has already checked out for this shift', 400);
+  if (!attendance) throw new AppError('Không tìm thấy bản ghi chấm công vào cho ca này', 400);
+  if (attendance.checkOutTime) throw new AppError('Nhân viên đã chấm công ra cho ca này', 400);
 
   const checkOutTime = new Date();
   const actualHours = parseFloat(((checkOutTime - attendance.checkInTime) / 3600000).toFixed(2));
@@ -113,7 +113,7 @@ const getAttendanceByEmployee = async (targetEmployeeId, dateFrom, dateTo, reque
   if (isStaff) {
     const employee = await employeeRepo.findByAccountId(requester.accountId);
     if (!employee || employee.employeeId !== targetEmployeeId) {
-      throw new AppError('You can only view your own attendance records', 403);
+      throw new AppError('Bạn chỉ có thể xem lịch sử chấm công của bản thân', 403);
     }
   }
 
@@ -141,7 +141,7 @@ const buildDateQuery = (dateFrom, dateTo) => {
 
 const getAttendanceSummary = async (employeeId, month, year) => {
   if (!employeeId || !month || !year) {
-    throw new AppError('employeeId, month, and year are required', 400);
+    throw new AppError('Mã nhân viên, tháng và năm là bắt buộc', 400);
   }
 
   const monthStr = String(month).padStart(2, '0');

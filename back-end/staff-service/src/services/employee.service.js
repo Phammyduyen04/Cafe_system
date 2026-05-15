@@ -19,12 +19,12 @@ const generateEmployeeId = async () => {
 const createEmployee = async (data, user) => {
   const { fullName, position, employeeType, maxWorkingHours, accountId, managerId } = data;
   if (!fullName || !position || !employeeType) {
-    throw new AppError('Full name, position, and employee type are required', 400);
+    throw new AppError('Họ tên, vị trí và loại nhân viên là bắt buộc', 400);
   }
 
   if (accountId) {
     const existing = await employeeRepo.findByAccountId(accountId);
-    if (existing) throw new AppError('This accountId is already linked to another employee', 409);
+    if (existing) throw new AppError('Tài khoản này đã được liên kết với nhân viên khác', 409);
   }
 
   // Auto-populate managerId từ token nếu không được cung cấp
@@ -77,18 +77,18 @@ const getAllEmployees = async (filters, page = 1, limit = 10) => {
 
 const getEmployeeById = async (id) => {
   const employee = await employeeRepo.findByEmployeeId(id);
-  if (!employee) throw new AppError('Employee not found', 404);
+  if (!employee) throw new AppError('Không tìm thấy nhân viên', 404);
   return employee;
 };
 
 const updateEmployee = async (id, data) => {
   const employee = await employeeRepo.findByEmployeeId(id);
-  if (!employee) throw new AppError('Employee not found', 404);
+  if (!employee) throw new AppError('Không tìm thấy nhân viên', 404);
 
   if (data.accountId) {
     const existing = await employeeRepo.findByAccountId(data.accountId);
     if (existing && existing.employeeId !== id) {
-      throw new AppError('This accountId is already linked to another employee', 409);
+      throw new AppError('Tài khoản này đã được liên kết với nhân viên khác', 409);
     }
   }
 
@@ -96,18 +96,18 @@ const updateEmployee = async (id, data) => {
 };
 
 const deleteEmployee = async (id, reason) => {
-  if (!reason || !reason.trim()) throw new AppError('Reason is required when deactivating an employee', 400);
+  if (!reason || !reason.trim()) throw new AppError('Vui lòng nhập lý do khi vô hiệu hóa nhân viên', 400);
   const employee = await employeeRepo.findByEmployeeId(id);
-  if (!employee) throw new AppError('Employee not found', 404);
-  if (employee.status === 'INACTIVE') throw new AppError('Employee is already inactive', 400);
+  if (!employee) throw new AppError('Không tìm thấy nhân viên', 404);
+  if (employee.status === 'INACTIVE') throw new AppError('Nhân viên đã ở trạng thái không hoạt động', 400);
   return await employeeRepo.update(employee._id, { status: 'INACTIVE', inactiveReason: reason.trim() });
 };
 
 const reactivateEmployee = async (id, reason) => {
-  if (!reason || !reason.trim()) throw new AppError('Reason is required when reactivating an employee', 400);
+  if (!reason || !reason.trim()) throw new AppError('Vui lòng nhập lý do khi kích hoạt lại nhân viên', 400);
   const employee = await employeeRepo.findByEmployeeId(id);
-  if (!employee) throw new AppError('Employee not found', 404);
-  if (employee.status === 'ACTIVE') throw new AppError('Employee is already active', 400);
+  if (!employee) throw new AppError('Không tìm thấy nhân viên', 404);
+  if (employee.status === 'ACTIVE') throw new AppError('Nhân viên đã ở trạng thái hoạt động', 400);
   return await employeeRepo.update(employee._id, {
     status: 'ACTIVE',
     inactiveReason: null,
@@ -122,16 +122,16 @@ const getAvailability = async (employeeId) => {
 // Chỉ STAFF PART_TIME mới được cập nhật lịch rảnh
 const updateAvailability = async (employeeId, data, requester) => {
   const employee = await employeeRepo.findByEmployeeId(employeeId);
-  if (!employee) throw new AppError('Employee not found', 404);
+  if (!employee) throw new AppError('Không tìm thấy nhân viên', 404);
 
   // Staff chỉ được cập nhật lịch rảnh của bản thân
   if (String(employee.accountId) !== String(requester.accountId)) {
-    throw new AppError('You can only update your own availability', 403);
+    throw new AppError('Bạn chỉ có thể cập nhật lịch rảnh của bản thân', 403);
   }
 
   // FULL_TIME không cần lịch rảnh — manager có thể gán ca bất kỳ
   if (employee.employeeType === 'FULL_TIME') {
-    throw new AppError('Full-time employees do not need to set availability as they work all week', 400);
+    throw new AppError('Nhân viên toàn thời gian không cần đặt lịch rảnh', 400);
   }
 
   return await availabilityRepo.createOrUpdate(employeeId, { ...data, employeeId });
@@ -139,7 +139,7 @@ const updateAvailability = async (employeeId, data, requester) => {
 
 const getEmployeeByAccountId = async (accountId) => {
   const employee = await employeeRepo.findByAccountId(accountId);
-  if (!employee) throw new AppError('Employee not found for this account', 404);
+  if (!employee) throw new AppError('Không tìm thấy nhân viên cho tài khoản này', 404);
   return employee;
 };
 

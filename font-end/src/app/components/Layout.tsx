@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import CoffeaNavbar from "./CoffeaNavbar";
 import CoffeaFooter from "./CoffeaFooter";
 
+
 export default function Layout() {
   const { pathname } = useLocation();
 
