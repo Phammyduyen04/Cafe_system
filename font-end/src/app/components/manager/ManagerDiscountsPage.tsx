@@ -185,6 +185,10 @@ export default function ManagerDiscountsPage() {
     if (formType === "PERCENT" && (val < 1 || val > 100)) { setFormError("Phần trăm giảm phải từ 1 đến 100"); return; }
     if (!formStart) { setFormError("Vui lòng chọn ngày bắt đầu"); return; }
     if (!formEnd) { setFormError("Vui lòng chọn ngày kết thúc"); return; }
+    const _td = new Date();
+    const _tdStr = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`;
+    if (formStart < _tdStr) { setFormError("Ngày bắt đầu không được là ngày trong quá khứ"); return; }
+    if (formEnd < formStart) { setFormError("Ngày kết thúc phải cùng ngày hoặc sau ngày bắt đầu"); return; }
     const maxUsageNum = formMaxUsage ? parseInt(formMaxUsage) : undefined;
     if (formMaxUsage && (!maxUsageNum || maxUsageNum < 1)) { setFormError("Số lần sử dụng tối đa phải lớn hơn 0"); return; }
 
@@ -573,6 +577,7 @@ export default function ManagerDiscountsPage() {
                   </label>
                   <input type="date" value={formStart} onChange={(e) => setFormStart(e.target.value)}
                     disabled={!!editingDisc && editingDisc.status === "ACTIVE"}
+                    min={(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })()}
                     className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)] disabled:bg-gray-50 disabled:text-gray-400" style={{ fontSize: 14 }} />
                 </div>
                 <div>
@@ -580,6 +585,7 @@ export default function ManagerDiscountsPage() {
                     Ngày kết thúc <span className="text-red-500">*</span>
                   </label>
                   <input type="date" value={formEnd} onChange={(e) => setFormEnd(e.target.value)}
+                    min={formStart || (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })()}
                     className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)]" style={{ fontSize: 14 }} />
                 </div>
               </div>

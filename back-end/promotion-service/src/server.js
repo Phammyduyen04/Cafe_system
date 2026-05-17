@@ -31,21 +31,24 @@ mongoose
     // Cron job: tự động cập nhật trạng thái mỗi phút
     cron.schedule('* * * * *', async () => {
       const now = new Date();
+      // So sánh theo ngày (UTC) để tránh lệch múi giờ
+      // endDate "2026-05-16" lưu là 2026-05-16T00:00:00Z — phải đợi sang ngày 17 mới EXPIRED
+      const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
       try {
         await Promotion.updateMany(
-          { status: 'PLANNED', startDate: { $lte: now } },
+          { status: 'PLANNED', startDate: { $lte: startOfToday } },
           { $set: { status: 'ACTIVE' } }
         );
         await Promotion.updateMany(
-          { status: 'ACTIVE', endDate: { $ne: null, $lt: now } },
+          { status: 'ACTIVE', endDate: { $ne: null, $lt: startOfToday } },
           { $set: { status: 'EXPIRED' } }
         );
         await Discount.updateMany(
-          { status: 'PLANNED', startDate: { $lte: now } },
+          { status: 'PLANNED', startDate: { $lte: startOfToday } },
           { $set: { status: 'ACTIVE' } }
         );
         await Discount.updateMany(
-          { status: 'ACTIVE', endDate: { $ne: null, $lt: now } },
+          { status: 'ACTIVE', endDate: { $ne: null, $lt: startOfToday } },
           { $set: { status: 'EXPIRED' } }
         );
       } catch (err) {
