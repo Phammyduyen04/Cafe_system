@@ -2,10 +2,16 @@ const { AppError } = require('../../../shared');
 const promotionRepo = require('../repositories/promotion.repo');
 const conditionRepo = require('../repositories/promotionCondition.repo');
 
+const toDateOnly = (d) => {
+  const dt = d instanceof Date ? d : new Date(d);
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}`;
+};
+
 const computeStatus = (startDate, endDate) => {
   const now = new Date();
-  if (endDate && now > new Date(endDate)) return 'EXPIRED';
-  if (startDate && now < new Date(startDate)) return 'PLANNED';
+  const todayStr = toDateOnly(now);
+  if (endDate && toDateOnly(endDate) < todayStr) return 'EXPIRED';
+  if (startDate && toDateOnly(startDate) > todayStr) return 'PLANNED';
   return 'ACTIVE';
 };
 
@@ -30,8 +36,13 @@ const createPromotion = async (data, user) => {
   if (!startDate || !endDate) {
     throw new AppError('Ngày bắt đầu và kết thúc là bắt buộc', 400);
   }
-  if (new Date(endDate) <= new Date(startDate)) {
-    throw new AppError('Ngày kết thúc phải sau ngày bắt đầu', 400);
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  if (startDate < todayStr) {
+    throw new AppError('Ngày bắt đầu không được là ngày trong quá khứ', 400);
+  }
+  if (endDate < startDate) {
+    throw new AppError('Ngày kết thúc phải cùng ngày hoặc sau ngày bắt đầu', 400);
   }
 
   // Kiểm tra couponCode trùng lặp
@@ -118,8 +129,17 @@ const updatePromotion = async (id, data) => {
   }
 
   if (promotion.status === 'PLANNED') {
-    const newStartDate = 'startDate' in data ? data.startDate : promotion.startDate;
-    const newEndDate   = 'endDate'   in data ? data.endDate   : promotion.endDate;
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    const toDs = (d) => { const dt = d instanceof Date ? d : new Date(d); return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`; };
+    if ('startDate' in data && data.startDate < todayStr) {
+      throw new AppError('Ngày bắt đầu không được là ngày trong quá khứ', 400);
+    }
+    const newStartDate = 'startDate' in data ? data.startDate : toDs(promotion.startDate);
+    const newEndDate   = 'endDate'   in data ? data.endDate   : toDs(promotion.endDate);
+    if (newEndDate < newStartDate) {
+      throw new AppError('Ngày kết thúc phải cùng ngày hoặc sau ngày bắt đầu', 400);
+    }
     data.status = computeStatus(newStartDate, newEndDate);
   }
 

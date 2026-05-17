@@ -25,17 +25,19 @@ Content-Type: application/json
 
 ---
 
-### 0.2 Login STAFF (để test endpoint `/use`)
+### 0.2 Login EMPLOYEE (để test endpoint `/calculate` và `/use`)
 ```
 POST http://localhost:3000/api/auth/login
 Content-Type: application/json
 
 {
-  "username": "staff01",
+  "username": "nhanvien01",
   "password": "123456"
 }
 ```
-**Kết quả mong đợi**: `200 OK` → lưu `accessToken` của staff
+**Kết quả mong đợi**: `200 OK` → lưu `accessToken` của employee
+
+> Tài khoản thực tế: `nhanvien01` (EMP-007) hoặc `parttime01` (EMP-013), cả hai đều có role EMPLOYEE.
 
 ---
 
@@ -55,13 +57,13 @@ Content-Type: application/json
   "discountType": "PERCENT",
   "discountValue": 20,
   "description": "Áp dụng cho tất cả đơn vào thứ 7 và chủ nhật",
-  "startDate": "2026-04-07",
+  "startDate": "2026-05-17",
   "endDate": "2026-12-31",
   "couponCode": "WEEKEND20",
   "maxUsage": 100
 }
 ```
-**Kết quả mong đợi**: `201 Created` → lưu `discountId` (dạng `DISCOUNT_001`)
+**Kết quả mong đợi**: `201 Created` → lưu `discountId` (dạng `DISC_001`)
 
 ---
 
@@ -76,7 +78,7 @@ Content-Type: application/json
   "discountType": "FIXED",
   "discountValue": 30000,
   "description": "Áp dụng cho đơn hàng từ 150.000đ trở lên",
-  "startDate": "2026-04-07",
+  "startDate": "2026-05-17",
   "endDate": "2026-06-30"
 }
 ```
@@ -94,7 +96,7 @@ Content-Type: application/json
   "discountName": "Giảm vô lý",
   "discountType": "PERCENT",
   "discountValue": 150,
-  "startDate": "2026-04-07",
+  "startDate": "2026-05-17",
   "endDate": "2026-12-31"
 }
 ```
@@ -112,7 +114,7 @@ Content-Type: application/json
   "discountName": "Giảm 0%",
   "discountType": "PERCENT",
   "discountValue": 0,
-  "startDate": "2026-04-07",
+  "startDate": "2026-05-17",
   "endDate": "2026-12-31"
 }
 ```
@@ -130,7 +132,7 @@ Content-Type: application/json
   "discountName": "Giảm âm",
   "discountType": "FIXED",
   "discountValue": -5000,
-  "startDate": "2026-04-07",
+  "startDate": "2026-05-17",
   "endDate": "2026-12-31"
 }
 ```
@@ -149,10 +151,10 @@ Content-Type: application/json
   "discountType": "PERCENT",
   "discountValue": 10,
   "startDate": "2026-12-31",
-  "endDate": "2026-04-07"
+  "endDate": "2026-05-17"
 }
 ```
-**Kết quả mong đợi**: `400 Bad Request` — "Ngày kết thúc phải sau ngày bắt đầu"
+**Kết quả mong đợi**: `400 Bad Request` — "Ngày kết thúc phải cùng ngày hoặc sau ngày bắt đầu"
 
 ---
 
@@ -166,7 +168,7 @@ Content-Type: application/json
   "discountName": "Discount trùng mã",
   "discountType": "PERCENT",
   "discountValue": 15,
-  "startDate": "2026-04-07",
+  "startDate": "2026-05-17",
   "endDate": "2026-12-31",
   "couponCode": "WEEKEND20"
 }
@@ -175,17 +177,17 @@ Content-Type: application/json
 
 ---
 
-### 1.8 Tạo discount — không có quyền (STAFF)
+### 1.8 Tạo discount — không có quyền (EMPLOYEE)
 ```
 POST http://localhost:3000/api/promotions/discounts
-Authorization: Bearer <staff_token>
+Authorization: Bearer <employee_token>
 Content-Type: application/json
 
 {
   "discountName": "Test",
   "discountType": "PERCENT",
   "discountValue": 10,
-  "startDate": "2026-04-07",
+  "startDate": "2026-05-17",
   "endDate": "2026-12-31"
 }
 ```
@@ -219,7 +221,7 @@ GET http://localhost:3000/api/promotions/discounts/<discountId>
 
 ### 1.12 Lấy chi tiết — không tồn tại
 ```
-GET http://localhost:3000/api/promotions/discounts/DISCOUNT_999
+GET http://localhost:3000/api/promotions/discounts/DISC_999
 ```
 **Kết quả mong đợi**: `404 Not Found`
 
@@ -247,7 +249,7 @@ Authorization: Bearer <manager_token>
 Content-Type: application/json
 
 {
-  "startDate": "2026-01-01"
+  "startDate": "2026-06-01"
 }
 ```
 **Kết quả mong đợi**: `400 Bad Request` — "Không thể sửa ngày khi chương trình đang hoạt động"
@@ -274,6 +276,45 @@ Content-Type: application/json
 }
 ```
 **Kết quả mong đợi**: `400 Bad Request` — "Không thể sửa chương trình đã hết hạn hoặc đã hủy"
+
+---
+
+### 1.17 Tạo discount — startDate là ngày trong quá khứ (lỗi)
+```
+POST http://localhost:3000/api/promotions/discounts
+Authorization: Bearer <manager_token>
+Content-Type: application/json
+
+{
+  "discountName": "Test ngày quá khứ",
+  "discountType": "PERCENT",
+  "discountValue": 10,
+  "startDate": "2026-05-01",
+  "endDate": "2026-12-31"
+}
+```
+**Kết quả mong đợi**: `400 Bad Request` — "Ngày bắt đầu không được là ngày trong quá khứ"
+
+---
+
+### 1.18 Tạo discount — startDate = endDate = hôm nay (thành công, trạng thái ACTIVE)
+```
+POST http://localhost:3000/api/promotions/discounts
+Authorization: Bearer <manager_token>
+Content-Type: application/json
+
+{
+  "discountName": "Flash sale hôm nay",
+  "discountType": "PERCENT",
+  "discountValue": 15,
+  "startDate": "2026-05-16",
+  "endDate": "2026-05-16",
+  "couponCode": "TODAY15"
+}
+```
+**Kết quả mong đợi**: `201 Created`, `status: "ACTIVE"`
+
+> Discount cùng ngày sẽ chuyển sang `EXPIRED` lúc 00:00 UTC ngày hôm sau (tức 07:00 sáng hôm sau theo giờ Việt Nam).
 
 ---
 
@@ -406,17 +447,17 @@ Content-Type: application/json
   "promotionName": "Mua 2 tặng 1 Espresso",
   "benefitType": "BUY_X_GET_Y",
   "description": "Mua 2 ly Espresso bất kỳ, tặng thêm 1 ly",
-  "startDate": "2026-04-07",
+  "startDate": "2026-05-17",
   "endDate": "2026-05-31",
   "couponCode": "B2G1ESP",
   "maxUsage": 50
 }
 ```
-**Kết quả mong đợi**: `201 Created` → lưu `promotionId` (dạng `PROMOTION_001`)
+**Kết quả mong đợi**: `201 Created` → lưu `promotionId` (dạng `PROMO_001`)
 
 ---
 
-### 4.2 Tạo promotion — FREE_ITEM không giới hạn (MANAGER)
+### 4.2 Tạo promotion — GIFT_WITH_ORDER không giới hạn (MANAGER)
 ```
 POST http://localhost:3000/api/promotions
 Authorization: Bearer <manager_token>
@@ -426,8 +467,8 @@ Content-Type: application/json
   "promotionName": "Tặng bánh sinh nhật cho đơn từ 300.000đ",
   "benefitType": "GIFT_WITH_ORDER",
   "description": "Áp dụng trong tháng sinh nhật quán",
-  "startDate": "2026-04-15",
-  "endDate": "2026-04-30"
+  "startDate": "2026-06-01",
+  "endDate": "2026-06-30"
 }
 ```
 **Kết quả mong đợi**: `201 Created`, `couponCode: null`, `maxUsage: null`
@@ -443,7 +484,7 @@ Content-Type: application/json
 {
   "promotionName": "Loại sai",
   "benefitType": "INVALID_TYPE",
-  "startDate": "2026-04-07",
+  "startDate": "2026-05-17",
   "endDate": "2026-12-31"
 }
 ```
@@ -460,7 +501,7 @@ Content-Type: application/json
 {
   "promotionName": "Promotion trùng mã",
   "benefitType": "FREE_ITEM",
-  "startDate": "2026-04-07",
+  "startDate": "2026-05-17",
   "endDate": "2026-12-31",
   "couponCode": "B2G1ESP"
 }
@@ -499,6 +540,44 @@ DELETE http://localhost:3000/api/promotions/<promotionId>
 Authorization: Bearer <manager_token>
 ```
 **Kết quả mong đợi**: `200 OK`, `status: "CANCELLED"`
+
+---
+
+### 4.9 Tạo promotion — startDate là ngày trong quá khứ (lỗi)
+```
+POST http://localhost:3000/api/promotions
+Authorization: Bearer <manager_token>
+Content-Type: application/json
+
+{
+  "promotionName": "Test ngày quá khứ",
+  "benefitType": "FREE_ITEM",
+  "startDate": "2026-04-01",
+  "endDate": "2026-12-31"
+}
+```
+**Kết quả mong đợi**: `400 Bad Request` — "Ngày bắt đầu không được là ngày trong quá khứ"
+
+---
+
+### 4.10 Tạo promotion — startDate = endDate = hôm nay (thành công, trạng thái ACTIVE)
+```
+POST http://localhost:3000/api/promotions
+Authorization: Bearer <manager_token>
+Content-Type: application/json
+
+{
+  "promotionName": "Khuyến mãi hôm nay",
+  "benefitType": "FREE_ITEM",
+  "description": "Áp dụng duy nhất trong ngày hôm nay",
+  "startDate": "2026-05-16",
+  "endDate": "2026-05-16",
+  "couponCode": "TODAYPROMO"
+}
+```
+**Kết quả mong đợi**: `201 Created`, `status: "ACTIVE"`
+
+> Promotion cùng ngày sẽ chuyển sang `EXPIRED` lúc 00:00 UTC ngày hôm sau (07:00 sáng hôm sau theo giờ Việt Nam).
 
 ---
 
@@ -586,12 +665,12 @@ GET http://localhost:3000/api/promotions/coupon/<mã_đã_dùng_hết>
 ### 6.1 Tính tiền DISCOUNT — PERCENT thành công
 ```
 POST http://localhost:3000/api/promotions/calculate
-Authorization: Bearer <staff_token>
+Authorization: Bearer <employee_token>
 Content-Type: application/json
 
 {
   "type": "DISCOUNT",
-  "programId": "DISCOUNT_001",
+  "programId": "DISC_001",
   "orderAmount": 200000,
   "productIds": ["prod_001", "prod_002"],
   "categoryIds": ["cat_coffee"],
@@ -602,7 +681,7 @@ Content-Type: application/json
 ```json
 {
   "type": "DISCOUNT",
-  "program": { "discountId": "DISCOUNT_001", "discountType": "PERCENT", "discountValue": 20, ... },
+  "program": { "discountId": "DISC_001", "discountType": "PERCENT", "discountValue": 20, "..." : "..." },
   "originalAmount": 200000,
   "discountAmount": 40000,
   "finalAmount": 160000,
@@ -615,12 +694,12 @@ Content-Type: application/json
 ### 6.2 Tính tiền DISCOUNT — FIXED thành công
 ```
 POST http://localhost:3000/api/promotions/calculate
-Authorization: Bearer <staff_token>
+Authorization: Bearer <employee_token>
 Content-Type: application/json
 
 {
   "type": "DISCOUNT",
-  "programId": "DISCOUNT_002",
+  "programId": "DISC_002",
   "orderAmount": 200000,
   "productIds": [],
   "categoryIds": [],
@@ -634,12 +713,12 @@ Content-Type: application/json
 ### 6.3 Tính tiền DISCOUNT — FIXED vượt quá tổng đơn (capped)
 ```
 POST http://localhost:3000/api/promotions/calculate
-Authorization: Bearer <staff_token>
+Authorization: Bearer <employee_token>
 Content-Type: application/json
 
 {
   "type": "DISCOUNT",
-  "programId": "DISCOUNT_002",
+  "programId": "DISC_002",
   "orderAmount": 20000,
   "productIds": [],
   "categoryIds": [],
@@ -654,12 +733,12 @@ Content-Type: application/json
 ### 6.4 Tính tiền PROMOTION — trả về rewardProducts
 ```
 POST http://localhost:3000/api/promotions/calculate
-Authorization: Bearer <staff_token>
+Authorization: Bearer <employee_token>
 Content-Type: application/json
 
 {
   "type": "PROMOTION",
-  "programId": "PROMOTION_001",
+  "programId": "PROMO_001",
   "orderAmount": 150000,
   "productIds": ["prod_esp_001", "prod_esp_001"],
   "categoryIds": ["cat_coffee"],
@@ -670,7 +749,7 @@ Content-Type: application/json
 ```json
 {
   "type": "PROMOTION",
-  "program": { "promotionId": "PROMOTION_001", ... },
+  "program": { "promotionId": "PROMO_001", "..." : "..." },
   "originalAmount": 150000,
   "discountAmount": 0,
   "finalAmount": 150000,
@@ -683,12 +762,12 @@ Content-Type: application/json
 ### 6.5 Tính tiền — orderAmount không đủ điều kiện (lỗi)
 ```
 POST http://localhost:3000/api/promotions/calculate
-Authorization: Bearer <staff_token>
+Authorization: Bearer <employee_token>
 Content-Type: application/json
 
 {
   "type": "DISCOUNT",
-  "programId": "DISCOUNT_001",
+  "programId": "DISC_001",
   "orderAmount": 50000,
   "productIds": ["prod_001"],
   "categoryIds": ["cat_coffee"],
@@ -702,7 +781,7 @@ Content-Type: application/json
 ### 6.6 Tính tiền — discount không còn ACTIVE (lỗi)
 ```
 POST http://localhost:3000/api/promotions/calculate
-Authorization: Bearer <staff_token>
+Authorization: Bearer <employee_token>
 Content-Type: application/json
 
 {
@@ -721,12 +800,12 @@ Content-Type: application/json
 ### 6.7 Tính tiền — type không hợp lệ (lỗi)
 ```
 POST http://localhost:3000/api/promotions/calculate
-Authorization: Bearer <staff_token>
+Authorization: Bearer <employee_token>
 Content-Type: application/json
 
 {
   "type": "VOUCHER",
-  "programId": "DISCOUNT_001",
+  "programId": "DISC_001",
   "orderAmount": 200000
 }
 ```
@@ -737,7 +816,7 @@ Content-Type: application/json
 ### 6.8 Tính tiền — thiếu programId (lỗi)
 ```
 POST http://localhost:3000/api/promotions/calculate
-Authorization: Bearer <staff_token>
+Authorization: Bearer <employee_token>
 Content-Type: application/json
 
 {
@@ -757,13 +836,13 @@ Content-Type: application/json
 ### 7.1 Ghi nhận sử dụng DISCOUNT thành công
 ```
 POST http://localhost:3000/api/promotions/use
-Authorization: Bearer <staff_token>
+Authorization: Bearer <employee_token>
 Content-Type: application/json
 
 {
   "type": "DISCOUNT",
-  "programId": "DISCOUNT_001",
-  "orderId": "ORDER_20260407_001",
+  "programId": "DISC_001",
+  "orderId": "ORDER_20260517_001",
   "customerId": "12",
   "originalAmount": 200000,
   "discountAmount": 40000
@@ -772,9 +851,9 @@ Content-Type: application/json
 **Kết quả mong đợi**: `201 Created`
 ```json
 {
-  "programId": "DISCOUNT_001",
+  "programId": "DISC_001",
   "programType": "DISCOUNT",
-  "orderId": "ORDER_20260407_001",
+  "orderId": "ORDER_20260517_001",
   "customerId": "12",
   "originalAmount": 200000,
   "discountAmount": 40000,
@@ -782,20 +861,20 @@ Content-Type: application/json
   "usedAt": "..."
 }
 ```
-> `usageCount` của DISCOUNT_001 tăng từ 0 lên 1
+> `usageCount` của DISC_001 tăng từ 0 lên 1
 
 ---
 
 ### 7.2 Ghi nhận sử dụng PROMOTION thành công
 ```
 POST http://localhost:3000/api/promotions/use
-Authorization: Bearer <staff_token>
+Authorization: Bearer <employee_token>
 Content-Type: application/json
 
 {
   "type": "PROMOTION",
-  "programId": "PROMOTION_001",
-  "orderId": "ORDER_20260407_002",
+  "programId": "PROMO_001",
+  "orderId": "ORDER_20260517_002",
   "customerId": "15",
   "originalAmount": 150000,
   "discountAmount": 0
@@ -808,13 +887,13 @@ Content-Type: application/json
 ### 7.3 Ghi nhận — orderId đã được dùng (lỗi — 1 đơn 1 chương trình)
 ```
 POST http://localhost:3000/api/promotions/use
-Authorization: Bearer <staff_token>
+Authorization: Bearer <employee_token>
 Content-Type: application/json
 
 {
   "type": "DISCOUNT",
-  "programId": "DISCOUNT_002",
-  "orderId": "ORDER_20260407_001",
+  "programId": "DISC_002",
+  "orderId": "ORDER_20260517_001",
   "customerId": "12",
   "originalAmount": 200000,
   "discountAmount": 30000
@@ -829,13 +908,13 @@ Content-Type: application/json
 > Trước đó tạo discount với `maxUsage: 1`, đã ghi nhận 1 lần, giờ ghi nhận lần 2:
 ```
 POST http://localhost:3000/api/promotions/use
-Authorization: Bearer <staff_token>
+Authorization: Bearer <employee_token>
 Content-Type: application/json
 
 {
   "type": "DISCOUNT",
   "programId": "<discountId_maxUsage_1>",
-  "orderId": "ORDER_20260407_003",
+  "orderId": "ORDER_20260517_003",
   "customerId": "20",
   "originalAmount": 200000,
   "discountAmount": 20000
@@ -848,12 +927,12 @@ Content-Type: application/json
 ### 7.5 Ghi nhận — thiếu orderId (lỗi)
 ```
 POST http://localhost:3000/api/promotions/use
-Authorization: Bearer <staff_token>
+Authorization: Bearer <employee_token>
 Content-Type: application/json
 
 {
   "type": "DISCOUNT",
-  "programId": "DISCOUNT_001",
+  "programId": "DISC_001",
   "originalAmount": 200000,
   "discountAmount": 40000
 }
@@ -869,8 +948,8 @@ Content-Type: application/json
 
 {
   "type": "DISCOUNT",
-  "programId": "DISCOUNT_001",
-  "orderId": "ORDER_20260407_004",
+  "programId": "DISC_001",
+  "orderId": "ORDER_20260517_004",
   "originalAmount": 200000,
   "discountAmount": 40000
 }
@@ -883,7 +962,7 @@ Content-Type: application/json
 
 ### 8.1 Xem lịch sử sử dụng của discount (MANAGER)
 ```
-GET http://localhost:3000/api/promotions/usage/DISCOUNT_001
+GET http://localhost:3000/api/promotions/usage/DISC_001
 Authorization: Bearer <manager_token>
 ```
 **Kết quả mong đợi**: `200 OK` với pagination, danh sách ghi nhận sử dụng
@@ -891,14 +970,14 @@ Authorization: Bearer <manager_token>
 {
   "data": [
     {
-      "programId": "DISCOUNT_001",
+      "programId": "DISC_001",
       "programType": "DISCOUNT",
-      "orderId": "ORDER_20260407_001",
+      "orderId": "ORDER_20260517_001",
       "customerId": "12",
       "originalAmount": 200000,
       "discountAmount": 40000,
       "finalAmount": 160000,
-      "usedAt": "2026-04-07T..."
+      "usedAt": "2026-05-17T..."
     }
   ],
   "pagination": { "page": 1, "limit": 20, "total": 1, "totalPages": 1 }
@@ -909,7 +988,7 @@ Authorization: Bearer <manager_token>
 
 ### 8.2 Xem lịch sử với phân trang
 ```
-GET http://localhost:3000/api/promotions/usage/PROMOTION_001?page=1&limit=5
+GET http://localhost:3000/api/promotions/usage/PROMO_001?page=1&limit=5
 Authorization: Bearer <manager_token>
 ```
 **Kết quả mong đợi**: `200 OK`, tối đa 5 records
@@ -918,17 +997,17 @@ Authorization: Bearer <manager_token>
 
 ### 8.3 Xem lịch sử — chương trình chưa được dùng
 ```
-GET http://localhost:3000/api/promotions/usage/DISCOUNT_002
+GET http://localhost:3000/api/promotions/usage/DISC_002
 Authorization: Bearer <manager_token>
 ```
 **Kết quả mong đợi**: `200 OK`, `data: []`, `total: 0`
 
 ---
 
-### 8.4 Xem lịch sử — không có quyền (STAFF)
+### 8.4 Xem lịch sử — không có quyền (EMPLOYEE)
 ```
-GET http://localhost:3000/api/promotions/usage/DISCOUNT_001
-Authorization: Bearer <staff_token>
+GET http://localhost:3000/api/promotions/usage/DISC_001
+Authorization: Bearer <employee_token>
 ```
 **Kết quả mong đợi**: `403 Forbidden`
 
@@ -936,16 +1015,17 @@ Authorization: Bearer <staff_token>
 
 ## Nhóm 9: Kiểm tra Cron Job (Status tự động)
 
-> Cron chạy **mỗi phút**: PLANNED → ACTIVE → EXPIRED.
+> Cron chạy **mỗi phút**, so sánh theo **ngày** (UTC midnight): `PLANNED → ACTIVE → EXPIRED`.
+> Sử dụng `startOfToday = new Date(Date.UTC(year, month, day))` để tránh lệch múi giờ.
 
-### 9.1 Tạo discount PLANNED (startDate trong tương lai)
+### 9.1 Tạo discount PLANNED (startDate trong tương lai xa)
 ```
 POST http://localhost:3000/api/promotions/discounts
 Authorization: Bearer <manager_token>
 Content-Type: application/json
 
 {
-  "discountName": "Flash sale ngày mai",
+  "discountName": "Flash sale năm 2099",
   "discountType": "PERCENT",
   "discountValue": 30,
   "startDate": "2099-01-01",
@@ -956,7 +1036,7 @@ Content-Type: application/json
 
 ---
 
-### 9.2 Tạo discount EXPIRED (endDate đã qua)
+### 9.2 Tạo discount — startDate quá khứ bị từ chối (validation)
 ```
 POST http://localhost:3000/api/promotions/discounts
 Authorization: Bearer <manager_token>
@@ -970,17 +1050,31 @@ Content-Type: application/json
   "endDate": "2024-06-30"
 }
 ```
-**Kết quả mong đợi**: `201 Created`, `status: "EXPIRED"` (computeStatus tính ngay khi tạo)
+**Kết quả mong đợi**: `400 Bad Request` — "Ngày bắt đầu không được là ngày trong quá khứ"
+
+> Hệ thống **không cho phép** tạo chương trình với ngày đã qua. Trạng thái `EXPIRED` chỉ xảy ra khi chương trình ACTIVE hết hạn sau khi cron chạy sang ngày tiếp theo.
 
 ---
 
-### 9.3 Kiểm tra sau khi cron chạy
+### 9.3 Kiểm tra cron chuyển PLANNED → ACTIVE
 
-Tạo discount với `startDate` = thời điểm hiện tại + 2 phút, đợi 3 phút, rồi gọi:
+Tạo discount với `startDate` = **ngày mai**, quan sát sau khi cron chạy vào 00:00 UTC (07:00 sáng VN):
 ```
 GET http://localhost:3000/api/promotions/discounts/<discountId>
 ```
-**Kết quả mong đợi**: `status` đã tự động chuyển từ `PLANNED` → `ACTIVE`
+**Kết quả mong đợi**: `status` tự động chuyển từ `PLANNED` → `ACTIVE` vào đầu ngày startDate.
+
+> Cron so sánh `startDate <= startOfToday` (UTC midnight) nên chuyển trạng thái đúng theo ngày, không bị lệch giờ.
+
+---
+
+### 9.4 Kiểm tra cron chuyển ACTIVE → EXPIRED
+
+Tạo discount với `endDate` = **hôm nay**, để qua ngày hôm sau, rồi kiểm tra:
+```
+GET http://localhost:3000/api/promotions/discounts/<discountId>
+```
+**Kết quả mong đợi**: `status` tự động chuyển từ `ACTIVE` → `EXPIRED` vào 00:00 UTC ngày hôm sau (07:00 sáng VN).
 
 ---
 
@@ -999,12 +1093,12 @@ GET http://localhost:3000/api/promotions/discounts/coupon/WEEKEND20
 **Bước 2** — Preview số tiền sau giảm:
 ```
 POST http://localhost:3000/api/promotions/calculate
-Authorization: Bearer <staff_token>
+Authorization: Bearer <employee_token>
 Content-Type: application/json
 
 {
   "type": "DISCOUNT",
-  "programId": "DISCOUNT_001",
+  "programId": "DISC_001",
   "orderAmount": 200000,
   "productIds": ["prod_001"],
   "categoryIds": ["cat_coffee"],
@@ -1016,13 +1110,13 @@ Content-Type: application/json
 **Bước 3** — Sau khi order-service tạo đơn thành công, ghi nhận:
 ```
 POST http://localhost:3000/api/promotions/use
-Authorization: Bearer <staff_token>
+Authorization: Bearer <employee_token>
 Content-Type: application/json
 
 {
   "type": "DISCOUNT",
-  "programId": "DISCOUNT_001",
-  "orderId": "ORDER_20260407_010",
+  "programId": "DISC_001",
+  "orderId": "ORDER_20260517_010",
   "customerId": "5",
   "originalAmount": 200000,
   "discountAmount": 40000
@@ -1038,17 +1132,17 @@ Content-Type: application/json
 ```
 GET http://localhost:3000/api/promotions/check?productIds=prod_esp_001,prod_esp_001&orderAmount=100000&customerType=REGULAR
 ```
-→ Nhận danh sách promotion, trong đó có PROMOTION_001 (B2G1ESP)
+→ Nhận danh sách promotion, trong đó có PROMO_001 (B2G1ESP)
 
 **Bước 2** — Tính tiền (không giảm giá, trả về sản phẩm tặng):
 ```
 POST http://localhost:3000/api/promotions/calculate
-Authorization: Bearer <staff_token>
+Authorization: Bearer <employee_token>
 Content-Type: application/json
 
 {
   "type": "PROMOTION",
-  "programId": "PROMOTION_001",
+  "programId": "PROMO_001",
   "orderAmount": 100000,
   "productIds": ["prod_esp_001", "prod_esp_001"],
   "categoryIds": [],
@@ -1060,13 +1154,13 @@ Content-Type: application/json
 **Bước 3** — Ghi nhận sau khi đơn tạo:
 ```
 POST http://localhost:3000/api/promotions/use
-Authorization: Bearer <staff_token>
+Authorization: Bearer <employee_token>
 Content-Type: application/json
 
 {
   "type": "PROMOTION",
-  "programId": "PROMOTION_001",
-  "orderId": "ORDER_20260407_011",
+  "programId": "PROMO_001",
+  "orderId": "ORDER_20260517_011",
   "customerId": "5",
   "originalAmount": 100000,
   "discountAmount": 0
@@ -1108,7 +1202,9 @@ Content-Type: application/json
 
 - **1 đơn hàng = 1 chương trình**: `orderId` là unique trong `usage_history` — không thể ghi nhận 2 chương trình khác nhau cho cùng 1 đơn.
 - **Soft delete**: Hủy discount/promotion chỉ đổi `status → CANCELLED`, không xóa khỏi DB — `usageCount` và lịch sử vẫn còn.
-- **Cron job**: Chạy mỗi phút, tự động: `PLANNED → ACTIVE` (khi đến startDate) và `ACTIVE → EXPIRED` (khi qua endDate).
+- **Cron job**: Chạy mỗi phút, so sánh theo **ngày UTC** (`startOfToday = UTC midnight`), tự động: `PLANNED → ACTIVE` (khi đến startDate) và `ACTIVE → EXPIRED` (khi qua endDate). Dùng ngày UTC để tránh lệch múi giờ.
+- **Validation ngày**: `startDate` không được là ngày trong quá khứ. `endDate` phải >= `startDate` (cùng ngày được phép — single-day promotion/discount).
+- **Promotion/discount cùng ngày**: `startDate = endDate = hôm nay` → tạo thành công, trạng thái `ACTIVE`. Sẽ chuyển `EXPIRED` lúc 00:00 UTC ngày hôm sau (07:00 sáng VN).
 - **couponCode**: Lưu dạng **UPPERCASE**, tự động normalize — gõ thường hay hoa đều tìm được.
 - **maxUsage**: `null` = không giới hạn số lần dùng. Khi `usageCount >= maxUsage`, chương trình không còn áp dụng được và không hiện trong kết quả `/check`.
 - **PERCENT discount**: Giảm tối đa 100%, tối thiểu 1% — validate khi tạo và cập nhật.
@@ -1116,3 +1212,5 @@ Content-Type: application/json
 - **Promotion**: Không giảm giá tiền — trả về `rewardProducts` (sản phẩm tặng kèm). `discountAmount` luôn = 0.
 - **Calculate**: Endpoint preview, **không ghi nhận** và **không tăng** `usageCount` — gọi bao nhiêu lần cũng được.
 - **benefitType** hợp lệ: `BUY_X_GET_Y`, `FREE_ITEM`, `GIFT_WITH_ORDER`.
+- **ID formats**: discountId dạng `DISC_001`, promotionId dạng `PROMO_001`.
+- **Tài khoản test**: manager `manager01/Man@123`; employee `nhanvien01/123456` (EMP-007) hoặc `parttime01/123456` (EMP-013).
