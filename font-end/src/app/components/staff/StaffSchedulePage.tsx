@@ -23,7 +23,12 @@ function getWeekDates(anchor: Date): Date[] {
   });
 }
 
-function toDateStr(d: Date) { return d.toISOString().split("T")[0]; }
+function toDateStr(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 function formatDayHeader(d: Date) {
   const dd = String(d.getDate()).padStart(2, "0");
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -255,6 +260,7 @@ export default function StaffSchedulePage() {
                 >
                   <div style={{ fontSize: 10, opacity: 0.75 }}>{DAY_LABELS_FULL[dayKey]}</div>
                   <div style={{ fontSize: 14, fontWeight: 700, marginTop: 1 }}>{formatDayHeader(date)}</div>
+                  <div style={{ fontSize: 9, opacity: 0.65, marginTop: 1 }}>{date.getFullYear()}</div>
                 </div>
 
                 {/* Shift cards */}

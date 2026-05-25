@@ -26,7 +26,10 @@ function getWeekDates(anchor: Date): Date[] {
 }
 
 function toDateStr(d: Date) {
-  return d.toISOString().split("T")[0];
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function formatDateShort(d: Date) {
@@ -102,6 +105,42 @@ interface ShiftWithAssignments extends Shift {
 }
 
 // ── component ─────────────────────────────────────────────────────────────────
+// ── Toast notification ────────────────────────────────────────────────────────
+interface ToastItem { id: number; type: "success" | "error"; message: string; }
+
+function ToastContainer({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: number) => void }) {
+  if (toasts.length === 0) return null;
+  return (
+    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-2" style={{ minWidth: 280, maxWidth: 380 }}>
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className="flex items-start gap-3 px-4 py-3 rounded-xl shadow-lg border font-body"
+          style={{
+            backgroundColor: t.type === "success" ? "#f0fdf4" : "#fef2f2",
+            borderColor: t.type === "success" ? "#86efac" : "#fca5a5",
+            color: t.type === "success" ? "#15803d" : "#dc2626",
+            fontSize: 13,
+          }}
+        >
+          <span style={{ fontSize: 16, lineHeight: 1.2, flexShrink: 0 }}>
+            {t.type === "success" ? "✓" : "✕"}
+          </span>
+          <span className="flex-1" style={{ lineHeight: 1.5 }}>{t.message}</span>
+          <button
+            onClick={() => onDismiss(t.id)}
+            className="shrink-0 hover:opacity-60 transition-opacity"
+            style={{ fontSize: 16, lineHeight: 1, marginTop: 1 }}
+            aria-label="Đóng"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ManagerSchedulePage() {
   const [anchor, setAnchor] = useState(() => new Date());
   const weekDates = getWeekDates(anchor);
@@ -109,8 +148,15 @@ export default function ManagerSchedulePage() {
   const [shifts, setShifts] = useState<ShiftWithAssignments[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
-  const [successMsg, setSuccessMsg] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const toastCounter = useRef(0);
+
+  const addToast = (type: "success" | "error", message: string) => {
+    const id = ++toastCounter.current;
+    setToasts((prev) => [...prev, { id, type, message }]);
+    setTimeout(() => dismissToast(id), type === "success" ? 3000 : 5000);
+  };
+  const dismissToast = (id: number) => setToasts((prev) => prev.filter((t) => t.id !== id));
 
   // date picker
   const [showCalendar, setShowCalendar] = useState(false);
@@ -147,7 +193,6 @@ export default function ManagerSchedulePage() {
 
   const loadAll = async () => {
     setLoading(true);
-    setErrorMsg("");
     try {
       const [shiftsRes, empRes] = await Promise.all([
         // fetch all shifts in week range - we'll filter client-side
@@ -179,16 +224,13 @@ export default function ManagerSchedulePage() {
 
       setShifts(withAssignments);
     } catch (e: any) {
-      setErrorMsg(e.message || "Lỗi tải dữ liệu");
+      addToast("error", e.message || "Lỗi tải dữ liệu");
     } finally {
       setLoading(false);
     }
   };
 
-  const showSuccess = (msg: string) => {
-    setSuccessMsg(msg);
-    setTimeout(() => setSuccessMsg(""), 3000);
-  };
+  const showSuccess = (msg: string) => addToast("success", msg);
 
   // ── drag-and-drop ──────────────────────────────────────────────────────────
   const onDragStart = (empId: string) => {
@@ -210,13 +252,11 @@ export default function ManagerSchedulePage() {
     const empId = draggingEmpId.current;
     if (!empId) return;
     if (shift.status === "CANCELLED" || shift.status === "COMPLETED") {
-      setErrorMsg("Không thể gán vào ca đã hủy hoặc đã hoàn thành");
-      setTimeout(() => setErrorMsg(""), 3000);
+      addToast("error", "Không thể gán vào ca đã hủy hoặc đã hoàn thành");
       return;
     }
     if (shift.assignedEmployees.some((e) => e.employeeId === empId)) {
-      setErrorMsg("Nhân viên đã được gán vào ca này");
-      setTimeout(() => setErrorMsg(""), 3000);
+      addToast("error", "Nhân viên đã được gán vào ca này");
       return;
     }
     try {
@@ -224,8 +264,7 @@ export default function ManagerSchedulePage() {
       showSuccess("Đã gán nhân viên!");
       loadAll();
     } catch (err: any) {
-      setErrorMsg(err.message || "Lỗi khi gán");
-      setTimeout(() => setErrorMsg(""), 4000);
+      addToast("error", err.message || "Lỗi khi gán");
     }
   };
 
@@ -241,8 +280,7 @@ export default function ManagerSchedulePage() {
         );
       }
     } catch (err: any) {
-      setErrorMsg(err.message || "Lỗi khi gỡ");
-      setTimeout(() => setErrorMsg(""), 4000);
+      addToast("error", err.message || "Lỗi khi gỡ");
     }
   };
 
@@ -358,8 +396,7 @@ export default function ManagerSchedulePage() {
         </div>
       </div>
 
-      {successMsg && <div className="mb-3 px-4 py-2.5 bg-green-50 border border-green-200 rounded-xl text-green-700 font-body text-sm">{successMsg}</div>}
-      {errorMsg && <div className="mb-3 px-4 py-2.5 bg-red-50 border border-red-200 rounded-xl text-red-600 font-body text-sm">{errorMsg}</div>}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
       <div className="flex gap-4 flex-1 min-h-0">
         {/* ── Calendar grid ── */}
@@ -390,6 +427,9 @@ export default function ManagerSchedulePage() {
                     >
                       <div style={{ fontSize: 10, opacity: 0.7 }}>{DAY_LABELS[dayKey]}</div>
                       <div style={{ fontSize: 16 }}>{date.getDate()}</div>
+                      <div style={{ fontSize: 9, opacity: 0.65, marginTop: 1 }}>
+                        {String(date.getMonth() + 1).padStart(2, "0")}/{date.getFullYear()}
+                      </div>
                     </div>
 
                     {/* Shift cards drop zone */}
@@ -625,8 +665,7 @@ export default function ManagerSchedulePage() {
                                 setDetailShift((prev) => prev ? { ...prev, assignedEmployees: [...prev.assignedEmployees, emp] } : null);
                                 setShifts((prev) => prev.map((s) => s.shiftId === detailShift.shiftId ? { ...s, assignedEmployees: [...s.assignedEmployees, emp] } : s));
                               } catch (err: any) {
-                                setErrorMsg(err.message || "Lỗi gán");
-                                setTimeout(() => setErrorMsg(""), 4000);
+                                addToast("error", err.message || "Lỗi gán");
                               }
                             }}
                             className="font-body px-3 py-1 bg-[var(--cafe-primary)] text-white rounded-lg hover:opacity-90"

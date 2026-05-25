@@ -27,3 +27,7 @@ mongo_data/
 rabbitmq_data/
 
 .claude
+
+# Chatbot (excluded from repo)
+font-end/src/services/chatbot.service.ts
+font-end/src/app/components/chat/
