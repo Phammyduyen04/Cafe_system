@@ -6,7 +6,9 @@ const { AppError } = require('../../../shared');
 
 /* ── Helpers ─────────────────────────────────────────────── */
 
-const VALID_POSITIONS = ['STAFF', 'CASHIER', 'BARISTA', 'KITCHEN', 'CLEANER', 'MANAGER', 'SUPERVISOR'];
+const EMPLOYEE_POSITIONS = ['STAFF', 'BARISTA', 'CASHIER', 'KITCHEN', 'CLEANER', 'SUPERVISOR', 'EMPLOYEE'];
+const MANAGER_POSITIONS = ['MANAGER'];
+const VALID_POSITIONS = [...EMPLOYEE_POSITIONS, ...MANAGER_POSITIONS];
 
 const generatePassword = () => {
   const digits = Math.floor(1000 + Math.random() * 9000);
@@ -16,12 +18,11 @@ const generatePassword = () => {
 };
 
 const userTypeFromPosition = (position) => {
-  const upper = position.toUpperCase();
-  return ['MANAGER', 'SUPERVISOR'].includes(upper) ? 'MANAGER' : 'STAFF';
+  return MANAGER_POSITIONS.includes(position.toUpperCase()) ? 'MANAGER' : 'EMPLOYEE';
 };
 
 const roleNameFromPosition = (position) => {
-  return userTypeFromPosition(position) === 'MANAGER' ? 'MANAGER' : 'STAFF';
+  return MANAGER_POSITIONS.includes(position.toUpperCase()) ? 'MANAGER' : 'EMPLOYEE';
 };
 
 /* ── Create staff account (auto-generate credentials) ─────── */

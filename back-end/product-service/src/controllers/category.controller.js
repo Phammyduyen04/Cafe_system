@@ -10,7 +10,8 @@ const createCategory = async (req, res, next) => {
 
 const getAllCategories = async (req, res, next) => {
   try {
-    const includeInactive = req.query.all === 'true';
+    const userType = req.user?.userType;
+    const includeInactive = ['ADMIN', 'MANAGER'].includes(userType) || req.query.all === 'true';
     const categories = await categoryService.getAllCategories(includeInactive);
     return responseHelper.success(res, categories);
   } catch (error) { next(error); }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NEWSLETTER_DECO } from "../../../constants/images";
+import newsletterCoffeeBeans from "../../../assets/newsletter-coffee-beans.png";
 import svgPaths from "../../../constants/svg-paths";
 
 // ─── Newsletter Section ────────────────────────────────────────────────────────
@@ -9,13 +9,13 @@ export default function NewsletterSection() {
   return (
     <section className="relative bg-cafe-accent overflow-hidden py-16 px-6">
       <img
-        src={NEWSLETTER_DECO}
+        src={newsletterCoffeeBeans}
         alt=""
         className="absolute left-0 top-0 h-full object-cover pointer-events-none opacity-80 hidden sm:block"
         style={{ width: "22%", transform: "scaleY(-1)" }}
       />
       <img
-        src={NEWSLETTER_DECO}
+        src={newsletterCoffeeBeans}
         alt=""
         className="absolute right-0 top-0 h-full object-cover pointer-events-none opacity-80 hidden sm:block"
         style={{ width: "22%", transform: "scaleX(-1)" }}

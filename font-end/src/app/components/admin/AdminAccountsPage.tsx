@@ -749,7 +749,7 @@ function CreateAccountTab({ onCreated }: { onCreated: () => void }) {
                 { label: "Họ tên", value: created.fullName },
                 { label: "Email", value: created.email || "—" },
                 { label: "Chức vụ", value: created.position },
-                { label: "Quyền hạn", value: created.role },
+                { label: "Quyền hạn", value: Array.isArray(created.roles) ? created.roles.join(', ') : created.roles },
                 { label: "Loại tài khoản", value: created.userType },
                 ...(created.startDate ? [{ label: "Ngày bắt đầu", value: created.startDate }] : []),
               ].map((row) => (

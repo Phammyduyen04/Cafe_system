@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const categoryController = require('../controllers/category.controller');
-const { authMiddleware, authorizeMiddleware } = require('../../../shared');
+const { authMiddleware, authorizeMiddleware, optionalAuthMiddleware } = require('../../../shared');
 
-router.get('/', categoryController.getAllCategories);
+router.get('/', optionalAuthMiddleware, categoryController.getAllCategories);
 router.get('/:id', categoryController.getCategoryById);
 
 router.use(authMiddleware);
