@@ -313,7 +313,7 @@ export default function CoffeaNavbar() {
                                   {product.price.toLocaleString("vi-VN")}đ
                                 </p>
                               </div>
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "rgba(48,38,28,0.3)", shrink: 0 }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "rgba(48,38,28,0.3)", flexShrink: 0 }}>
                                 <path d="M9 18l6-6-6-6" />
                               </svg>
                             </button>
@@ -455,7 +455,7 @@ export default function CoffeaNavbar() {
                       Trang Quản lý
                     </Link>
                   )}
-                  {(user?.userType === "STAFF" || user?.roles?.includes("STAFF")) && (
+                  {(user?.userType === "STAFF" || user?.userType === "EMPLOYEE" || user?.roles?.includes("STAFF")) && (
                     <Link
                       to="/staff"
                       className="font-body flex items-center gap-3 w-full px-4 py-3 text-cafe-primary hover:bg-cafe-bg transition-colors border-t border-cafe-accent"

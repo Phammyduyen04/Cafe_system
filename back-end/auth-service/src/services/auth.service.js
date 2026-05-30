@@ -82,14 +82,42 @@ const getRefreshTokenExpiry = () => {
  * Đăng ký tài khoản CUSTOMER (chỉ CUSTOMER tự đăng ký)
  */
 const register = async (data) => {
-  const { username, password, userId, phoneNumber, email, fullName } = data;
+  const {
+    username,
+    password,
+    userId,
+    email,
+    phoneNumber = data.phone_number,
+    fullName = data.full_name,
+  } = data;
 
   if (!username) throw new AppError('Tên đăng nhập là bắt buộc', 400);
   if (!password) throw new AppError('Mật khẩu là bắt buộc', 400);
+  if (!phoneNumber) throw new AppError('Số điện thoại là bắt buộc', 400);
 
   const existingAccount = await accountRepo.findByUsername(username);
   if (existingAccount) {
     throw new AppError('Tên đăng nhập đã tồn tại', 409);
+  }
+
+  // Kiểm tra phone/email trùng trong customer-service trước khi tạo account
+  const customerServiceUrl = process.env.CUSTOMER_SERVICE_URL || 'http://localhost:3002';
+  if (phoneNumber || email) {
+    try {
+      const checkResult = await internalPost(`${customerServiceUrl}/internal/check-conflict`, {
+        phone: phoneNumber || null,
+        email: email || null,
+      });
+      if (checkResult.ok) {
+        const parsed = JSON.parse(checkResult.body);
+        if (parsed.conflicts && parsed.conflicts.length > 0) {
+          throw new AppError(parsed.conflicts[0], 409);
+        }
+      }
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+      console.warn('Could not check conflict with customer-service:', err.message);
+    }
   }
 
   const salt = await bcrypt.genSalt(10);
@@ -114,8 +142,7 @@ const register = async (data) => {
     console.warn('Could not auto-assign CUSTOMER role:', err.message);
   }
 
-  // Tạo customer profile trong customer-service
-  const customerServiceUrl = process.env.CUSTOMER_SERVICE_URL || 'http://localhost:3002';
+  // Tạo customer profile trong customer-service và lưu customer_id vào account.user_id
   try {
     const result = await internalPost(`${customerServiceUrl}/internal/create-from-account`, {
       accountId: account.account_id,
@@ -124,7 +151,14 @@ const register = async (data) => {
       email: email || null,
       fullName: fullName || username,
     });
-    if (!result.ok) {
+    if (result.ok) {
+      const parsed = JSON.parse(result.body);
+      const customerId = parsed?.data?.customer_id;
+      if (customerId) {
+        await accountRepo.update(account.account_id, { user_id: customerId });
+        account.user_id = customerId;
+      }
+    } else {
       console.warn('Customer profile creation failed:', result.body);
     }
   } catch (err) {
@@ -137,6 +171,7 @@ const register = async (data) => {
     fullName: account.full_name,
     email: account.email,
     userType: account.user_type,
+    userId: account.user_id,
   };
 };
 

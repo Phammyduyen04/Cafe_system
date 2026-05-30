@@ -9,6 +9,8 @@ export default function ProductsCarousel({ title, products, categories }: { titl
   const gap = 20;
   const max = Math.max(0, products.length - 1);
   const paused = useRef(false);
+  const sectionRef = useRef<HTMLElement>(null);
+  const [visible, setVisible] = useState(false);
 
   // Auto-play: advance one card every 3.5s, reset to 0 at end
   useEffect(() => {
@@ -21,8 +23,28 @@ export default function ProductsCarousel({ title, products, categories }: { titl
     return () => clearInterval(timer);
   }, [max, products.length]);
 
+  // Scroll-reveal on enter viewport
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setVisible(true); },
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <section className="py-16 bg-cafe-bg">
+    <section
+      ref={sectionRef}
+      className="py-16 bg-cafe-bg"
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateY(0)" : "translateY(40px)",
+        transition: "opacity 0.7s ease-out, transform 0.7s ease-out",
+      }}
+    >
       <h2
         className="font-heading text-center mb-10 tracking-widest uppercase px-4 text-cafe-primary"
         style={{ fontWeight: 600, fontSize: "clamp(20px, 3vw, 28px)", letterSpacing: "1.28px" }}

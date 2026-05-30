@@ -81,7 +81,6 @@ services:
       PRODUCT_SERVICE_URL: http://product-service:3005
       PROMOTION_SERVICE_URL: http://promotion-service:3006
       STAFF_SERVICE_URL: http://staff-service:3007
-      CHATBOT_SERVICE_URL: http://chatbot-service:3008
   # ========================
   # MYSQL SERVICES
   # ========================
@@ -240,25 +239,6 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
-
-  chatbot-service:
-    build:
-      context: .
-      dockerfile: chatbot-service/Dockerfile
-    container_name: coffee_chatbot_service
-    restart: on-failure
-    ports:
-      - "3008:3008"
-    environment:
-      PORT: 3008
-      SERVICE_NAME: chatbot-service
-      GROQ_API_KEY: ${GROQ_API_KEY}
-      PRODUCT_SERVICE_URL: http://product-service:3005
-      PROMOTION_SERVICE_URL: http://promotion-service:3006
-      MENU_CACHE_TTL_MS: 300000
-    depends_on:
-      - product-service
-      - promotion-service
 
   # ========================
   # FRONTEND

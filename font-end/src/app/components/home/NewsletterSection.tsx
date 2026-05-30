@@ -1,24 +1,45 @@
-import { useState } from "react";
-import { NEWSLETTER_DECO } from "../../../constants/images";
+import { useState, useRef, useEffect } from "react";
+import newsletterCoffeeBeans from "../../../assets/newsletter-coffee-beans.png";
 import svgPaths from "../../../constants/svg-paths";
 
 // ─── Newsletter Section ────────────────────────────────────────────────────────
 export default function NewsletterSection() {
   const [email, setEmail] = useState("");
+  const sectionRef = useRef<HTMLElement>(null);
+  const [offset, setOffset] = useState(0);
+
+  useEffect(() => {
+    const update = () => {
+      if (!sectionRef.current) return;
+      const rect = sectionRef.current.getBoundingClientRect();
+      setOffset((rect.top + rect.height / 2 - window.innerHeight / 2) * 0.1);
+    };
+    window.addEventListener("scroll", update, { passive: true });
+    update();
+    return () => window.removeEventListener("scroll", update);
+  }, []);
 
   return (
-    <section className="relative bg-cafe-accent overflow-hidden py-16 px-6">
+    <section ref={sectionRef} className="relative bg-cafe-accent overflow-hidden py-16 px-6">
       <img
-        src={NEWSLETTER_DECO}
+        src={newsletterCoffeeBeans}
         alt=""
         className="absolute left-0 top-0 h-full object-cover pointer-events-none opacity-80 hidden sm:block"
-        style={{ width: "22%", transform: "scaleY(-1)" }}
+        style={{
+          width: "22%",
+          transform: `scaleY(-1) translateY(${offset}px)`,
+          willChange: "transform",
+        }}
       />
       <img
-        src={NEWSLETTER_DECO}
+        src={newsletterCoffeeBeans}
         alt=""
         className="absolute right-0 top-0 h-full object-cover pointer-events-none opacity-80 hidden sm:block"
-        style={{ width: "22%", transform: "scaleX(-1)" }}
+        style={{
+          width: "22%",
+          transform: `scaleX(-1) translateY(${-offset}px)`,
+          willChange: "transform",
+        }}
       />
 
       <div className="relative z-10 flex flex-col items-center text-center gap-4">

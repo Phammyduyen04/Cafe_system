@@ -21,7 +21,14 @@ const revoke = async (accountId, roleId) => {
   });
 };
 
+const revokeAll = async (accountId) => {
+  return await prisma.accountRole.deleteMany({
+    where: { account_id: accountId },
+  });
+};
+
 module.exports = {
   assign,
   revoke,
+  revokeAll,
 };
