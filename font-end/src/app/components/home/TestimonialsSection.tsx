@@ -38,6 +38,8 @@ export default function TestimonialsSection() {
   const [activePage, setActivePage] = useState(0); // desktop: trang (nhóm 3)
   const [activeMobile, setActiveMobile] = useState(0); // mobile: từng bình luận
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     productService.getStoreReviews()
@@ -86,10 +88,30 @@ export default function TestimonialsSection() {
   const prevMobile = () => setActiveMobile((prev) => (prev - 1 + totalMobile) % totalMobile);
   const nextMobile = () => setActiveMobile((prev) => (prev + 1) % totalMobile);
 
+  // Re-run after loading so sectionRef is attached (early return prevents ref during load)
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setVisible(true); },
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loading]);
+
   if (loading || reviews.length === 0) return null;
 
   return (
-    <section className="bg-cafe-bg py-20 px-6">
+    <section
+      ref={sectionRef}
+      className="bg-cafe-bg py-20 px-6"
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateY(0)" : "translateY(40px)",
+        transition: "opacity 0.7s ease-out, transform 0.7s ease-out",
+      }}
+    >
       <div className="text-center mb-12">
         <p className="font-body text-cafe-primary" style={{ fontWeight: 400, fontSize: "clamp(24px, 3vw, 32px)" }}>
           Hãy đến và cùng chúng tôi

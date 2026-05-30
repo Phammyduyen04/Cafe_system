@@ -92,7 +92,7 @@ export default function ProductDetailPage() {
         productId: product._id,
         size: sizeLabel,
         quantity,
-        price: product.price,
+        price: displayPrice,
         name: product.name,
         image: imageUrl,
       });
@@ -154,6 +154,9 @@ export default function ProductDetailPage() {
   const sizes = product.sizes ?? [{ label: "S" }, { label: "M" }, { label: "L" }];
   const categoryName = getCategoryName(product, categories);
 
+  const SIZE_PRICE_OFFSETS = [0, 10000, 15000]; // S, M, L
+  const displayPrice = product.price + (SIZE_PRICE_OFFSETS[selectedSize] ?? 0);
+
   return (
     <div className="min-h-screen bg-cafe-bg">
       {/* ── Desktop Layout ── */}
@@ -209,7 +212,7 @@ export default function ProductDetailPage() {
                     Đã bao gồm thuế VAT
                   </p>
                   <p className="font-body text-cafe-primary" style={{ fontWeight: 600, fontSize: 15, letterSpacing: "0.5px" }}>
-                    {product.price.toLocaleString("vi-VN")} ₫
+                    {displayPrice.toLocaleString("vi-VN")} ₫
                   </p>
                 </div>
               </div>
@@ -335,7 +338,7 @@ export default function ProductDetailPage() {
               </p>
             </div>
             <p className="font-body text-cafe-primary shrink-0" style={{ fontWeight: 600, fontSize: 16 }}>
-              {product.price.toLocaleString("vi-VN")} ₫
+              {displayPrice.toLocaleString("vi-VN")} ₫
             </p>
           </div>
 

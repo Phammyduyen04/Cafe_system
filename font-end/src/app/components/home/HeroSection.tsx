@@ -4,6 +4,16 @@ import banner1 from "../../../assets/banner1.jpg";
 import banner2 from "../../../assets/banner2.jpg";
 import banner3 from "../../../assets/banner3.jpg";
 
+function useScrollY() {
+  const [scrollY, setScrollY] = useState(0);
+  useEffect(() => {
+    const onScroll = () => setScrollY(window.scrollY);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  return scrollY;
+}
+
 // ─── Hero Carousel ──────────────────────────────────────────────────────────────
 const heroSlides = [
   {
@@ -35,6 +45,7 @@ const heroSlides = [
 // ─── Hero Section ────────────────────────────────────────────────────────────
 export default function HeroSection() {
   const [current, setCurrent] = useState(0);
+  const scrollY = useScrollY();
 
   const goTo = useCallback((idx: number) => {
     setCurrent(idx);
@@ -52,14 +63,24 @@ export default function HeroSection() {
 
   return (
     <section className="relative min-h-[600px] md:min-h-[750px] overflow-hidden flex items-center">
-      {/* Background images */}
+      {/* Background images — extra height + top offset so parallax never reveals a gap */}
       {heroSlides.map((s, i) => (
         <img
           key={i}
           src={s.bg}
           alt="Coffee background"
-          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700"
-          style={{ opacity: i === current ? 1 : 0 }}
+          className="absolute object-cover object-center"
+          style={{
+            opacity: i === current ? 1 : 0,
+            transition: "opacity 700ms",
+            top: "-150px",
+            left: 0,
+            right: 0,
+            width: "100%",
+            height: "calc(100% + 300px)",
+            transform: `translateY(${scrollY * 0.3}px)`,
+            willChange: "transform",
+          }}
         />
       ))}
       {/* Dark overlay */}

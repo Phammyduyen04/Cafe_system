@@ -12,6 +12,7 @@ export default function RegisterPage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [showPass, setShowPass] = useState(false);
@@ -26,7 +27,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       const fullName = `${firstName} ${lastName}`.trim();
-      const res = await authService.register({ username, fullName, email, password });
+      const res = await authService.register({ username, fullName, email, password, phone });
       // If server returns tokens, auto-login; otherwise go to login page
       const r = res as any;
       if (r.accessToken && r.refreshToken && r.user) {
@@ -166,6 +167,23 @@ export default function RegisterPage() {
               />
             </div>
 
+            {/* Phone */}
+            <div className="flex flex-col gap-1.5">
+              <label className="font-body text-cafe-primary" style={{ fontSize: 11, fontWeight: 500, letterSpacing: "1.5px", textTransform: "uppercase" }}>
+                Số điện thoại
+              </label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                placeholder="0912 345 678"
+                required
+                pattern="[0-9]{9,11}"
+                className="font-body w-full border border-cafe-border bg-white px-4 py-3 outline-none focus:border-cafe-primary transition-colors placeholder:text-[rgba(48,38,28,0.3)] text-cafe-primary"
+                style={{ fontSize: 13, borderRadius: 0 }}
+              />
+            </div>
+
             {/* Password */}
             <div className="flex flex-col gap-1.5">
               <label className="font-body text-cafe-primary" style={{ fontSize: 11, fontWeight: 500, letterSpacing: "1.5px", textTransform: "uppercase" }}>
@@ -235,9 +253,9 @@ export default function RegisterPage() {
               </div>
               <span className="font-body" style={{ fontSize: 12, color: "rgba(48,38,28,0.65)" }}>
                 Tôi đồng ý với{" "}
-                <span className="text-cafe-primary" style={{ fontWeight: 600, textDecoration: "underline" }}>Điều khoản dịch vụ</span>
+                <Link to="/terms" target="_blank" className="text-cafe-primary hover:opacity-70 transition-opacity" style={{ fontWeight: 600, textDecoration: "underline" }}>Điều khoản dịch vụ</Link>
                 {" "}và{" "}
-                <span className="text-cafe-primary" style={{ fontWeight: 600, textDecoration: "underline" }}>Chính sách bảo mật</span>
+                <Link to="/privacy" target="_blank" className="text-cafe-primary hover:opacity-70 transition-opacity" style={{ fontWeight: 600, textDecoration: "underline" }}>Chính sách bảo mật</Link>
               </span>
             </label>
 

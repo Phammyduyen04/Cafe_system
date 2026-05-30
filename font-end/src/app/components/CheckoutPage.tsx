@@ -8,7 +8,7 @@ import type { PaymentMethod, PaymentInfo } from "../../services/order.service";
 import StepIndicator, { STEPS } from "./checkout/StepIndicator";
 import OrderSummary from "./checkout/OrderSummary";
 import FloatingInput from "./checkout/FloatingInput";
-import AddressAutocomplete from "./checkout/AddressAutocomplete";
+import MapAddressPicker from "./checkout/MapAddressPicker";
 
 // ─── Shipping options ────────────────────────────────────────────────────────
 const SHIP_OPTIONS = [
@@ -80,7 +80,6 @@ export default function CheckoutPage() {
 
   // Step 0 — contact + address
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
 
@@ -153,8 +152,6 @@ export default function CheckoutPage() {
       return "Vui lòng nhập số điện thoại.";
     if (!/^(0|\+84)[3|5|7|8|9][0-9]{8}$/.test(phoneClean))
       return "Số điện thoại không hợp lệ (VD: 0912345678).";
-    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
-      return "Email không hợp lệ.";
     if (!address.trim() || address.trim().length < 10)
       return "Địa chỉ giao hàng quá ngắn, vui lòng nhập đầy đủ (tối thiểu 10 ký tự).";
     return "";
@@ -177,7 +174,7 @@ export default function CheckoutPage() {
       const res = await orderService.checkout({
         customerInfo: {
           fullName: fullName || user?.username || "Khách",
-          email,
+          email: "",
           phone,
           address,
           city: "",
@@ -398,8 +395,7 @@ export default function CheckoutPage() {
                   <SectionLabel>Thông tin đặt hàng</SectionLabel>
                   <FloatingInput label="Họ và tên" value={fullName} onChange={setFullName} required />
                   <FloatingInput label="Số điện thoại" type="tel" value={phone} onChange={setPhone} required />
-                  <FloatingInput label="Email" type="email" value={email} onChange={setEmail} required />
-                  <AddressAutocomplete value={address} onChange={setAddress} required />
+                  <MapAddressPicker value={address} onChange={setAddress} />
                 </div>
               )}
 

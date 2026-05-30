@@ -31,12 +31,14 @@ export const authService = {
     fullName: string;
     email: string;
     password: string;
+    phone?: string;
   }) =>
     api.post<RegisterResponse>("/api/auth/register", {
       username: data.username,
       password: data.password,
       fullName: data.fullName,
       email: data.email,
+      phoneNumber: data.phone,
     }),
 
   logout: () => {
