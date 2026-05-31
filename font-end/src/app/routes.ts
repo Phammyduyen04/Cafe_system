@@ -32,6 +32,8 @@ import StaffAvailabilityPage from "./components/staff/StaffAvailabilityPage";
 import AdminLayout from "./components/admin/AdminLayout";
 import AdminAccountsPage from "./components/admin/AdminAccountsPage";
 import AdminRolesPage from "./components/admin/AdminRolesPage";
+import TermsPage from "./components/TermsPage";
+import PrivacyPage from "./components/PrivacyPage";
 
 export const router = createBrowserRouter([
   {
@@ -49,6 +51,8 @@ export const router = createBrowserRouter([
       { path: "my-orders", Component: MyOrdersPage },
       { path: "payment/result", Component: PaymentResultPage },
       { path: "promotions", Component: PromotionsPage },
+      { path: "terms", Component: TermsPage },
+      { path: "privacy", Component: PrivacyPage },
     ],
   },
   {

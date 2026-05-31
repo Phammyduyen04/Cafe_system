@@ -20,6 +20,24 @@ app.get('/api/health', (req, res) => {
 app.use('/api/customers', customerRoutes);
 
 // Internal API (không cần auth, chỉ dùng giữa các service)
+app.post('/internal/check-conflict', async (req, res) => {
+  try {
+    const { phone, email } = req.body;
+    const conflicts = [];
+    if (phone) {
+      const existing = await customerService.findByPhone(phone);
+      if (existing) conflicts.push('Số điện thoại đã được sử dụng');
+    }
+    if (email) {
+      const existing = await customerService.findByEmail(email);
+      if (existing) conflicts.push('Email đã được sử dụng');
+    }
+    res.json({ success: true, conflicts });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 app.post('/internal/create-from-account', async (req, res) => {
   try {
     const customer = await customerService.createCustomerFromAccount(req.body);

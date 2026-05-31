@@ -88,17 +88,21 @@ const updateOwnProfile = async (accountId, data) => {
   const customer = await customerRepo.findByAccountId(accountId);
   if (!customer) throw new AppError('Customer profile not found', 404);
 
+  const fullName = data.fullName ?? data.full_name;
+  const email = data.email;
+  const phoneNumber = data.phoneNumber ?? data.phone_number;
+
   const updateData = {};
-  if (data.fullName) updateData.full_name = data.fullName;
-  if (data.email !== undefined) updateData.email = data.email || null;
-  if (data.phoneNumber !== undefined) {
-    if (data.phoneNumber) {
-      const existingPhone = await customerRepo.findByPhoneNumber(data.phoneNumber);
+  if (fullName) updateData.full_name = fullName;
+  if (email !== undefined) updateData.email = email || null;
+  if (phoneNumber !== undefined) {
+    if (phoneNumber) {
+      const existingPhone = await customerRepo.findByPhoneNumber(phoneNumber);
       if (existingPhone && existingPhone.customer_id !== customer.customer_id) {
         throw new AppError('Phone number already exists', 409);
       }
     }
-    updateData.phone_number = data.phoneNumber || null;
+    updateData.phone_number = phoneNumber || null;
   }
 
   return await customerRepo.update(customer.customer_id, updateData);
@@ -215,6 +219,9 @@ const deleteOwnAccount = async (accountId, confirm) => {
   return { message: 'Tài khoản đã được vô hiệu hóa thành công' };
 };
 
+const findByPhone = async (phone) => customerRepo.findByPhoneNumber(phone);
+const findByEmail = async (email) => customerRepo.findByEmail(email);
+
 module.exports = {
   createCustomer,
   getAllCustomers,
@@ -227,4 +234,6 @@ module.exports = {
   getCustomerPointLogs,
   addPoints,
   redeemPoints,
+  findByPhone,
+  findByEmail,
 };

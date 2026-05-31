@@ -1,6 +1,7 @@
 const { AppError } = require('../../../shared');
 const roleRepo = require('../repositories/role.repo');
 const accountRoleRepo = require('../repositories/accountRole.repo');
+const accountRepo = require('../repositories/account.repo');
 
 const createRole = async (data) => {
   const { roleName, description } = data;
@@ -39,7 +40,24 @@ const deleteRole = async (id) => {
 };
 
 const assignRole = async (accountId, roleId, assignedBy) => {
-  return await accountRoleRepo.assign(accountId, roleId, assignedBy);
+  const role = await roleRepo.findById(roleId);
+  if (!role) throw new AppError('Role not found', 404);
+
+  // Xóa role cũ và gán role mới
+  await accountRoleRepo.revokeAll(accountId);
+  const result = await accountRoleRepo.assign(accountId, roleId, assignedBy);
+
+  // Cập nhật userType theo role mới
+  const userTypeMap = {
+    ADMIN: 'ADMIN',
+    MANAGER: 'MANAGER',
+    EMPLOYEE: 'EMPLOYEE',
+    CUSTOMER: 'CUSTOMER',
+  };
+  const newUserType = userTypeMap[role.role_name] || 'EMPLOYEE';
+  await accountRepo.update(accountId, { user_type: newUserType });
+
+  return result;
 };
 
 const revokeRole = async (accountId, roleId) => {

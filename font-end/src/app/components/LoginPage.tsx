@@ -17,6 +17,8 @@ export default function LoginPage() {
 
   const getRedirectPath = (userType: string) => {
     if (userType === "ADMIN") return "/admin";
+    if (userType === "MANAGER") return "/manager";
+    if (userType === "EMPLOYEE") return "/staff";
     return "/";
   };
 

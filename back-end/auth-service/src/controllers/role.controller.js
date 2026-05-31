@@ -48,8 +48,12 @@ const deleteRole = async (req, res, next) => {
 
 const assignRole = async (req, res, next) => {
   try {
-    const { accountId, roleId } = req.body;
-    const result = await roleService.assignRole(accountId, roleId, req.user.username);
+    const { accountId, account_id, roleId, role_id } = req.body;
+    const result = await roleService.assignRole(
+      accountId || account_id,
+      roleId || role_id,
+      req.user.username
+    );
     return responseHelper.created(res, result, 'Role assigned successfully');
   } catch (error) {
     next(error);
@@ -58,8 +62,8 @@ const assignRole = async (req, res, next) => {
 
 const revokeRole = async (req, res, next) => {
   try {
-    const { accountId, roleId } = req.body;
-    await roleService.revokeRole(accountId, roleId);
+    const { accountId, account_id, roleId, role_id } = req.body;
+    await roleService.revokeRole(accountId || account_id, roleId || role_id);
     return responseHelper.success(res, null, 'Role revoked successfully');
   } catch (error) {
     next(error);

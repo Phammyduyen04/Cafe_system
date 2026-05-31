@@ -26,18 +26,18 @@ router.post('/initiate', paymentController.initiatePayment);
 // =============================================
 // PAYMENTS
 // =============================================
-router.get('/', authorizeMiddleware('ADMIN', 'MANAGER', 'STAFF'), paymentController.getAllPayments);
+router.get('/', authorizeMiddleware('ADMIN', 'MANAGER', 'STAFF', 'EMPLOYEE'), paymentController.getAllPayments);
 router.get('/order/:orderId', paymentController.getPaymentByOrderId);
 router.get('/:id', paymentController.getPaymentById);
 
 // =============================================
 // CASH: Nhân viên xác nhận thu tiền mặt
 // =============================================
-router.post('/:id/cash-confirm', authorizeMiddleware('ADMIN', 'MANAGER', 'STAFF'), paymentController.confirmCashPayment);
+router.post('/:id/cash-confirm', authorizeMiddleware('ADMIN', 'MANAGER', 'STAFF', 'EMPLOYEE'), paymentController.confirmCashPayment);
 
 // =============================================
 // QR: Nhân viên xác nhận nhận được chuyển khoản
 // =============================================
-router.post('/:id/qr-confirm', authorizeMiddleware('ADMIN', 'MANAGER', 'STAFF'), paymentController.confirmQRPayment);
+router.post('/:id/qr-confirm', authorizeMiddleware('ADMIN', 'MANAGER', 'STAFF', 'EMPLOYEE'), paymentController.confirmQRPayment);
 
 module.exports = router;

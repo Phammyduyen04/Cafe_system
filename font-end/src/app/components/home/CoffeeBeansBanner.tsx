@@ -1,9 +1,48 @@
+import { useRef, useEffect, useState } from "react";
 import { Link } from "react-router";
+import beansExplosion from "../../../assets/beans-explosion.png";
+import coffeeCupSplash from "../../../assets/coffee-cup-splash.png";
 
 // ─── Coffee Beans Banner ───────────────────────────────────────────────────────
 export default function CoffeeBeansBanner() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const [offset, setOffset] = useState(0);
+
+  useEffect(() => {
+    const update = () => {
+      if (!sectionRef.current) return;
+      const rect = sectionRef.current.getBoundingClientRect();
+      setOffset((rect.top + rect.height / 2 - window.innerHeight / 2) * 0.12);
+    };
+    window.addEventListener("scroll", update, { passive: true });
+    update();
+    return () => window.removeEventListener("scroll", update);
+  }, []);
+
   return (
-    <section className="relative bg-cafe-accent overflow-hidden" style={{ minHeight: 280 }}>
+    <section ref={sectionRef} className="relative bg-cafe-accent overflow-hidden" style={{ minHeight: 280 }}>
+      <img
+        src={beansExplosion}
+        alt=""
+        className="absolute left-0 bottom-0 pointer-events-none hidden sm:block"
+        style={{
+          width: "28%",
+          maxWidth: 320,
+          transform: `scaleX(-1) translateY(${offset}px)`,
+          willChange: "transform",
+        }}
+      />
+      <img
+        src={coffeeCupSplash}
+        alt=""
+        className="absolute right-0 bottom-0 pointer-events-none hidden sm:block"
+        style={{
+          width: "26%",
+          maxWidth: 300,
+          transform: `translateY(${-offset}px)`,
+          willChange: "transform",
+        }}
+      />
       {/* Center content */}
       <div className="relative z-10 flex flex-col items-center justify-center py-12 sm:py-16 px-8 sm:px-16 text-center gap-5 sm:gap-6">
         <h2
