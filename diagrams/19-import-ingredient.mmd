@@ -1,0 +1,53 @@
+﻿%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor MG as Manager
+    participant GW as API Gateway
+    participant Product as Product Service
+    participant ProductDB as Product DB
+
+    MG->>GW: POST /api/products/ingredients/:ingredientId/import
+    Note over MG,GW: quantity, unitCost<br/>supplier tuy chon, note tuy chon
+    GW->>Product: Forward request - yeu cau auth MANAGER
+
+    Product->>ProductDB: ingredient.findById(ingredientId)
+    ProductDB-->>Product: ingredient record
+
+    alt Nguyen lieu khong ton tai
+        Product-->>GW: 404 Not Found
+        GW-->>MG: Nguyen lieu khong ton tai
+    else quantity <= 0 hoac unitCost < 0
+        Product-->>GW: 400 Bad Request
+        GW-->>MG: Du lieu nhap khong hop le
+    else Hop le
+        Product->>ProductDB: ingredient.update - currentStock += quantity
+        Product->>ProductDB: importLog.create
+        Note over Product,ProductDB: ingredientId, quantity, unitCost<br/>supplier, note, importedBy=managerId<br/>totalCost = quantity * unitCost
+        ProductDB-->>Product: import da ghi nhan
+
+        Product-->>GW: 201 Created
+        Note over Product,GW: importLogId, ingredientId<br/>quantity, currentStock moi, totalCost
+        GW-->>MG: Nhap nguyen lieu thanh cong
+    end
+

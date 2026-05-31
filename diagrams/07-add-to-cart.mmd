@@ -1,0 +1,88 @@
+﻿%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor KH as Khach hang
+    participant GW as API Gateway
+    participant Order as Order Service
+    participant Product as Product Service
+    participant CartDB as Cart DB - MongoDB
+
+    KH->>GW: POST /api/orders/cart/items
+    Note over KH,GW: productId, quantity<br/>size, sugarLevel, iceLevel<br/>toppings[], itemNote
+    GW->>Order: Forward request - yeu cau auth
+
+    activate Order
+
+    alt productId khong co
+        Order-->>GW: 400 Bad Request
+        GW-->>KH: productId la bat buoc
+    else productId hop le
+        Order->>Product: GET /api/products/:productId
+        activate Product
+
+        alt San pham khong ton tai
+            Product-->>Order: 404 Not Found
+            Order-->>GW: 404 Not Found
+            GW-->>KH: San pham khong ton tai
+        else San pham khong kha dung
+            Product-->>Order: status != ACTIVE hoac isAvailable = false
+            Order-->>GW: 400 Bad Request
+            GW-->>KH: San pham hien khong kha dung
+        else San pham hop le
+            Product-->>Order: productName, price, status=ACTIVE
+            deactivate Product
+
+            Order->>Order: Ap dung mac dinh<br/>sugarLevel=100%, iceLevel=100%, quantity=1
+            Order->>Order: validateItemData - quantity, size, sugarLevel, iceLevel
+
+            alt Co toppings
+                loop Moi topping trong danh sach
+                    Order->>Product: GET /api/products/toppings/:toppingId
+                    activate Product
+
+                    alt Topping khong ton tai hoac khong kha dung
+                        Product-->>Order: 404 hoac isAvailable=false
+                        Order-->>GW: 400 Bad Request
+                        GW-->>KH: Topping khong hop le
+                    else Topping hop le
+                        Product-->>Order: toppingName, price
+                        deactivate Product
+                    end
+                end
+            end
+
+            Order->>CartDB: getOrCreateCart - customerId
+            CartDB-->>Order: cart record
+
+            Order->>CartDB: cart.addItem - product + toppings
+            CartDB-->>Order: cart da cap nhat
+
+            Order-->>GW: 200 OK
+            Note over Order,GW: cart voi day du items
+            GW-->>KH: Them vao gio hang thanh cong
+        end
+    end
+
+    deactivate Order
+

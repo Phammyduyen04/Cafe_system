@@ -1,0 +1,62 @@
+﻿%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor KH as Khach hang
+    participant GW as API Gateway
+    participant Customer as Customer Service
+    participant CustomerDB as Customer DB
+
+    KH->>GW: POST /api/customers/:customerId/points/redeem
+    Note over KH,GW: points - so diem muon doi
+    GW->>Customer: Forward request - yeu cau auth CUSTOMER
+
+    Customer->>CustomerDB: customer.findById(customerId)
+    CustomerDB-->>Customer: customer record
+
+    alt Khach hang khong ton tai
+        Customer-->>GW: 404 Not Found
+        GW-->>KH: Khach hang khong ton tai
+    else So diem doi khong hop le - points <= 0
+        Customer-->>GW: 400 Bad Request
+        GW-->>KH: So diem khong hop le
+    else Khong du diem
+        Customer-->>GW: 400 Bad Request
+        GW-->>KH: Khong du diem de doi
+    else Du diem
+        Customer->>CustomerDB: customer.update - loyaltyPoints -= points
+        Customer->>CustomerDB: pointLog.create
+        Note over Customer,CustomerDB: points - so am, reason=REDEEMED<br/>balanceBefore, balanceAfter
+
+        alt loyaltyPoints < 200 va tier = VIP
+            Customer->>CustomerDB: customer.update - tier=REGULAR
+            Note over Customer: Ha cap tu VIP xuong REGULAR
+        end
+
+        CustomerDB-->>Customer: customer da cap nhat
+
+        Customer-->>GW: 200 OK
+        Note over Customer,GW: customerId, pointsRedeemed<br/>remainingPoints, tier
+        GW-->>KH: Doi diem thanh cong
+    end
+

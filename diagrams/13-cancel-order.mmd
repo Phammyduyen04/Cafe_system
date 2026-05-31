@@ -1,0 +1,57 @@
+﻿%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor KH as Khach hang
+    participant GW as API Gateway
+    participant Order as Order Service
+    participant OrderDB as Order DB
+
+    KH->>GW: PUT /api/orders/my-orders/:orderId/cancel
+    Note over KH,GW: reason tuy chon
+    GW->>Order: Forward request - yeu cau auth CUSTOMER
+
+    Order->>OrderDB: order.findById(orderId)
+    OrderDB-->>Order: order record
+
+    alt Don hang khong ton tai
+        Order-->>GW: 404 Not Found
+        GW-->>KH: Don hang khong ton tai
+    else Don hang khong thuoc ve khach hang nay
+        Order-->>GW: 403 Forbidden
+        GW-->>KH: Khong co quyen huy don hang nay
+    else Trang thai khong cho phep huy
+        Note over Order: Chi huy duoc khi status<br/>la PENDING hoac PENDING_PAYMENT
+        Order-->>GW: 400 Bad Request
+        GW-->>KH: Khong the huy don hang o trang thai nay
+    else Co the huy
+        Order->>OrderDB: order.update - status=CANCELLED
+        Order->>OrderDB: statusLog.create
+        Note over Order,OrderDB: changed_by=customerId<br/>old_status, reason, timestamp
+        OrderDB-->>Order: order da cap nhat
+
+        Order-->>GW: 200 OK
+        Note over Order,GW: orderId, orderCode<br/>status=CANCELLED
+        GW-->>KH: Don hang da huy thanh cong
+    end
+

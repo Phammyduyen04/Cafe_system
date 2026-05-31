@@ -1,0 +1,77 @@
+﻿%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor KH as Khach hang
+    participant GW as API Gateway
+    participant Order as Order Service
+    participant CartDB as Cart DB - MongoDB
+    participant OrderDB as Order DB
+    participant Payment as Payment Service
+    participant MoMo as MoMo API
+    participant MQ as RabbitMQ
+
+    KH->>GW: POST /api/orders/checkout
+    Note over KH,GW: paymentMethod=MOMO<br/>orderType, note, discounts, promotions
+    GW->>Order: Forward request - yeu cau auth
+
+    Order->>CartDB: findByCustomerId(customerId)
+    CartDB-->>Order: cart record
+
+    alt Gio hang trong
+        Order-->>GW: 400 Bad Request
+        GW-->>KH: Gio hang trong
+    else Gio hang co san pham
+        Order->>Order: Chuyen cart items sang order items
+        Order->>Order: buildOrderDetails - tinh subtotal, discount, promotion
+        Note over Order: initialStatus=PENDING_PAYMENT<br/>orderChannel=ONLINE, paymentMethod=MOMO
+
+        Order->>OrderDB: order.create - status=PENDING_PAYMENT
+        Note over Order,OrderDB: order_details, order_discounts<br/>order_promotions, status_log
+        OrderDB-->>Order: order record
+
+        Order->>Payment: POST /api/payments/initiate
+        Note over Order,Payment: orderId, totalAmount<br/>paymentMethod=MOMO, orderCode
+
+        Payment->>MoMo: createMomoPayment - amount, orderInfo
+
+        alt MoMo loi - resultCode != 0
+            MoMo-->>Payment: resultCode != 0
+            Payment-->>Order: 400 Bad Request
+            Order->>MQ: Publish order_exchange / order.created
+            Note over Order,MQ: Fallback - Payment Service tu tao CASH payment
+
+        else MoMo thanh cong
+            MoMo-->>Payment: payUrl, deeplink, qrCodeUrl
+            Payment->>Payment: payment.create - status=PENDING, provider_order_id
+            Payment-->>Order: 200 OK - payUrl
+        end
+
+        Order->>CartDB: clearCart(cart_id)
+        Order-->>GW: 201 Created
+        Note over Order,GW: orderId, orderCode<br/>status=PENDING_PAYMENT, payUrl
+        GW-->>KH: Don hang da tao - chuyen den trang MoMo
+    end
+
+    Note over KH,MQ: KH thanh toan tren MoMo<br/>MoMo gui IPN callback - xem diagram 16
+

@@ -1,0 +1,95 @@
+﻿%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor KH as Khach hang
+    participant FE as Frontend
+    participant GW as API Gateway
+    participant Auth as Auth Service
+    participant Google as Google OAuth
+    participant AuthDB as Auth DB
+    participant CS as Customer Service
+
+    KH->>FE: Nhan nut Dang nhap Google
+    FE->>Google: Google Sign-In popup
+    Google-->>FE: idToken
+
+    FE->>GW: POST /api/auth/google
+    Note over FE,GW: idToken
+    GW->>Auth: Forward request
+
+    activate Auth
+    Auth->>Google: OAuth2Client.verifyIdToken(idToken)
+
+    alt Token Google khong hop le
+        Google-->>Auth: Error
+        Auth-->>GW: 401 Unauthorized
+        GW-->>FE: Token Google khong hop le
+    else Token hop le
+        Google-->>Auth: payload - googleId, email, name
+        Auth->>AuthDB: findByGoogleId(googleId)
+
+        alt Da co tai khoan Google truoc do
+            AuthDB-->>Auth: account record
+        else Chua co - tim theo email
+            AuthDB-->>Auth: null
+            Auth->>AuthDB: findByEmail(email)
+
+            alt Tim thay tai khoan cu theo email
+                AuthDB-->>Auth: account record
+                Auth->>AuthDB: account.update - gan google_id
+                Note over Auth,AuthDB: Lien ket Google vao tai khoan cu
+            else Chua co tai khoan nao
+                AuthDB-->>Auth: null
+                Auth->>AuthDB: account.create - userType=CUSTOMER
+                AuthDB-->>Auth: account moi
+
+                Auth->>AuthDB: role.assign - CUSTOMER
+                Auth->>CS: POST /internal/create-from-account
+                Note over Auth,CS: accountId, username, email, fullName
+
+                activate CS
+                CS-->>Auth: 201 Created
+                deactivate CS
+            end
+        end
+
+        alt Tai khoan bi vo hieu hoa
+            Auth-->>GW: 403 Forbidden
+            GW-->>FE: Tai khoan da bi vo hieu hoa
+        else Tai khoan ACTIVE
+            Auth->>AuthDB: getAccountRoles(accountId)
+            Auth->>Auth: jwt.sign - accessToken 15m
+            Auth->>Auth: randomBytes(64) - refreshToken 7d
+            Auth->>AuthDB: refreshToken.create
+            Auth->>AuthDB: updateLastLogin
+
+            Auth-->>GW: 200 OK
+            Note over Auth,GW: accessToken, refreshToken<br/>accountId, username, roles
+            GW-->>FE: Dang nhap thanh cong
+            FE-->>KH: Chuyen trang dashboard
+        end
+    end
+
+    deactivate Auth
+

@@ -1,0 +1,55 @@
+﻿%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor NV as Nhan vien
+    participant GW as API Gateway
+    participant Order as Order Service
+    participant OrderDB as Order DB
+
+    NV->>GW: PUT /api/orders/:orderId/status
+    Note over NV,GW: newStatus, note tuy chon
+    GW->>Order: Forward request - yeu cau auth STAFF
+
+    Order->>OrderDB: order.findById(orderId)
+    OrderDB-->>Order: order record
+
+    alt Don hang khong ton tai
+        Order-->>GW: 404 Not Found
+        GW-->>NV: Don hang khong ton tai
+    else Chuyen trang thai khong hop le
+        Note over Order: State machine hop le:<br/>PAID -> CONFIRMED -> PREPARING<br/>CONFIRMED -> PREPARING -> READY
+        Order-->>GW: 400 Bad Request
+        GW-->>NV: Chuyen trang thai khong hop le
+    else Chuyen trang thai hop le
+        Order->>Order: validateStatusTransition(currentStatus, newStatus)
+        Order->>OrderDB: order.update - status=newStatus
+        Order->>OrderDB: statusLog.create
+        Note over Order,OrderDB: changed_by=staffId<br/>old_status, new_status, note, timestamp
+        OrderDB-->>Order: order da cap nhat
+
+        Order-->>GW: 200 OK
+        Note over Order,GW: orderId, orderCode<br/>oldStatus, newStatus
+        GW-->>NV: Cap nhat trang thai thanh cong
+    end
+

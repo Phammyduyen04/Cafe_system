@@ -1,0 +1,92 @@
+﻿%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor MG as Manager
+    participant GW as API Gateway
+    participant Staff as Staff Service
+    participant StaffDB as Staff DB
+
+    Note over MG,StaffDB: Buoc 1 - Tao ca lam moi
+
+    MG->>GW: POST /api/staff/shifts
+    Note over MG,GW: date, startTime, endTime<br/>shiftType, maxEmployee, note
+    GW->>Staff: Forward request - yeu cau auth MANAGER
+
+    Staff->>StaffDB: shift.findConflict(date, startTime, endTime)
+    StaffDB-->>Staff: ket qua kiem tra trung
+
+    alt Thoi gian khong hop le - endTime <= startTime
+        Staff-->>GW: 400 Bad Request
+        GW-->>MG: Thoi gian ca lam khong hop le
+    else Trung ca lam da ton tai
+        Staff-->>GW: 409 Conflict
+        GW-->>MG: Ca lam bi trung thoi gian
+    else Hop le
+        Staff->>StaffDB: shift.create
+        Note over Staff,StaffDB: date, startTime, endTime<br/>shiftType, maxEmployee, createdBy=managerId
+        StaffDB-->>Staff: shift record
+
+        Staff-->>GW: 201 Created
+        Note over Staff,GW: shiftId, date<br/>startTime, endTime, shiftType
+        GW-->>MG: Tao ca lam thanh cong
+    end
+
+    Note over MG,StaffDB: Buoc 2 - Phan cong nhan vien vao ca
+
+    MG->>GW: POST /api/staff/shifts/:shiftId/assignments
+    Note over MG,GW: employeeId
+    GW->>Staff: Forward request - yeu cau auth MANAGER
+
+    Staff->>StaffDB: shift.findById(shiftId)
+    StaffDB-->>Staff: shift record
+
+    Staff->>StaffDB: employee.findById(employeeId)
+    StaffDB-->>Staff: employee record
+
+    alt Ca lam khong ton tai
+        Staff-->>GW: 404 Not Found
+        GW-->>MG: Ca lam khong ton tai
+    else Nhan vien khong ton tai hoac khong hoat dong
+        Staff-->>GW: 404 Not Found
+        GW-->>MG: Nhan vien khong ton tai
+    else Nhan vien da duoc phan cong ca nay
+        Staff->>StaffDB: assignment.findDuplicate(shiftId, employeeId)
+        StaffDB-->>Staff: assignment da ton tai
+        Staff-->>GW: 409 Conflict
+        GW-->>MG: Nhan vien da duoc phan cong ca nay
+    else Ca da day nhan vien
+        Staff->>StaffDB: assignment.countByShift(shiftId)
+        StaffDB-->>Staff: so nhan vien hien tai >= maxEmployee
+        Staff-->>GW: 400 Bad Request
+        GW-->>MG: Ca lam da dat so nhan vien toi da
+    else Hop le
+        Staff->>StaffDB: assignment.create
+        Note over Staff,StaffDB: shiftId, employeeId<br/>assignedBy=managerId, assignedAt=now
+        StaffDB-->>Staff: assignment record
+
+        Staff-->>GW: 201 Created
+        Note over Staff,GW: assignmentId, shiftId<br/>employeeId, employeeName
+        GW-->>MG: Phan cong nhan vien thanh cong
+    end
+
