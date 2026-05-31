@@ -1,0 +1,68 @@
+﻿%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor Admin as Admin
+    participant GW as API Gateway
+    participant Auth as Auth Service
+    participant AuthDB as Auth DB
+
+    Admin->>GW: POST /api/auth/admin/accounts
+    Note over Admin,GW: fullName, position, email<br/>phoneNumber, branch, startDate
+    GW->>Auth: Forward request - yeu cau role ADMIN
+
+    activate Auth
+
+    Auth->>Auth: Kiem tra position hop le
+    Note over Auth: STAFF, CASHIER, BARISTA<br/>KITCHEN, CLEANER, MANAGER, SUPERVISOR
+
+    alt Position khong hop le
+        Auth-->>GW: 400 Bad Request
+        GW-->>Admin: Chuc vu khong hop le
+    else Email da ton tai
+        Auth->>AuthDB: findByEmail(email)
+        AuthDB-->>Auth: account record
+        Auth-->>GW: 409 Conflict
+        GW-->>Admin: Email da duoc su dung
+    else Hop le
+        Auth->>Auth: Tao username tu email hoac so dien thoai
+        Auth->>AuthDB: Kiem tra username bi trung - them so neu can
+        Auth->>Auth: generatePassword - Coffea@XXXX + 2 ky tu
+        Auth->>Auth: bcrypt.hash(password, salt=10)
+
+        Auth->>Auth: userTypeFromPosition<br/>MANAGER/SUPERVISOR -> MANAGER<br/>Con lai -> STAFF
+
+        Auth->>AuthDB: account.create - userType=STAFF hoac MANAGER
+        AuthDB-->>Auth: account record
+
+        Auth->>AuthDB: role.findByName - STAFF hoac MANAGER
+        AuthDB-->>Auth: role record
+        Auth->>AuthDB: accountRole.assign(accountId, roleId, adminUsername)
+
+        Auth-->>GW: 201 Created
+        Note over Auth,GW: accountId, username<br/>password, fullName, role, position
+        GW-->>Admin: Tao nhan vien thanh cong
+    end
+
+    deactivate Auth
+

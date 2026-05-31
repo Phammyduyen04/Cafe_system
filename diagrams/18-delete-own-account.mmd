@@ -1,0 +1,62 @@
+﻿%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor KH as Khach hang
+    participant GW as API Gateway
+    participant Customer as Customer Service
+    participant CustomerDB as Customer DB
+    participant Auth as Auth Service
+    participant AuthDB as Auth DB
+
+    KH->>GW: DELETE /api/customers/me
+    Note over KH,GW: confirm=true
+    GW->>Customer: Forward request - yeu cau auth CUSTOMER
+
+    Customer->>CustomerDB: customer.findByAccountId(accountId)
+    CustomerDB-->>Customer: customer record
+
+    alt Khach hang khong ton tai
+        Customer-->>GW: 404 Not Found
+        GW-->>KH: Khach hang khong ton tai
+    else confirm != true
+        Customer-->>GW: 400 Bad Request
+        GW-->>KH: Can xac nhan xoa tai khoan
+    else Xac nhan xoa
+        Customer->>CustomerDB: customer.update - customer_status=INACTIVE
+        CustomerDB-->>Customer: customer da vo hieu hoa
+
+        Customer->>Auth: PUT /internal/deactivate-account/:accountId
+        Note over Customer,Auth: Internal HTTP call - khong qua Gateway
+
+        Auth->>AuthDB: account.update - status=INACTIVE
+        Auth->>AuthDB: refreshTokens.revokeAll(accountId)
+        Note over Auth,AuthDB: Thu hoi toan bo refresh tokens
+        AuthDB-->>Auth: account da vo hieu hoa
+        Auth-->>Customer: 200 OK
+
+        Customer-->>GW: 200 OK
+        Note over Customer,GW: customerId, accountId<br/>status=INACTIVE
+        GW-->>KH: Tai khoan da bi xoa
+    end
+

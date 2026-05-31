@@ -1,0 +1,63 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor MG as Manager
+    participant GW as API Gateway
+    participant Staff as Staff Service
+    participant StaffDB as Staff DB - MongoDB
+
+    MG->>GW: POST /api/staff/employees
+    Note over MG,GW: fullName, position, employeeType<br/>accountId tuy chon, maxWorkingHours tuy chon
+    GW->>Staff: Forward request - yeu cau auth MANAGER
+
+    alt Thieu fullName, position hoac employeeType
+        Staff-->>GW: 400 Bad Request
+        GW-->>MG: Ho ten, vi tri va loai nhan vien la bat buoc
+    else accountId da duoc lien ket voi nhan vien khac
+        Staff->>StaffDB: employee.findByAccountId(accountId)
+        StaffDB-->>Staff: employee record da ton tai
+        Staff-->>GW: 409 Conflict
+        GW-->>MG: Tai khoan nay da duoc lien ket voi nhan vien khac
+    else Hop le
+        Staff->>StaffDB: employee.findAll - dem de sinh employeeId
+        StaffDB-->>Staff: danh sach employeeId hien co
+        Staff->>Staff: generateEmployeeId - EMP-001, EMP-002...
+
+        Staff->>Staff: Tinh maxWorkingHours
+        Note over Staff: FULL_TIME - mac dinh 40 gio/tuan<br/>PART_TIME - lay tu input hoac null
+
+        Staff->>Staff: Auto-populate managerId tu token
+        Note over Staff: Tim employee record cua Manager<br/>theo accountId trong JWT
+
+        Staff->>StaffDB: employee.create
+        Note over Staff,StaffDB: employeeId, fullName, position<br/>employeeType, maxWorkingHours<br/>accountId, managerId, status=ACTIVE
+        StaffDB-->>Staff: employee record
+
+        Staff->>StaffDB: availability.createOrUpdate
+        Note over Staff,StaffDB: Tao availability rong<br/>availableDays, availableTimeRanges empty
+
+        Staff-->>GW: 201 Created
+        Note over Staff,GW: employeeId, fullName, position<br/>employeeType, accountId, managerId
+        GW-->>MG: Tao ho so nhan vien thanh cong
+    end

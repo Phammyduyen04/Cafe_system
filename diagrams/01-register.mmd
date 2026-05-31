@@ -1,0 +1,68 @@
+﻿%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor KH as Khach hang
+    participant GW as API Gateway
+    participant Auth as Auth Service
+    participant AuthDB as Auth DB
+    participant CS as Customer Service
+    participant CustDB as Customer DB
+
+    KH->>GW: POST /api/auth/register
+    Note over KH,GW: username, password<br/>fullName, email, phoneNumber
+    GW->>Auth: Forward request
+
+    activate Auth
+
+    Auth->>AuthDB: findByUsername(username)
+    AuthDB-->>Auth: result
+
+    alt Username da ton tai
+        Auth-->>GW: 409 Conflict
+        GW-->>KH: Ten dang nhap da ton tai
+    else Username hop le
+        Auth->>Auth: bcrypt.hash(password, salt=10)
+        Auth->>AuthDB: account.create - userType=CUSTOMER
+        AuthDB-->>Auth: account record
+
+        Auth->>AuthDB: role.findByName - CUSTOMER
+        AuthDB-->>Auth: role record
+        Auth->>AuthDB: accountRole.assign(accountId, roleId)
+
+        Auth->>CS: POST /internal/create-from-account
+        Note over Auth,CS: accountId, username<br/>fullName, email, phoneNumber
+
+        activate CS
+        CS->>CustDB: customer.create<br/>customerType=REGULAR, points=0
+        CustDB-->>CS: customer record
+        CS-->>Auth: 201 Created
+        deactivate CS
+
+        Auth-->>GW: 201 Created
+        Note over Auth,GW: accountId, username<br/>fullName, userType=CUSTOMER
+        GW-->>KH: Dang ky thanh cong
+    end
+
+    deactivate Auth
+

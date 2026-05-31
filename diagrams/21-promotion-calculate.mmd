@@ -1,0 +1,56 @@
+﻿%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor KH as Khach hang
+    participant GW as API Gateway
+    participant Promotion as Promotion Service
+    participant PromotionDB as Promotion DB
+
+    KH->>GW: POST /api/promotions/calculate
+    Note over KH,GW: items - productId, quantity, price<br/>customerId, totalAmount
+    GW->>Promotion: Forward request - public hoac auth
+
+    Promotion->>PromotionDB: promotion.findAllActive
+    Note over Promotion,PromotionDB: status=ACTIVE, startDate <= now<br/>endDate >= now
+    PromotionDB-->>Promotion: danh sach promotions dang chay
+
+    loop Moi promotion active
+        Promotion->>Promotion: Kiem tra dieu kien ap dung
+        Note over Promotion: minOrderAmount, applicableProducts<br/>customerTier, dayOfWeek, timeRange
+
+        alt Promotion khong ap dung duoc
+            Note over Promotion: Bo qua promotion nay
+        else Promotion ap dung duoc
+            Promotion->>Promotion: Tinh appliedAmount
+            Note over Promotion: BUY_X_GET_Y - san pham mien phi<br/>PERCENTAGE - giam % tong don<br/>FIXED_AMOUNT - giam so tien co dinh
+            Promotion->>Promotion: Them vao danh sach applicable
+        end
+    end
+
+    Promotion-->>GW: 200 OK
+    Note over Promotion,GW: applicablePromotions - danh sach<br/>promotionId, name, appliedAmount<br/>totalDiscount - tong giam gia
+    GW-->>KH: Danh sach khuyen mai co the ap dung
+
+    Note over KH,GW: KH chon promotions muon ap dung<br/>Gui promotionIds kem khi checkout
+

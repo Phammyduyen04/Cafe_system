@@ -1,0 +1,71 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor MG as Manager
+    participant GW as API Gateway
+    participant Promotion as Promotion Service
+    participant PromotionDB as Promotion DB - MongoDB
+
+    MG->>GW: POST /api/promotions
+    Note over MG,GW: promotionName, benefitType<br/>startDate, endDate<br/>couponCode tuy chon, maxUsage tuy chon
+    GW->>Promotion: Forward request - yeu cau auth MANAGER
+
+    alt Thieu promotionName hoac benefitType
+        Promotion-->>GW: 400 Bad Request
+        GW-->>MG: Ten chuong trinh va loai uu dai la bat buoc
+    else Thieu startDate hoac endDate
+        Promotion-->>GW: 400 Bad Request
+        GW-->>MG: Ngay bat dau va ket thuc la bat buoc
+    else startDate la ngay trong qua khu
+        Promotion-->>GW: 400 Bad Request
+        GW-->>MG: Ngay bat dau khong duoc la ngay trong qua khu
+    else endDate truoc startDate
+        Promotion-->>GW: 400 Bad Request
+        GW-->>MG: Ngay ket thuc phai sau hoac bang ngay bat dau
+    else couponCode bi trung
+        Promotion->>PromotionDB: promotion.findByCouponCode(couponCode)
+        PromotionDB-->>Promotion: promotion da ton tai
+        Promotion-->>GW: 409 Conflict
+        GW-->>MG: Ma coupon nay da duoc su dung
+    else Hop le
+        Promotion->>PromotionDB: promotion.findAll - dem de sinh promotionId
+        PromotionDB-->>Promotion: danh sach promotionId hien co
+        Promotion->>Promotion: generateNextPromotionId - PROMO_001, PROMO_002...
+
+        Promotion->>Promotion: computeStatus - tinh trang thai tu ngay
+        Note over Promotion: startDate > hom nay -> PLANNED<br/>endDate < hom nay -> EXPIRED<br/>con lai -> ACTIVE
+
+        Promotion->>PromotionDB: promotion.create
+        Note over Promotion,PromotionDB: promotionId, promotionName, benefitType<br/>couponCode normalized UPPERCASE<br/>usageCount=0, status, createdBy
+        PromotionDB-->>Promotion: promotion record
+
+        Promotion->>PromotionDB: promotionCondition.createOrUpdate
+        Note over Promotion,PromotionDB: Tao condition rong gan voi promotionId<br/>triggerProducts, rewardProducts se cap nhat sau
+
+        Promotion-->>GW: 201 Created
+        Note over Promotion,GW: promotionId, promotionName<br/>benefitType, status, couponCode
+        GW-->>MG: Tao chuong trinh khuyen mai thanh cong
+    end
+
+    Note over MG,PromotionDB: Buoc tiep theo - cap nhat dieu kien<br/>PUT /api/promotions/:id/conditions<br/>triggerProducts, rewardProducts, minimumOrderAmount

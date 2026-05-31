@@ -1,0 +1,79 @@
+﻿%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor NV as Nhan vien
+    participant GW as API Gateway
+    participant Staff as Staff Service
+    participant StaffDB as Staff DB
+
+    Note over NV,StaffDB: Buoc 1 - Check-in bat dau ca lam
+
+    NV->>GW: POST /api/staff/attendance/check-in
+    Note over NV,GW: shiftId tuy chon, note tuy chon
+    GW->>Staff: Forward request - yeu cau auth STAFF
+
+    Staff->>StaffDB: employee.findByAccountId(accountId)
+    StaffDB-->>Staff: employee record
+
+    alt Nhan vien khong ton tai
+        Staff-->>GW: 404 Not Found
+        GW-->>NV: Nhan vien khong ton tai
+    else Da check-in truoc do chua check-out
+        Staff->>StaffDB: attendance.findOpenRecord(employeeId)
+        StaffDB-->>Staff: attendance record chua check-out
+        Staff-->>GW: 400 Bad Request
+        GW-->>NV: Ban chua check-out ca truoc
+    else Hop le
+        Staff->>StaffDB: attendance.create
+        Note over Staff,StaffDB: employeeId, shiftId tuy chon<br/>checkInTime=now, status=WORKING
+        StaffDB-->>Staff: attendance record
+
+        Staff-->>GW: 201 Created
+        Note over Staff,GW: attendanceId, employeeId<br/>checkInTime, status=WORKING
+        GW-->>NV: Check-in thanh cong
+    end
+
+    Note over NV,StaffDB: Buoc 2 - Check-out ket thuc ca lam
+
+    NV->>GW: POST /api/staff/attendance/check-out
+    Note over NV,GW: note tuy chon
+    GW->>Staff: Forward request - yeu cau auth STAFF
+
+    Staff->>StaffDB: attendance.findOpenRecord(employeeId)
+    StaffDB-->>Staff: attendance record dang mo
+
+    alt Chua check-in
+        Staff-->>GW: 400 Bad Request
+        GW-->>NV: Ban chua check-in
+    else Hop le
+        Staff->>Staff: workingHours = checkOutTime - checkInTime
+        Staff->>StaffDB: attendance.update
+        Note over Staff,StaffDB: checkOutTime=now<br/>workingHours, status=COMPLETED
+        StaffDB-->>Staff: attendance da cap nhat
+
+        Staff-->>GW: 200 OK
+        Note over Staff,GW: attendanceId, checkInTime<br/>checkOutTime, workingHours
+        GW-->>NV: Check-out thanh cong
+    end
+

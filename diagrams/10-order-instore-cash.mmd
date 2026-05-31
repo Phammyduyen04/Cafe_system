@@ -1,0 +1,74 @@
+﻿%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor NV as Nhan vien
+    participant GW as API Gateway
+    participant Order as Order Service
+    participant Product as Product Service
+    participant OrderDB as Order DB
+    participant Payment as Payment Service
+    participant MQ as RabbitMQ
+
+    NV->>GW: POST /api/orders
+    Note over NV,GW: orderChannel=IN_STORE, paymentMethod=CASH<br/>items - productId, quantity, size, toppings<br/>customerId tuy chon, note, discounts
+    GW->>Order: Forward request - yeu cau auth STAFF
+
+    loop Moi san pham trong don
+        Order->>Product: GET /api/products/:productId
+        alt San pham khong hop le
+            Product-->>Order: 404 hoac status != ACTIVE
+            Order-->>GW: 400 Bad Request
+            GW-->>NV: San pham khong ton tai hoac khong kha dung
+        else San pham hop le
+            Product-->>Order: productName, price
+        end
+    end
+
+    Order->>Order: buildOrderDetails - tinh subtotal, discount
+    Note over Order: initialStatus=CONFIRMED<br/>orderChannel=IN_STORE, paymentMethod=CASH
+
+    Order->>OrderDB: order.create - status=CONFIRMED
+    Note over Order,OrderDB: order_details, order_discounts<br/>status_log - changed_by=staffId
+    OrderDB-->>Order: order record
+
+    Order->>Payment: POST /api/payments/initiate
+    Note over Order,Payment: orderId, totalAmount<br/>paymentMethod=CASH, orderCode
+
+    Payment->>Payment: payment.create - status=PENDING
+    Note over Payment: CASH khong can goi API ngoai<br/>cho NV xac nhan sau
+
+    alt HTTP that bai
+        Payment-->>Order: 500 Error
+        Order->>MQ: Publish order_exchange / order.created
+        Note over Order,MQ: Fallback - Payment Service tu tao CASH payment
+    else HTTP thanh cong
+        Payment-->>Order: 200 OK - paymentId
+    end
+
+    Order-->>GW: 201 Created
+    Note over Order,GW: orderId, orderCode<br/>status=CONFIRMED, paymentMethod=CASH
+    GW-->>NV: Don hang da tao - cho xac nhan thanh toan
+
+    Note over NV,MQ: NV thu tien mat va xac nhan<br/>xem diagram 14
+

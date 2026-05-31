@@ -1,0 +1,73 @@
+﻿%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor KH as Khach hang
+    participant GW as API Gateway
+    participant Order as Order Service
+    participant CartDB as Cart DB - MongoDB
+    participant OrderDB as Order DB
+    participant Payment as Payment Service
+    participant MQ as RabbitMQ
+
+    KH->>GW: POST /api/orders/checkout
+    Note over KH,GW: paymentMethod=QR<br/>orderType, note, discounts, promotions
+    GW->>Order: Forward request - yeu cau auth
+
+    Order->>CartDB: findByCustomerId(customerId)
+    CartDB-->>Order: cart record
+
+    alt Gio hang trong
+        Order-->>GW: 400 Bad Request
+        GW-->>KH: Gio hang trong
+    else Gio hang co san pham
+        Order->>Order: Chuyen cart items sang order items
+        Order->>Order: buildOrderDetails - tinh subtotal, discount, promotion
+        Note over Order: initialStatus=PENDING_PAYMENT<br/>orderChannel=ONLINE, paymentMethod=QR
+
+        Order->>OrderDB: order.create - status=PENDING_PAYMENT
+        Note over Order,OrderDB: order_details, order_discounts<br/>order_promotions, status_log
+        OrderDB-->>Order: order record
+
+        Order->>Payment: POST /api/payments/initiate
+        Note over Order,Payment: orderId, totalAmount<br/>paymentMethod=QR, orderCode
+
+        Payment->>Payment: Tao VietQR URL - accountNo, amount, addInfo
+        Payment->>Payment: payment.create - status=PENDING, qrCodeUrl
+
+        alt HTTP that bai
+            Payment-->>Order: 500 Error
+            Order->>MQ: Publish order_exchange / order.created
+            Note over Order,MQ: Fallback - Payment Service tu xu ly qua RabbitMQ
+            Order-->>GW: 201 Created - khong co qrUrl
+        else HTTP thanh cong
+            Payment-->>Order: 200 OK - qrCodeUrl
+            Order->>CartDB: clearCart(cart_id)
+            Order-->>GW: 201 Created
+            Note over Order,GW: orderId, orderCode<br/>status=PENDING_PAYMENT, qrCodeUrl
+            GW-->>KH: Don hang da tao - hien thi ma QR
+        end
+    end
+
+    Note over KH,MQ: KH quet QR chuyen khoan<br/>Nhan vien xac nhan - xem diagram 15
+

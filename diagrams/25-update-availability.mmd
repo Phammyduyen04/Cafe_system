@@ -1,0 +1,54 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor NV as Nhan vien
+    participant GW as API Gateway
+    participant Staff as Staff Service
+    participant StaffDB as Staff DB - MongoDB
+
+    NV->>GW: PUT /api/staff/employees/:employeeId/availability
+    Note over NV,GW: availableDays - danh sach ngay ranh<br/>availableTimeRanges - khung gio ranh
+    GW->>Staff: Forward request - yeu cau auth EMPLOYEE
+
+    Staff->>StaffDB: employee.findByEmployeeId(employeeId)
+    StaffDB-->>Staff: employee record
+
+    alt Nhan vien khong ton tai
+        Staff-->>GW: 404 Not Found
+        GW-->>NV: Khong tim thay nhan vien
+    else accountId khong khop voi nguoi dang dang nhap
+        Staff-->>GW: 403 Forbidden
+        GW-->>NV: Ban chi co the cap nhat lich ranh cua ban than
+    else Nhan vien toan thoi gian - FULL_TIME
+        Staff-->>GW: 400 Bad Request
+        GW-->>NV: Nhan vien toan thoi gian khong can dat lich ranh
+    else Hop le - chi PART_TIME
+        Staff->>StaffDB: availability.createOrUpdate(employeeId, data)
+        Note over Staff,StaffDB: Upsert - tao moi neu chua co<br/>cap nhat neu da co<br/>availableDays - MON, TUE, SAT...<br/>availableTimeRanges - start, end
+        StaffDB-->>Staff: availability record
+
+        Staff-->>GW: 200 OK
+        Note over Staff,GW: employeeId, availableDays<br/>availableTimeRanges
+        GW-->>NV: Cap nhat lich ranh thanh cong
+    end
