@@ -4,10 +4,12 @@ const paymentController = require('../controllers/payment.controller');
 const { authMiddleware, authorizeMiddleware } = require('../../../shared');
 
 // =============================================
-// PUBLIC: MoMo IPN callback (không cần auth)
-// Phải đặt TRƯỚC router.use(authMiddleware)
+// PUBLIC: Callbacks không cần auth (đặt TRƯỚC authMiddleware)
 // =============================================
-router.post('/momo/ipn', paymentController.handleMomoIPN);
+router.post('/momo/ipn',    paymentController.handleMomoIPN);
+router.get('/vnpay/ipn',   paymentController.handleVnpayIPN);
+// Mock webhook giả lập ngân hàng — chỉ dùng dev/demo, xóa khi lên production
+router.post('/webhook/mock', paymentController.handleMockBankWebhook);
 
 // Tất cả routes bên dưới đều yêu cầu xác thực
 router.use(authMiddleware);
@@ -39,5 +41,6 @@ router.post('/:id/cash-confirm', authorizeMiddleware('ADMIN', 'MANAGER', 'STAFF'
 // QR: Nhân viên xác nhận nhận được chuyển khoản
 // =============================================
 router.post('/:id/qr-confirm', authorizeMiddleware('ADMIN', 'MANAGER', 'STAFF', 'EMPLOYEE'), paymentController.confirmQRPayment);
+
 
 module.exports = router;

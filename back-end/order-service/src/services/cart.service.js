@@ -72,7 +72,8 @@ const addToCart = async (customerId, itemData) => {
   // Xác minh sản phẩm tồn tại và lấy thông tin từ product-service
   const product = await getProductById(itemData.productId);
   itemData.productName = product.productName;
-  itemData.unitPrice = product.price;
+  // Dùng unitPrice từ client nếu có (đã tính phụ phí size), fallback về giá gốc
+  itemData.unitPrice = itemData.unitPrice ?? product.price;
 
   // Áp dụng mặc định và validate
   itemData.sugarLevel = itemData.sugarLevel || '100%';

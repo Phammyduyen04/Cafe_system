@@ -3,9 +3,11 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 const PAYMENT_METHODS = [
-  { method_code: 'CASH', method_name: 'Tiền mặt',        is_active: true, description: 'Thanh toán bằng tiền mặt tại quầy' },
-  { method_code: 'MOMO', method_name: 'Ví MoMo',         is_active: true, description: 'Thanh toán qua ví điện tử MoMo' },
-  { method_code: 'QR',   method_name: 'Chuyển khoản QR', is_active: true, description: 'Thanh toán qua mã QR ngân hàng (VietQR)' },
+  { method_code: 'CASH',        method_name: 'Tiền mặt',                is_active: true,  description: 'Thanh toán bằng tiền mặt tại quầy' },
+  { method_code: 'MOMO',        method_name: 'Ví MoMo',                 is_active: true,  description: 'Thanh toán qua ví điện tử MoMo' },
+  { method_code: 'VNPAY',       method_name: 'Thanh toán ngân hàng qua VNPAY', is_active: true, description: 'Thanh toán qua VNPay — ATM, QR ngân hàng, thẻ quốc tế' },
+  { method_code: 'BANK_TRANSFER', method_name: 'Chuyển khoản (xác nhận thủ công)', is_active: false, description: 'Nhân viên xác nhận sau khi nhận tiền' },
+  { method_code: 'QR',          method_name: 'Chuyển khoản QR (cũ)',    is_active: false, description: 'Đã thay thế bởi VNPay' },
 ];
 
 async function main() {
