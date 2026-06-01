@@ -2,6 +2,7 @@ const { AppError, publisher } = require('../../../shared');
 const paymentRepo = require('../repositories/payment.repo');
 const momoService = require('./momo.service');
 const vietQRService = require('./vietqr.service');
+const vnpayService = require('./vnpay.service');
 const crypto = require('crypto');
 
 const generateCode = (prefix) => {
@@ -86,6 +87,25 @@ const initiatePayment = async (orderId, totalAmount, paymentMethod, orderCode) =
     });
 
     return { payment, qrUrl };
+  }
+
+  if (method === 'VNPAY') {
+    const payUrl = vnpayService.createPaymentUrl({
+      amount: Math.round(Number(totalAmount)),
+      orderCode,
+      orderInfo: `Thanh toan don hang ${orderCode}`,
+    });
+
+    const payment = await paymentRepo.createPayment({
+      order_id: orderId,
+      total_amount: totalAmount,
+      remaining_amount: totalAmount,
+      payment_method: 'VNPAY',
+      payment_url: payUrl,
+      provider_order_id: orderCode,
+    });
+
+    return { payment, payUrl };
   }
 
   // CASH
@@ -281,6 +301,124 @@ const handleMomoCallback = async (data) => {
 };
 
 // =============================================
+// VNPAY: Xử lý IPN callback từ VNPay
+// =============================================
+
+/**
+ * VNPay gọi endpoint này sau khi giao dịch hoàn tất.
+ * Phải trả về { RspCode: "00", Message: "Confirm Success" } để VNPay không retry.
+ */
+const handleVnpayIPN = async (query) => {
+  const isValid = vnpayService.verifyCallback(query);
+  if (!isValid) {
+    return { RspCode: '97', Message: 'Invalid Checksum' };
+  }
+
+  const orderCode      = query.vnp_TxnRef;
+  const responseCode   = query.vnp_ResponseCode;
+  const transactionNo  = query.vnp_TransactionNo;
+  const vnpAmount      = Number(query.vnp_Amount) / 100; // VNPay gửi amount * 100
+
+  const payment = await paymentRepo.findByProviderOrderId(orderCode);
+  if (!payment) return { RspCode: '01', Message: 'Order Not Found' };
+  if (payment.payment_status === 'COMPLETED') return { RspCode: '02', Message: 'Order Already Confirmed' };
+
+  // Kiểm tra số tiền
+  if (Math.abs(vnpAmount - Number(payment.total_amount)) > 1) {
+    return { RspCode: '04', Message: 'Invalid Amount' };
+  }
+
+  if (responseCode !== '00') {
+    // Giao dịch thất bại — ghi log, không cập nhật
+    console.warn(`[vnpay-ipn] Payment failed: orderCode=${orderCode}, code=${responseCode}`);
+    return { RspCode: '00', Message: 'Confirm Success' }; // vẫn trả 00 để VNPay biết ta đã nhận
+  }
+
+  const vnpayMethod = await paymentRepo.findMethodByCode('BANK_TRANSFER');
+
+  const session = await paymentRepo.createSession({
+    payment_id: payment.payment_id,
+    session_code: generateCode('SS'),
+    expired_at: new Date(),
+    session_status: 'COMPLETED',
+    ended_at: new Date(),
+  });
+
+  await paymentRepo.createTransaction({
+    payment_session_id: session.payment_session_id,
+    payment_method_id: vnpayMethod ? vnpayMethod.payment_method_id : null,
+    transaction_code: generateCode('TXN'),
+    amount: Number(payment.total_amount),
+    transaction_status: 'SUCCESS',
+    gateway_response: JSON.stringify({ transactionNo, responseCode }),
+    note: `VNPay transNo: ${transactionNo}`,
+    paid_at: new Date(),
+  });
+
+  await paymentRepo.updatePayment(payment.payment_id, {
+    paid_amount: Number(payment.total_amount),
+    remaining_amount: 0,
+    payment_status: 'COMPLETED',
+  });
+
+  await publishPaymentCompleted(payment.order_id, 'VNPAY');
+  return { RspCode: '00', Message: 'Confirm Success' };
+};
+
+// =============================================
+// MOCK WEBHOOK: Giả lập ngân hàng báo thanh toán thành công
+// Chỉ dùng trong môi trường dev/demo — thay bằng PayOS/Sepay webhook ở production
+// =============================================
+
+/**
+ * Giả lập callback từ ngân hàng/payment gateway xác nhận giao dịch QR thành công.
+ * Payload giống chuẩn PayOS: { orderCode, amount, transactionId }
+ */
+const handleMockBankWebhook = async ({ orderId, amount, transactionId }) => {
+  if (!orderId) throw new AppError('orderId là bắt buộc', 400);
+
+  const payment = await paymentRepo.findByOrderId(orderId);
+  if (!payment) throw new AppError('Không tìm thấy payment cho đơn hàng này', 404);
+  if (payment.payment_method !== 'QR') throw new AppError('Đơn hàng này không dùng thanh toán QR', 400);
+  if (payment.payment_status === 'COMPLETED') return payment; // idempotent — bank có thể gọi nhiều lần
+
+  // Kiểm tra số tiền khớp (nới lỏng ±1đ vì làm tròn)
+  if (amount !== undefined && Math.abs(Number(amount) - Number(payment.total_amount)) > 1) {
+    throw new AppError(`Số tiền không khớp: nhận ${amount}, cần ${payment.total_amount}`, 400);
+  }
+
+  const qrMethod = await paymentRepo.findMethodByCode('BANK_TRANSFER');
+
+  const session = await paymentRepo.createSession({
+    payment_id: payment.payment_id,
+    session_code: generateCode('SS'),
+    expired_at: new Date(Date.now() + 5 * 60 * 1000),
+    session_status: 'COMPLETED',
+    ended_at: new Date(),
+  });
+
+  await paymentRepo.createTransaction({
+    payment_session_id: session.payment_session_id,
+    payment_method_id: qrMethod ? qrMethod.payment_method_id : null,
+    transaction_code: transactionId ?? generateCode('TXN'),
+    amount: Number(payment.total_amount),
+    transaction_status: 'SUCCESS',
+    gateway_response: JSON.stringify({ source: 'mock_bank_webhook', transactionId }),
+    note: `[MOCK] Ngân hàng xác nhận giao dịch: ${transactionId ?? 'N/A'}`,
+    paid_at: new Date(),
+  });
+
+  const completed = await paymentRepo.updatePayment(payment.payment_id, {
+    paid_amount: Number(payment.total_amount),
+    remaining_amount: 0,
+    payment_status: 'COMPLETED',
+  });
+
+  await publishPaymentCompleted(payment.order_id, 'QR');
+  return completed;
+};
+
+// =============================================
 // QUERIES
 // =============================================
 
@@ -331,6 +469,8 @@ module.exports = {
   createPaymentFromOrder,
   confirmCashPayment,
   confirmQRPayment,
+  handleVnpayIPN,
+  handleMockBankWebhook,
   handleMomoCallback,
   getAllPayments,
   getPaymentById,

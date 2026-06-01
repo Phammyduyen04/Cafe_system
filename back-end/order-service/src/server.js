@@ -3,7 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const { errorHandler, subscriber } = require('../../shared');
-const orderRoutes = require('./routes/order.routes');
+const orderRoutes    = require('./routes/order.routes');
+const shippingRoutes = require('./routes/shipping.routes');
 const orderService = require('./services/order.service');
 
 const app = express();
@@ -17,7 +18,8 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'Order Service is running', timestamp: new Date().toISOString() });
 });
 
-app.use('/api/orders', orderRoutes);
+app.use('/api/orders',   orderRoutes);
+app.use('/api/shipping', shippingRoutes);
 
 app.use(errorHandler);
 

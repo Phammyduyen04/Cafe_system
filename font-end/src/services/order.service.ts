@@ -83,8 +83,8 @@ export const orderService = {
   checkout: (payload: CheckoutPayload) =>
     api.post<{ order: Order; paymentInfo?: PaymentInfo; message: string }>("/api/orders/checkout", payload),
 
-  getMyOrders: () =>
-    api.get<{ data: Order[]; pagination?: unknown }>("/api/orders/my-orders"),
+  getMyOrders: (limit = 200) =>
+    api.get<{ data: Order[]; pagination?: unknown }>(`/api/orders/my-orders?limit=${limit}`),
 
   cancelOrder: (id: string) =>
     api.put<void>(`/api/orders/my-orders/${id}/cancel`, {}),

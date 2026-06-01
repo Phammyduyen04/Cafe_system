@@ -1,0 +1,10 @@
+{
+  "name": "cafe-backend",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail -n \"gateway,auth,customer,order,payment,product,promotion,staff\" -c \"bgBlue.bold,bgGreen.bold,bgYellow.bold,bgRed.bold,bgMagenta.bold,bgCyan.bold,bgWhite.bold,bgGray.bold\" \"npm --prefix api-gateway run dev\" \"npm --prefix auth-service run dev\" \"npm --prefix customer-service run dev\" \"npm --prefix order-service run dev\" \"npm --prefix payment-service run dev\" \"npm --prefix product-service run dev\" \"npm --prefix promotion-service run dev\" \"npm --prefix staff-service run dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}

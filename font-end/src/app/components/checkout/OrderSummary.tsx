@@ -7,9 +7,11 @@ const formatVND = (n: number) =>
 interface OrderSummaryProps {
   shippingFee?: number;
   shipOption?: string;
+  ahamoveFee?: number | null;
+  ahamoveLoading?: boolean;
 }
 
-export default function OrderSummary({ shippingFee, shipOption }: OrderSummaryProps = {}) {
+export default function OrderSummary({ shippingFee, shipOption, ahamoveFee, ahamoveLoading }: OrderSummaryProps = {}) {
   const { items } = useCart();
 
   if (items.length === 0) {
@@ -25,7 +27,8 @@ export default function OrderSummary({ shippingFee, shipOption }: OrderSummaryPr
 
   const subtotal = items.reduce((s, i) => s + (i.price ?? 0) * (i.quantity ?? 1), 0);
   const totalQty = items.reduce((s, i) => s + (i.quantity ?? 1), 0);
-  const isDynamic = shipOption === "partner";
+  const isPartner = shipOption === "partner";
+  const isDynamic = isPartner && ahamoveFee == null && !ahamoveLoading;
   const fee = shippingFee ?? 0;
   const total = isDynamic ? subtotal : subtotal + fee;
 
@@ -79,10 +82,17 @@ export default function OrderSummary({ shippingFee, shipOption }: OrderSummaryPr
           <span style={{ fontSize: 12, color: "rgba(48,38,28,0.65)" }}>Tạm tính</span>
           <span className="text-cafe-primary" style={{ fontSize: 12, fontWeight: 600 }}>{formatVND(subtotal)}</span>
         </div>
-        <div className="flex justify-between">
+        <div className="flex justify-between items-center">
           <span style={{ fontSize: 12, color: "rgba(48,38,28,0.65)" }}>Phí vận chuyển</span>
           {shipOption === undefined ? (
             <span style={{ fontSize: 11, color: "rgba(48,38,28,0.45)", fontStyle: "italic" }}>Tính ở bước tiếp theo</span>
+          ) : isPartner && ahamoveLoading ? (
+            <span className="flex items-center gap-1" style={{ fontSize: 11, color: "rgba(48,38,28,0.45)" }}>
+              <span className="w-3 h-3 border border-cafe-primary border-t-transparent rounded-full animate-spin inline-block" />
+              Đang tính...
+            </span>
+          ) : isPartner && ahamoveFee !== null && ahamoveFee !== undefined ? (
+            <span className="text-cafe-primary" style={{ fontSize: 12, fontWeight: 600 }}>+{formatVND(ahamoveFee)}</span>
           ) : isDynamic ? (
             <span style={{ fontSize: 11, color: "rgba(48,38,28,0.45)", fontStyle: "italic" }}>Tính theo khoảng cách</span>
           ) : fee === 0 ? (
@@ -92,9 +102,11 @@ export default function OrderSummary({ shippingFee, shipOption }: OrderSummaryPr
           )}
         </div>
         <div className="h-px bg-cafe-accent my-2" />
-        <div className="flex justify-between">
+        <div className="flex justify-between items-center">
           <span className="text-cafe-primary" style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.5px" }}>Tổng cộng</span>
-          {isDynamic ? (
+          {isPartner && ahamoveLoading ? (
+            <span style={{ fontSize: 11, color: "rgba(48,38,28,0.45)", fontStyle: "italic" }}>Đang tính...</span>
+          ) : isDynamic ? (
             <span style={{ fontSize: 11, color: "rgba(48,38,28,0.45)", fontStyle: "italic" }}>Tính theo khoảng cách</span>
           ) : (
             <span className="text-cafe-primary" style={{ fontSize: 13, fontWeight: 700 }}>{formatVND(total)}</span>

@@ -101,6 +101,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       productId: item.productId,
       size: item.size || null,
       quantity: item.quantity,
+      unitPrice: item.price, // bao gồm phụ phí size
     });
     await fetchCart();
   }, [fetchCart]);

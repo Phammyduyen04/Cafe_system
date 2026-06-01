@@ -47,6 +47,7 @@ const proxyOptions = {
 app.use('/api/auth',       proxy(AUTH_URL,      proxyOptions));
 app.use('/api/customers',  proxy(CUSTOMER_URL,  proxyOptions));
 app.use('/api/orders',     proxy(ORDER_URL,     proxyOptions));
+app.use('/api/shipping',   proxy(ORDER_URL,     proxyOptions));
 app.use('/api/payments',   proxy(PAYMENT_URL,   proxyOptions));
 app.use('/api/products',   proxy(PRODUCT_URL,   proxyOptions));
 app.use('/uploads/promotions', proxy(PROMOTION_URL, {
@@ -84,6 +85,7 @@ app.listen(PORT, () => {
   console.log(`  /api/auth       -> ${AUTH_URL}`);
   console.log(`  /api/customers  -> ${CUSTOMER_URL}`);
   console.log(`  /api/orders     -> ${ORDER_URL}`);
+  console.log(`  /api/shipping   -> ${ORDER_URL}`);
   console.log(`  /api/payments   -> ${PAYMENT_URL}`);
   console.log(`  /api/products   -> ${PRODUCT_URL}`);
   console.log(`  /api/promotions -> ${PROMOTION_URL}`);
