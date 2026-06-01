@@ -147,6 +147,13 @@ services:
       PRODUCT_SERVICE_URL: http://product-service:3005
       PROMOTION_SERVICE_URL: http://promotion-service:3006
       PAYMENT_SERVICE_URL: http://payment-service:3004
+      # AhaMove shipping
+      AHAMOVE_API_KEY: ${AHAMOVE_API_KEY}
+      AHAMOVE_API_URL: ${AHAMOVE_API_URL}
+      STORE_LAT: ${STORE_LAT}
+      STORE_LNG: ${STORE_LNG}
+      STORE_ADDRESS: ${STORE_ADDRESS}
+      STORE_PHONE: ${STORE_PHONE}
     depends_on:
       mysql:
         condition: service_healthy
@@ -178,6 +185,11 @@ services:
       VIETQR_BANK_ID: ${VIETQR_BANK_ID}
       VIETQR_ACCOUNT_NUMBER: ${VIETQR_ACCOUNT_NUMBER}
       VIETQR_ACCOUNT_NAME: ${VIETQR_ACCOUNT_NAME}
+      # VNPay
+      VNPAY_TMN_CODE: ${VNPAY_TMN_CODE}
+      VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET}
+      VNPAY_URL: ${VNPAY_URL}
+      VNPAY_RETURN_URL: ${VNPAY_RETURN_URL}
     depends_on:
       mysql:
         condition: service_healthy

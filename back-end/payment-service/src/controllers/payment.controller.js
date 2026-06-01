@@ -115,6 +115,45 @@ const confirmQRPayment = async (req, res, next) => {
 };
 
 // =============================================
+// VNPAY IPN: Callback từ VNPay (không cần auth)
+// =============================================
+
+/**
+ * GET /api/payments/vnpay/ipn?vnp_TxnRef=...&vnp_ResponseCode=00&...
+ * VNPay yêu cầu luôn trả về { RspCode: "00", Message: "Confirm Success" }
+ */
+const handleVnpayIPN = async (req, res, next) => {
+  try {
+    const result = await paymentService.handleVnpayIPN(req.query);
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('[vnpay-ipn] Error:', error.message);
+    return res.status(200).json({ RspCode: '99', Message: error.message });
+  }
+};
+
+// =============================================
+// MOCK WEBHOOK: Giả lập ngân hàng báo thanh toán thành công (chỉ dùng dev/demo)
+// =============================================
+
+/**
+ * POST /api/payments/webhook/mock
+ * Body: { orderId, amount, transactionId }
+ * Không cần auth — giả lập lời gọi từ bank/gateway bên ngoài (giống MoMo IPN)
+ */
+const handleMockBankWebhook = async (req, res, next) => {
+  try {
+    const { orderId, amount, transactionId } = req.body;
+    const payment = await paymentService.handleMockBankWebhook({ orderId, amount, transactionId });
+    return res.status(200).json({ success: true, message: 'Webhook xử lý thành công', data: payment });
+  } catch (error) {
+    // Trả 200 để client không retry (giống chuẩn webhook thực tế)
+    console.error('[mock-webhook] Error:', error.message);
+    return res.status(200).json({ success: false, message: error.message });
+  }
+};
+
+// =============================================
 // MOMO IPN: Callback từ MoMo (không cần auth)
 // =============================================
 
@@ -153,5 +192,7 @@ module.exports = {
   initiatePayment,
   confirmCashPayment,
   confirmQRPayment,
+  handleVnpayIPN,
+  handleMockBankWebhook,
   handleMomoIPN,
 };

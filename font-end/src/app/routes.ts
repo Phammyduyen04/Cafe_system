@@ -50,6 +50,7 @@ export const router = createBrowserRouter([
       { path: "profile", Component: ProfilePage },
       { path: "my-orders", Component: MyOrdersPage },
       { path: "payment/result", Component: PaymentResultPage },
+      { path: "payment/vnpay-result", Component: PaymentResultPage },
       { path: "promotions", Component: PromotionsPage },
       { path: "terms", Component: TermsPage },
       { path: "privacy", Component: PrivacyPage },

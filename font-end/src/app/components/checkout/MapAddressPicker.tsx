@@ -30,9 +30,10 @@ type NominatimResult = {
 interface Props {
   value: string;
   onChange: (address: string) => void;
+  onCoordinatesChange?: (lat: number, lng: number) => void;
 }
 
-export default function MapAddressPicker({ value, onChange }: Props) {
+export default function MapAddressPicker({ value, onChange, onCoordinatesChange }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMap = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
@@ -54,10 +55,11 @@ export default function MapAddressPicker({ value, onChange }: Props) {
       const addr = data.display_name ?? "";
       setQuery(addr);
       onChange(addr);
+      onCoordinatesChange?.(lat, lon);
     } catch {
       // silent
     }
-  }, [onChange]);
+  }, [onChange, onCoordinatesChange]);
 
   // ── Place marker and optionally reverse geocode ───────────────────────────
   const placeMarker = useCallback((lat: number, lon: number, geocode = true) => {
@@ -135,6 +137,7 @@ export default function MapAddressPicker({ value, onChange }: Props) {
     const lon = parseFloat(item.lon);
     setQuery(item.display_name);
     onChange(item.display_name);
+    onCoordinatesChange?.(lat, lon);
     setSuggestions([]);
     setShowSuggestions(false);
     if (leafletMap.current) {

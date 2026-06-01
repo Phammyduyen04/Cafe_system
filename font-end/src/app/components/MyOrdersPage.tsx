@@ -241,6 +241,8 @@ export default function MyOrdersPage() {
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(getLocalReviewedOrders);
   const [reviewingOrder, setReviewingOrder] = useState<Order | null>(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   useEffect(() => {
     if (!isLoggedIn) { navigate("/login"); return; }
@@ -320,8 +322,15 @@ export default function MyOrdersPage() {
           </div>
         )}
 
+        {/* Pagination info */}
+        {orders.length > 0 && (
+          <p className="font-body mb-2" style={{ fontSize: 12, color: "rgba(48,38,28,0.5)" }}>
+            Hiển thị {Math.min((page - 1) * PAGE_SIZE + 1, orders.length)}–{Math.min(page * PAGE_SIZE, orders.length)} trên {orders.length} đơn hàng
+          </p>
+        )}
+
         <div className="flex flex-col gap-4">
-          {orders.map(order => {
+          {orders.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(order => {
             const oid = order._id ?? order.order_id ?? "";
             const code = (order as any).order_code ?? `#${oid.slice(-8).toUpperCase()}`;
             const status = order.status ?? "PENDING";
@@ -412,6 +421,46 @@ export default function MyOrdersPage() {
             );
           })}
         </div>
+
+        {/* Pagination */}
+        {orders.length > PAGE_SIZE && (
+          <div className="flex items-center justify-center gap-2 mt-8">
+            <button
+              onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo(0, 0); }}
+              disabled={page === 1}
+              className="font-body w-9 h-9 border border-cafe-border flex items-center justify-center transition-colors hover:border-cafe-primary hover:text-cafe-primary disabled:opacity-30 disabled:cursor-not-allowed"
+              style={{ fontSize: 14 }}
+            >
+              ‹
+            </button>
+
+            {Array.from({ length: Math.ceil(orders.length / PAGE_SIZE) }, (_, i) => i + 1).map(p => (
+              <button
+                key={p}
+                onClick={() => { setPage(p); window.scrollTo(0, 0); }}
+                className="font-body w-9 h-9 border flex items-center justify-center transition-colors"
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderColor: p === page ? "#30261c" : "#d9d9d9",
+                  background: p === page ? "#30261c" : "white",
+                  color: p === page ? "#f1f0ee" : "#30261c",
+                }}
+              >
+                {p}
+              </button>
+            ))}
+
+            <button
+              onClick={() => { setPage(p => Math.min(Math.ceil(orders.length / PAGE_SIZE), p + 1)); window.scrollTo(0, 0); }}
+              disabled={page === Math.ceil(orders.length / PAGE_SIZE)}
+              className="font-body w-9 h-9 border border-cafe-border flex items-center justify-center transition-colors hover:border-cafe-primary hover:text-cafe-primary disabled:opacity-30 disabled:cursor-not-allowed"
+              style={{ fontSize: 14 }}
+            >
+              ›
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Review Modal */}
