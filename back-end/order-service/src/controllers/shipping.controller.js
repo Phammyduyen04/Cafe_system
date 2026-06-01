@@ -1,10 +1,11 @@
 const axios = require('axios');
 
-const AHAMOVE_API   = process.env.AHAMOVE_API_URL  || 'https://apistg.ahamove.com';
+const AHAMOVE_API   = process.env.AHAMOVE_API_URL  || 'https://partner-apistg.ahamove.com/v3';
 const STORE_LAT     = parseFloat(process.env.STORE_LAT     || '10.8414');
 const STORE_LNG     = parseFloat(process.env.STORE_LNG     || '106.8098');
 const STORE_ADDRESS = process.env.STORE_ADDRESS || 'Coffea Cafe, TP. Hồ Chí Minh';
-const STORE_PHONE   = process.env.STORE_PHONE   || '+84901234567';
+// AhaMove yêu cầu format 84XXXXXXXXX (không có dấu +)
+const STORE_PHONE   = (process.env.STORE_PHONE || '+84901234567').replace(/^\+/, '');
 
 // Cache token in memory — valid ~22 h (Ahamove token TTL is 24 h)
 let _cachedToken    = null;
@@ -22,11 +23,13 @@ async function getAhamoveToken() {
     return _cachedToken;
   }
 
-  const { data } = await axios.post(`${AHAMOVE_API}/v1/partner/login`, {
+  const loginUrl = `${AHAMOVE_API}/accounts/token`;
+  console.log('[AhaMove] Gọi login:', loginUrl, '| mobile:', STORE_PHONE, '| api_key:', apiKey.slice(0, 8) + '...');
+  const { data } = await axios.post(loginUrl, {
     api_key: apiKey,
     mobile:  STORE_PHONE,
-    name:    'Coffea',
   });
+  console.log('[AhaMove] Login thành công, token:', data.token?.slice(0, 12) + '...');
 
   _cachedToken    = data.token;
   _tokenFetchedAt = Date.now();
@@ -47,29 +50,37 @@ const estimateFee = async (req, res, next) => {
 
     const token = await getAhamoveToken();
 
-    const path     = JSON.stringify([
-      { lat: STORE_LAT, lng: STORE_LNG, name: 'Coffea',     address: STORE_ADDRESS, mobile: STORE_PHONE },
-      { lat: destLat,   lng: destLng,   name: 'Khách hàng', address: destAddress,   mobile: STORE_PHONE },
-    ]);
-    const services = JSON.stringify([{ _id: 'SGN-BIKE', requests: [] }]);
-
-    const { data } = await axios.get(`${AHAMOVE_API}/v1/order/estimated_fee`, {
-      params: { token, order_time: 0, path, services },
+    const { data } = await axios.post(`${AHAMOVE_API}/orders/estimates`, {
+      order_time:     0,
+      path: [
+        { lat: STORE_LAT, lng: STORE_LNG, name: 'Coffea',     address: STORE_ADDRESS, mobile: STORE_PHONE },
+        { lat: destLat,   lng: destLng,   name: 'Khách hàng', address: destAddress,   mobile: STORE_PHONE },
+      ],
+      services:       [{ _id: 'SGN-BIKE', requests: [] }],
+      requests:       [],
+      payment_method: 'CASH',
+    }, {
+      headers: { Authorization: `Bearer ${token}` },
     });
+
+    // Response là array: [{ service_id, data: { total_price, distance, duration } }]
+    const result = Array.isArray(data) ? (data[0]?.data ?? data[0]) : data;
 
     return res.json({
       success: true,
       data: {
-        totalPrice: data.total_price ?? 0,
-        distance:   data.distance   ?? 0,
-        duration:   data.duration   ?? 0,
+        totalPrice: result.total_price ?? result.totalPrice ?? 0,
+        distance:   result.distance   ?? 0,
+        duration:   result.duration   ?? 0,
       },
     });
   } catch (error) {
     if (error.response) {
-      const msg = error.response.data?.description || `Ahamove lỗi ${error.response.status}`;
+      console.error('[AhaMove] Lỗi từ API:', error.response.status, JSON.stringify(error.response.data));
+      const msg = error.response.data?.description || error.response.data?.message || `Ahamove lỗi ${error.response.status}`;
       return res.status(502).json({ success: false, message: msg });
     }
+    console.error('[AhaMove] Lỗi không phải từ API:', error.message);
     next(error);
   }
 };

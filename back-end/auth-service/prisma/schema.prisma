@@ -20,6 +20,7 @@ model Account {
   created_at     DateTime  @default(now())
   updated_at     DateTime  @updatedAt
   last_login_at  DateTime?
+  avatar         String?   @db.VarChar(500)
 
   account_roles         AccountRole[]
   refresh_tokens        RefreshToken[]

@@ -9,6 +9,12 @@ import type { Category, Product } from "../../services/product.service";
 
 const MAX_SUGGESTIONS = 6;
 
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
+function avatarSrc(avatar?: string | null) {
+  if (!avatar) return null;
+  return avatar.startsWith("http") ? avatar : `${BASE_URL}${avatar}`;
+}
+
 export default function CoffeaNavbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
@@ -390,10 +396,14 @@ export default function CoffeaNavbar() {
                 className="flex items-center gap-2 px-3 py-2 rounded-full text-white hover:bg-white/20 transition-colors"
                 aria-label="Tài khoản"
               >
-                <div className="w-8 h-8 rounded-full bg-cafe-accent flex items-center justify-center">
-                  <span className="font-body text-cafe-primary" style={{ fontSize: 12, fontWeight: 700 }}>
-                    {user?.username?.charAt(0)?.toUpperCase() ?? "U"}
-                  </span>
+                <div className="w-8 h-8 rounded-full bg-cafe-accent flex items-center justify-center overflow-hidden">
+                  {avatarSrc(user?.avatar) ? (
+                    <img src={avatarSrc(user?.avatar)!} alt="avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="font-body text-cafe-primary" style={{ fontSize: 12, fontWeight: 700 }}>
+                      {user?.username?.charAt(0)?.toUpperCase() ?? "U"}
+                    </span>
+                  )}
                 </div>
               </button>
               {accountOpen && (

@@ -63,6 +63,26 @@ export const authService = {
   resetPassword: (email: string, code: string, newPassword: string) =>
     api.post<void>("/api/auth/reset-password", { email, code, newPassword }),
 
+  updateProfile: (data: { fullName?: string; email?: string }) =>
+    api.put<AuthUser>("/api/auth/me", data),
+
+  uploadAvatar: async (file: File) => {
+    const token = localStorage.getItem("accessToken");
+    const form = new FormData();
+    form.append("avatar", file);
+    const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
+    const res = await fetch(`${BASE_URL}/api/auth/me/avatar`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error((body as any).message ?? `Lỗi ${res.status}`);
+    }
+    return res.json() as Promise<{ success: boolean; data: { avatar: string } }>;
+  },
+
   googleLogin: async (credential: string) => {
     const res = await api.post<LoginResponse>("/api/auth/google", {
       idToken: credential,
