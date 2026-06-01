@@ -219,6 +219,8 @@ services:
       SERVICE_NAME: promotion-service
       MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/promotion_db?authSource=admin
       JWT_SECRET: ${JWT_SECRET}
+    volumes:
+      - promotion_uploads:/app/promotion-service/uploads
     depends_on:
       mongodb:
         condition: service_healthy
@@ -256,3 +258,4 @@ volumes:
   mysql_data:
   mongo_data:
   rabbitmq_data:
+  promotion_uploads:

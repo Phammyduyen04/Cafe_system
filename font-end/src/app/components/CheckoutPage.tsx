@@ -4,6 +4,9 @@ import { useCart } from "../../contexts/CartContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { orderService } from "../../services/order.service";
 import type { PaymentMethod, PaymentInfo } from "../../services/order.service";
+import { promotionService } from "../../services/promotion.service";
+import type { CalculateResult } from "../../services/promotion.service";
+import { productService } from "../../services/product.service";
 
 import StepIndicator, { STEPS } from "./checkout/StepIndicator";
 import OrderSummary from "./checkout/OrderSummary";
@@ -98,9 +101,19 @@ export default function CheckoutPage() {
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);
   const [qrPaid, setQrPaid] = useState(false);
 
+  // Coupon
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{ type: "PROMOTION" | "DISCOUNT"; programId: string; couponCode: string } | null>(null);
+  const [couponResult, setCouponResult] = useState<CalculateResult | null>(null);
+  const [couponError, setCouponError] = useState("");
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [rewardDetails, setRewardDetails] = useState<{ productId: string; quantity: number; name: string; image?: string }[]>([]);
+
   // Compute shipping fee from selected option
   const selectedShip = SHIP_OPTIONS.find(o => o.id === shipMethod) ?? SHIP_OPTIONS[0];
   const shippingFee = selectedShip.fee;
+  const subtotal = items.reduce((s, i) => s + (i.price ?? 0) * (i.quantity ?? 1), 0);
+  const discountAmount = couponResult?.discountAmount ?? 0;
 
   // Poll order status when waiting for QR payment
   useEffect(() => {
@@ -157,6 +170,67 @@ export default function CheckoutPage() {
     return "";
   };
 
+  const handleApplyCoupon = async () => {
+    const code = couponInput.trim().toUpperCase();
+    if (!code) return;
+    setCouponLoading(true);
+    setCouponError("");
+    setCouponResult(null);
+    setAppliedCoupon(null);
+    // Lặp lại mỗi productId theo quantity để backend kiểm tra đủ số lượng trigger
+    const productIds = items.flatMap(i => Array(i.quantity ?? 1).fill(i.productId)).filter(Boolean);
+    try {
+      let type: "PROMOTION" | "DISCOUNT" = "DISCOUNT";
+      let programId = "";
+      try {
+        const res = await promotionService.getDiscountByCoupon(code);
+        programId = (res as any)?.discountId ?? "";
+        type = "DISCOUNT";
+      } catch {
+        try {
+          const res = await promotionService.getPromotionByCoupon(code);
+          programId = (res as any)?.promotionId ?? "";
+          type = "PROMOTION";
+        } catch {
+          setCouponError("Mã coupon không hợp lệ hoặc không tìm thấy.");
+          return;
+        }
+      }
+      if (!programId) { setCouponError("Mã coupon không hợp lệ."); return; }
+      const result = await promotionService.calculate({ type, programId, orderAmount: subtotal, productIds });
+      setAppliedCoupon({ type, programId, couponCode: code });
+      setCouponResult(result);
+      // Fetch tên sản phẩm tặng kèm (nếu có)
+      if (result.rewardProducts?.length > 0) {
+        const details = await Promise.all(
+          result.rewardProducts.map(async (rp) => {
+            try {
+              const p = await productService.getProduct(rp.productId);
+              return { productId: rp.productId, quantity: rp.quantity, name: p?.name ?? rp.productId, image: p?.image ?? p?.images?.[0] };
+            } catch {
+              return { productId: rp.productId, quantity: rp.quantity, name: rp.productId };
+            }
+          })
+        );
+        setRewardDetails(details);
+      } else {
+        setRewardDetails([]);
+      }
+    } catch (e: any) {
+      setCouponError(e?.message ?? "Mã coupon không thể áp dụng cho đơn hàng này.");
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponResult(null);
+    setCouponInput("");
+    setCouponError("");
+    setRewardDetails([]);
+  };
+
   const handleNext = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -187,9 +261,23 @@ export default function CheckoutPage() {
       });
       const order = (res as any)?.order ?? res;
       const pInfo = (res as any)?.paymentInfo ?? null;
-      setOrderId(order?._id ?? order?.order_id ?? "");
+      const createdOrderId = order?._id ?? order?.order_id ?? "";
+      setOrderId(createdOrderId);
       setOrderCode(order?.order_code ?? "");
       setPaymentInfo(pInfo);
+
+      if (appliedCoupon && createdOrderId) {
+        try {
+          await promotionService.recordUsage({
+            type: appliedCoupon.type,
+            programId: appliedCoupon.programId,
+            orderId: createdOrderId,
+            customerId: (user as any)?.id ?? (user as any)?.userId ?? undefined,
+            originalAmount: subtotal,
+            discountAmount,
+          });
+        } catch { /* không làm hỏng đơn hàng nếu ghi nhận thất bại */ }
+      }
 
       if (selectedPayMethod === "MOMO") {
         if (!pInfo?.payUrl) {
@@ -222,8 +310,7 @@ export default function CheckoutPage() {
   // ─── QR Waiting screen ───────────────────────────────────────────────────
   if (waitingQR) {
     const qrUrl = paymentInfo?.qrUrl;
-    const subtotal = items.reduce((s, i) => s + (i.price ?? 0) * (i.quantity ?? 1), 0);
-    const total = selectedShip.feeIsDynamic ? subtotal : subtotal + shippingFee;
+    const total = selectedShip.feeIsDynamic ? subtotal - discountAmount : subtotal + shippingFee - discountAmount;
 
     if (qrPaid) {
       return (
@@ -434,6 +521,55 @@ export default function CheckoutPage() {
               {step === 2 && (
                 <div className="flex flex-col gap-6">
                   <div>
+                    <SectionLabel>Mã giảm giá</SectionLabel>
+                    {appliedCoupon ? (
+                      <div className="flex items-center justify-between px-4 py-3 border border-[#c8e6c9] bg-[#f1f8f1]">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-body text-cafe-primary" style={{ fontSize: 12, fontWeight: 700 }}>{appliedCoupon.couponCode}</span>
+                          {couponResult && couponResult.discountAmount > 0 && (
+                            <span className="font-body" style={{ fontSize: 11, color: "#5a8a5a" }}>
+                              Giảm {couponResult.discountAmount.toLocaleString("vi-VN")}₫
+                            </span>
+                          )}
+                          {couponResult && couponResult.rewardProducts.length > 0 && (
+                            <span className="font-body" style={{ fontSize: 11, color: "#5a8a5a" }}>
+                              Tặng {couponResult.rewardProducts.length} sản phẩm
+                            </span>
+                          )}
+                        </div>
+                        <button type="button" onClick={handleRemoveCoupon} className="font-body" style={{ fontSize: 11, color: "rgba(48,38,28,0.5)", textDecoration: "underline" }}>
+                          Xóa
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={couponInput}
+                            onChange={e => setCouponInput(e.target.value.toUpperCase())}
+                            placeholder="Nhập mã giảm giá"
+                            className="flex-1 border border-[#d9d9d9] px-4 py-3 font-body bg-white text-cafe-primary"
+                            style={{ fontSize: 13, outline: "none" }}
+                            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleApplyCoupon(); } }}
+                          />
+                          <button
+                            type="button"
+                            onClick={handleApplyCoupon}
+                            disabled={couponLoading || !couponInput.trim()}
+                            className="px-5 py-3 border border-cafe-primary font-body text-cafe-primary transition-all hover:bg-cafe-primary hover:text-white disabled:opacity-50"
+                            style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}
+                          >
+                            {couponLoading ? "..." : "Áp dụng"}
+                          </button>
+                        </div>
+                        {couponError && (
+                          <p className="font-body" style={{ fontSize: 11, color: "#e74c3c" }}>{couponError}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div>
                     <SectionLabel>Phương thức thanh toán</SectionLabel>
                     <div className="flex flex-col gap-3">
                       {payMethods.map(m => (
@@ -530,13 +666,13 @@ export default function CheckoutPage() {
               </button>
 
               <div className="lg:hidden mt-4">
-                <OrderSummary shippingFee={step >= 1 ? shippingFee : undefined} shipOption={step >= 1 ? selectedShip.id : undefined} />
+                <OrderSummary shippingFee={step >= 1 ? shippingFee : undefined} shipOption={step >= 1 ? selectedShip.id : undefined} discountAmount={couponResult?.discountAmount} couponCode={appliedCoupon?.couponCode} rewardProducts={rewardDetails} />
               </div>
             </form>
 
             {/* RIGHT: Order Summary */}
             <div className="hidden lg:block w-[360px] xl:w-[400px] shrink-0 sticky top-24">
-              <OrderSummary shippingFee={step >= 1 ? shippingFee : undefined} shipOption={step >= 1 ? selectedShip.id : undefined} />
+              <OrderSummary shippingFee={step >= 1 ? shippingFee : undefined} shipOption={step >= 1 ? selectedShip.id : undefined} discountAmount={couponResult?.discountAmount} couponCode={appliedCoupon?.couponCode} rewardProducts={rewardDetails} />
             </div>
           </div>
 
