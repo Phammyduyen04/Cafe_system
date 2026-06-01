@@ -2,6 +2,16 @@ const { AppError } = require('../../../shared');
 const employeeRepo = require('../repositories/employee.repo');
 const availabilityRepo = require('../repositories/availability.repo');
 
+const POSITION_NORMALIZE = {
+  'barista': 'BARISTA', 'thu ngân': 'CASHIER', 'cashier': 'CASHIER',
+  'phục vụ': 'WAITER', 'waiter': 'WAITER', 'bếp': 'KITCHEN_STAFF',
+  'kitchen': 'KITCHEN_STAFF', 'kitchen_staff': 'KITCHEN_STAFF',
+  'quản lý': 'MANAGER', 'manager': 'MANAGER', 'vệ sinh': 'CLEANER',
+  'cleaner': 'CLEANER', 'khác': 'OTHER', 'other': 'OTHER',
+};
+const normalizePosition = (pos) =>
+  pos ? (POSITION_NORMALIZE[pos.toLowerCase()] ?? pos.toUpperCase()) : pos;
+
 // Sinh employeeId dạng EMP-001, EMP-002, ...
 const generateEmployeeId = async () => {
   const all = await employeeRepo.findAll({ employeeId: { $regex: '^EMP-' } });
@@ -17,7 +27,8 @@ const generateEmployeeId = async () => {
 };
 
 const createEmployee = async (data, user) => {
-  const { fullName, position, employeeType, maxWorkingHours, accountId, managerId } = data;
+  const { fullName, employeeType, maxWorkingHours, accountId, managerId } = data;
+  const position = normalizePosition(data.position);
   if (!fullName || !position || !employeeType) {
     throw new AppError('Họ tên, vị trí và loại nhân viên là bắt buộc', 400);
   }
@@ -82,6 +93,7 @@ const getEmployeeById = async (id) => {
 };
 
 const updateEmployee = async (id, data) => {
+  if (data.position) data = { ...data, position: normalizePosition(data.position) };
   const employee = await employeeRepo.findByEmployeeId(id);
   if (!employee) throw new AppError('Không tìm thấy nhân viên', 404);
 

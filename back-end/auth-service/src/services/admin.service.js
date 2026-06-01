@@ -6,9 +6,11 @@ const { AppError } = require('../../../shared');
 
 /* ── Helpers ─────────────────────────────────────────────── */
 
-const EMPLOYEE_POSITIONS = ['STAFF', 'BARISTA', 'CASHIER', 'KITCHEN', 'CLEANER', 'SUPERVISOR', 'EMPLOYEE'];
+const EMPLOYEE_POSITIONS = ['BARISTA', 'CASHIER', 'WAITER', 'KITCHEN_STAFF', 'CLEANER', 'OTHER'];
 const MANAGER_POSITIONS = ['MANAGER'];
 const VALID_POSITIONS = [...EMPLOYEE_POSITIONS, ...MANAGER_POSITIONS];
+
+const normalizePosition = (pos) => pos.toUpperCase();
 
 const generatePassword = () => {
   const digits = Math.floor(1000 + Math.random() * 9000);
@@ -33,7 +35,7 @@ const createStaffAccount = async (adminUsername, data) => {
   if (!fullName || !fullName.trim()) throw new AppError('Họ tên là bắt buộc', 400);
   if (!position) throw new AppError('Chức vụ là bắt buộc', 400);
 
-  const positionUpper = position.toUpperCase();
+  const positionUpper = normalizePosition(position);
   if (!VALID_POSITIONS.includes(positionUpper)) {
     throw new AppError(`Chức vụ không hợp lệ. Hợp lệ: ${VALID_POSITIONS.join(', ')}`, 400);
   }
@@ -70,7 +72,7 @@ const createStaffAccount = async (adminUsername, data) => {
   const plainPassword = generatePassword();
   const passwordHash = await bcrypt.hash(plainPassword, 10);
 
-  const userType = userTypeFromPosition(position);
+  const userType = userTypeFromPosition(positionUpper);
 
   // Create account
   const account = await accountRepo.create({
@@ -82,7 +84,7 @@ const createStaffAccount = async (adminUsername, data) => {
   });
 
   // Assign role
-  const roleName = roleNameFromPosition(position);
+  const roleName = roleNameFromPosition(positionUpper);
   try {
     const role = await roleRepo.findByName(roleName);
     if (role) {
