@@ -24,8 +24,10 @@ const isPromotionApplicable = async (promotion, { productIds = [], orderAmount =
     return { ok: false, reason: 'Loại khách hàng không được áp dụng' };
   }
   if (condition.triggerProducts?.length > 0) {
-    const hasTrigger = condition.triggerProducts.some((t) => productIds.includes(t.productId));
-    if (!hasTrigger) return { ok: false, reason: 'Đơn hàng không chứa sản phẩm kích hoạt khuyến mãi' };
+    // Tất cả sản phẩm trong đơn phải thuộc danh sách trigger
+    const triggerSet = new Set(condition.triggerProducts.map((t) => String(t.productId).trim()));
+    const allEligible = productIds.every((id) => id && triggerSet.has(String(id).trim()));
+    if (!allEligible) return { ok: false, reason: 'Đơn hàng chứa sản phẩm không thuộc điều kiện khuyến mãi' };
   }
 
   return { ok: true, condition };
@@ -57,7 +59,9 @@ const isDiscountApplicable = async (discount, { productIds = [], categoryIds = [
   }
   if (condition.timeFrames?.length > 0) {
     const now = new Date();
-    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    // Dùng UTC+7 (giờ Việt Nam) thay vì giờ server
+    const vnHours = (now.getUTCHours() + 7) % 24;
+    const currentTime = `${String(vnHours).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}`;
     const inFrame = condition.timeFrames.some((tf) => currentTime >= tf.from && currentTime <= tf.to);
     if (!inFrame) return { ok: false, reason: 'Ngoài khung giờ áp dụng giảm giá' };
   }
