@@ -92,6 +92,8 @@ services:
     restart: on-failure
     ports:
       - "3001:3001"
+    volumes:
+      - ./uploads/avatars:/app/auth-service/uploads/avatars
     environment:
       PORT: 3001
       SERVICE_NAME: auth-service

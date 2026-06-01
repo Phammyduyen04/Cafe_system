@@ -226,6 +226,7 @@ const login = async (username, password) => {
       username: account.username,
       fullName: account.full_name,
       email: account.email,
+      avatar: account.avatar ?? null,
       userType: account.user_type,
       userId: account.user_id,
       roles: accountRoles.map((r) => r.role.role_name),
@@ -304,6 +305,7 @@ const getAccountById = async (accountId) => {
     username: account.username,
     fullName: account.full_name,
     email: account.email,
+    avatar: account.avatar ?? null,
     userType: account.user_type,
     userId: account.user_id,
     status: account.account_status,
@@ -313,6 +315,39 @@ const getAccountById = async (accountId) => {
     lastLoginAt: account.last_login_at,
     createdAt: account.created_at,
   };
+};
+
+/**
+ * Cập nhật thông tin cá nhân (fullName, email)
+ */
+const updateProfile = async (accountId, { fullName, email }) => {
+  if (email) {
+    const existing = await accountRepo.findByEmail(email);
+    if (existing && existing.account_id !== accountId) {
+      throw new AppError('Email đã được sử dụng bởi tài khoản khác', 409);
+    }
+  }
+
+  const updateData = {};
+  if (fullName !== undefined) updateData.full_name = fullName;
+  if (email !== undefined) updateData.email = email;
+
+  const account = await accountRepo.update(accountId, updateData);
+  return {
+    accountId: account.account_id,
+    username: account.username,
+    fullName: account.full_name,
+    email: account.email,
+    avatar: account.avatar ?? null,
+  };
+};
+
+/**
+ * Cập nhật avatar
+ */
+const updateAvatar = async (accountId, avatarPath) => {
+  const account = await accountRepo.update(accountId, { avatar: avatarPath });
+  return { avatar: account.avatar };
 };
 
 /**
@@ -450,6 +485,7 @@ const googleLogin = async (idToken) => {
       username: account.username,
       fullName: account.full_name,
       email: account.email,
+      avatar: account.avatar ?? null,
       userType: account.user_type,
       userId: account.user_id,
       roles: accountRoles.map((r) => r.role.role_name),
@@ -539,6 +575,8 @@ module.exports = {
   refreshToken,
   logout,
   getAccountById,
+  updateProfile,
+  updateAvatar,
   changePassword,
   forgotPassword,
   resetPassword,

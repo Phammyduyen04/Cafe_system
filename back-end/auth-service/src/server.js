@@ -7,6 +7,9 @@ const authRoutes = require('./routes/auth.routes');
 const roleRoutes = require('./routes/role.routes');
 const adminRoutes = require('./routes/admin.routes');
 
+const path = require('path');
+const fs = require('fs');
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -14,6 +17,11 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(morgan('dev'));
 app.use(express.json());
+
+// Serve avatar images
+const avatarDir = path.join(__dirname, '../uploads/avatars');
+if (!fs.existsSync(avatarDir)) fs.mkdirSync(avatarDir, { recursive: true });
+app.use('/uploads/avatars', express.static(avatarDir));
 
 // Health check
 app.get('/api/health', (req, res) => {

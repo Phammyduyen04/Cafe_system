@@ -50,6 +50,13 @@ app.use('/api/orders',     proxy(ORDER_URL,     proxyOptions));
 app.use('/api/shipping',   proxy(ORDER_URL,     proxyOptions));
 app.use('/api/payments',   proxy(PAYMENT_URL,   proxyOptions));
 app.use('/api/products',   proxy(PRODUCT_URL,   proxyOptions));
+app.use('/uploads/avatars', proxy(AUTH_URL, {
+  proxyReqPathResolver(req) { return req.originalUrl; },
+  proxyErrorHandler(err, res, next) {
+    console.error('Proxy error:', err.message);
+    res.status(502).json({ success: false, message: 'Service unavailable' });
+  },
+}));
 app.use('/uploads/promotions', proxy(PROMOTION_URL, {
   proxyReqPathResolver(req) { return req.originalUrl; },
   proxyErrorHandler(err, res, next) {

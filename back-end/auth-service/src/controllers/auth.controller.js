@@ -89,6 +89,29 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
+const updateProfile = async (req, res, next) => {
+  try {
+    const { fullName, email } = req.body;
+    const result = await authService.updateProfile(req.user.accountId, { fullName, email });
+    return responseHelper.success(res, result, 'Profile updated successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+const uploadAvatar = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Không có file được tải lên' });
+    }
+    const avatarPath = `/uploads/avatars/${req.file.filename}`;
+    const result = await authService.updateAvatar(req.user.accountId, avatarPath);
+    return responseHelper.success(res, result, 'Avatar updated successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -96,6 +119,8 @@ module.exports = {
   refreshToken,
   logout,
   getMe,
+  updateProfile,
+  uploadAvatar,
   changePassword,
   forgotPassword,
   resetPassword,
