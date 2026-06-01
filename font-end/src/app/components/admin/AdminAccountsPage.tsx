@@ -38,7 +38,7 @@ const fmt = (v: string | null | undefined) => v || "—";
 ══════════════════════════════════════════════════════════ */
 
 export default function AdminAccountsPage() {
-  const [tab, setTab] = useState<"create" | "list">("list");
+  const [tab, setTab] = useState<"employees" | "list" | "create">("employees");
 
   return (
     <div>
@@ -50,9 +50,14 @@ export default function AdminAccountsPage() {
       </h1>
 
       {/* Tab switcher */}
-      <div className="flex gap-1 p-1 bg-white rounded-xl border border-[var(--cafe-border)] w-fit mb-6">
+      <div className="flex flex-wrap gap-1 p-1 bg-white rounded-xl border border-[var(--cafe-border)] w-fit mb-6">
         {(
           [
+            {
+              key: "employees",
+              label: "Nhân viên chưa có tài khoản",
+              icon: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
+            },
             {
               key: "list",
               label: "Danh sách tài khoản",
@@ -60,13 +65,14 @@ export default function AdminAccountsPage() {
             },
             {
               key: "create",
-              label: "Tạo tài khoản tự động",
+              label: "Tạo tài khoản thủ công",
               icon: "M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z",
             },
           ] as const
         ).map((t) => (
           <button
             key={t.key}
+            type="button"
             onClick={() => setTab(t.key)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-body transition-colors ${
               tab === t.key
@@ -75,16 +81,7 @@ export default function AdminAccountsPage() {
             }`}
             style={{ fontSize: 13, fontWeight: 500 }}
           >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d={t.icon} />
             </svg>
             {t.label}
@@ -92,11 +89,9 @@ export default function AdminAccountsPage() {
         ))}
       </div>
 
-      {tab === "list" ? (
-        <AccountListTab />
-      ) : (
-        <CreateAccountTab onCreated={() => setTab("list")} />
-      )}
+      {tab === "employees" && <EmployeesWithoutAccountTab onCreated={() => setTab("list")} />}
+      {tab === "list"      && <AccountListTab />}
+      {tab === "create"    && <CreateAccountTab onCreated={() => setTab("list")} />}
     </div>
   );
 }
@@ -127,6 +122,7 @@ function AccountListTab() {
   const [manualPass, setManualPass] = useState("");
   const [resetDone, setResetDone] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [resetError, setResetError] = useState("");
 
   const [successMsg, setSuccessMsg] = useState("");
 
@@ -203,15 +199,16 @@ function AccountListTab() {
   const handleResetPassword = async () => {
     if (!resetAcc) return;
     if (!manualPass || manualPass.length < 6) {
-      alert("Mật khẩu phải có ít nhất 6 ký tự");
+      setResetError("Mật khẩu phải có ít nhất 6 ký tự");
       return;
     }
     try {
       setResetting(true);
+      setResetError("");
       await adminService.resetPassword(resetAcc.accountId, manualPass);
       setResetDone(true);
     } catch (err: any) {
-      alert(err.message || "Lỗi khi đặt lại mật khẩu");
+      setResetError(err.message || "Lỗi khi đặt lại mật khẩu");
     } finally {
       setResetting(false);
     }
@@ -371,13 +368,16 @@ function AccountListTab() {
                         >
                           {acc.status === "ACTIVE" ? "Vô hiệu hoá" : "Kích hoạt"}
                         </button>
-                        <button
-                          onClick={() => { setResetAcc(acc); setManualPass(""); setResetDone(false); }}
-                          className="font-body text-blue-500 hover:underline"
-                          style={{ fontSize: 12 }}
-                        >
-                          Reset MK
-                        </button>
+                        {!acc.roles.includes("ADMIN") && (
+                          <button
+                            type="button"
+                            onClick={() => { setResetAcc(acc); setManualPass(""); setResetDone(false); setResetError(""); }}
+                            className="font-body text-blue-500 hover:underline"
+                            style={{ fontSize: 12 }}
+                          >
+                            Reset MK
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -474,7 +474,7 @@ function AccountListTab() {
 
       {/* Reset Password Modal */}
       {resetAcc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { setResetAcc(null); setManualPass(""); setResetDone(false); }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { setResetAcc(null); setManualPass(""); setResetDone(false); setResetError(""); }}>
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
             {resetDone ? (
               <>
@@ -502,31 +502,44 @@ function AccountListTab() {
                 <h2 className="font-heading text-[var(--cafe-primary)] mb-2" style={{ fontSize: 20, fontWeight: 700 }}>
                   Đặt lại mật khẩu
                 </h2>
-                <p className="font-body text-[var(--cafe-primary)]/70 mb-4" style={{ fontSize: 14 }}>
-                  Nhập mật khẩu mới cho tài khoản <strong>@{resetAcc.username}</strong>
-                </p>
-                <div className="mb-6">
+                <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" className="shrink-0">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                  </svg>
+                  <span className="font-body" style={{ fontSize: 13, color: "#1d4ed8" }}>
+                    <strong>@{resetAcc.username}</strong>
+                    <span style={{ opacity: 0.7 }}> · {USER_TYPE_LABELS[resetAcc.userType] || resetAcc.userType}</span>
+                  </span>
+                </div>
+                <div className="mb-4">
                   <label className="font-body text-[var(--cafe-primary)] block mb-1" style={{ fontSize: 13, fontWeight: 500 }}>
                     Mật khẩu mới (tối thiểu 6 ký tự)
                   </label>
                   <input
                     type="password"
                     value={manualPass}
-                    onChange={(e) => setManualPass(e.target.value)}
+                    onChange={(e) => { setManualPass(e.target.value); setResetError(""); }}
+                    onKeyDown={(e) => { if (e.key === "Enter" && manualPass.length >= 6) handleResetPassword(); }}
                     placeholder="Nhập mật khẩu mới..."
                     className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)]"
                     style={{ fontSize: 14 }}
+                    autoFocus
                   />
+                  {resetError && (
+                    <p className="font-body mt-2" style={{ fontSize: 12, color: "#dc2626" }}>{resetError}</p>
+                  )}
                 </div>
                 <div className="flex gap-3">
                   <button
-                    onClick={() => { setResetAcc(null); setManualPass(""); setResetDone(false); }}
+                    type="button"
+                    onClick={() => { setResetAcc(null); setManualPass(""); setResetDone(false); setResetError(""); }}
                     className="font-body flex-1 py-2.5 border border-[var(--cafe-border)] rounded-lg hover:bg-[var(--cafe-bg)]"
                     style={{ fontSize: 14, fontWeight: 500 }}
                   >
                     Hủy
                   </button>
                   <button
+                    type="button"
                     onClick={handleResetPassword}
                     disabled={resetting || manualPass.length < 6}
                     className="font-body flex-1 py-2.5 bg-[var(--cafe-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50"
@@ -555,6 +568,7 @@ interface FormData {
   phoneNumber: string;
   email: string;
   position: string;
+  employeeType: string;
   startDate: string;
 }
 
@@ -565,6 +579,7 @@ function CreateAccountTab({ onCreated }: { onCreated: () => void }) {
     phoneNumber: "",
     email: "",
     position: "STAFF",
+    employeeType: "FULL_TIME",
     startDate: new Date().toISOString().split("T")[0],
   });
   const [errors, setErrors] = useState<Partial<FormData>>({});
@@ -610,7 +625,7 @@ function CreateAccountTab({ onCreated }: { onCreated: () => void }) {
           await staffService.createEmployee({
             fullName: form.fullName.trim(),
             position: form.position,
-            employeeType: form.position,
+            employeeType: form.employeeType,
             accountId: result.accountId,
           } as any);
         } catch (err) {
@@ -632,6 +647,7 @@ function CreateAccountTab({ onCreated }: { onCreated: () => void }) {
       phoneNumber: "",
       email: "",
       position: "STAFF",
+      employeeType: "FULL_TIME",
       startDate: new Date().toISOString().split("T")[0],
     });
     setErrors({});
@@ -862,6 +878,20 @@ function CreateAccountTab({ onCreated }: { onCreated: () => void }) {
             }
           />
 
+          {/* Employee type */}
+          <Field
+            label="Loại hợp đồng *"
+            input={
+              <select
+                value={form.employeeType}
+                onChange={set("employeeType")}
+                className={inputCls(false)}
+              >
+                <option value="FULL_TIME">Toàn thời gian (Full-time)</option>
+                <option value="PART_TIME">Bán thời gian (Part-time)</option>
+              </select>
+            }
+          />
 
           {/* Start date */}
           <Field
@@ -898,6 +928,255 @@ function CreateAccountTab({ onCreated }: { onCreated: () => void }) {
           Kiểm tra & Tạo tài khoản
         </button>
       </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
+   Tab 0 — Nhân viên chưa có tài khoản
+══════════════════════════════════════════════════════════ */
+
+interface EmployeeItem {
+  employeeId: string;
+  fullName: string;
+  position: string;
+  employeeType: string;
+  status: string;
+}
+
+const POSITION_LABELS: Record<string, string> = {
+  BARISTA: "Barista", CASHIER: "Thu ngân", WAITER: "Phục vụ",
+  KITCHEN_STAFF: "Bếp", MANAGER: "Quản lý", CLEANER: "Vệ sinh", OTHER: "Khác",
+};
+
+// Map position từ staff-service → auth-service (VALID_POSITIONS của auth)
+const mapPositionToAuth = (pos: string): string => {
+  const MAP: Record<string, string> = {
+    WAITER: "STAFF",
+    KITCHEN_STAFF: "KITCHEN",
+    OTHER: "STAFF",
+  };
+  return MAP[pos.toUpperCase()] ?? pos.toUpperCase();
+};
+
+function EmployeesWithoutAccountTab({ onCreated }: { onCreated: () => void }) {
+  const [employees, setEmployees] = useState<EmployeeItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedEmp, setSelectedEmp] = useState<EmployeeItem | null>(null);
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [createdInfo, setCreatedInfo] = useState<CreatedAccount | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await staffService.getEmployees({ hasAccount: false, limit: 100 } as any);
+      const data = res as any;
+      setEmployees(Array.isArray(data) ? data : (data?.data ?? data?.employees ?? []));
+    } catch {
+      setEmployees([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const openModal = (emp: EmployeeItem) => {
+    setSelectedEmp(emp);
+    setEmail(""); setPhone(""); setFormError(""); setCreatedInfo(null);
+  };
+
+  const closeModal = () => {
+    setSelectedEmp(null); setCreatedInfo(null);
+  };
+
+  const handleCreate = async () => {
+    if (!selectedEmp) return;
+    setSubmitting(true); setFormError("");
+    try {
+      let result: CreatedAccount;
+
+      try {
+        result = await adminService.createStaffAccount({
+          fullName: selectedEmp.fullName,
+          phoneNumber: phone.trim(),
+          email: email.trim(),
+          position: mapPositionToAuth(selectedEmp.position),
+          startDate: undefined,
+        });
+      } catch (createErr: any) {
+        // Nếu email đã tồn tại (account mồ côi từ lần tạo thất bại trước) → tìm và link luôn
+        const isDupEmail = createErr?.message?.includes("đã được sử dụng") || createErr?.message?.includes("duplicate") || createErr?.message?.includes("409");
+        if (isDupEmail && email.trim()) {
+          const searchRes = await adminService.listAccounts({ search: email.trim(), limit: 5 } as any);
+          const found = (searchRes as any)?.data?.find((a: AccountInfo) => a.email?.toLowerCase() === email.trim().toLowerCase());
+          if (found) {
+            // Account đã tồn tại — link trực tiếp không cần tạo mới
+            await staffService.updateEmployee(selectedEmp.employeeId, { accountId: found.accountId } as any);
+            load();
+            setCreatedInfo({ ...found, password: "(đã tồn tại – không đổi)" } as any);
+            return;
+          }
+        }
+        throw createErr;
+      }
+
+      // Link accountId vào employee record
+      try {
+        await staffService.updateEmployee(selectedEmp.employeeId, { accountId: result.accountId } as any);
+        load();
+      } catch {
+        // Link thất bại, vẫn hiện credentials để admin biết account đã tạo
+      }
+      setCreatedInfo(result);
+    } catch (err: any) {
+      setFormError(err.message || "Tạo tài khoản thất bại");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div>
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <div className="w-8 h-8 border-4 border-[var(--cafe-gold)] border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : employees.length === 0 ? (
+        <div className="bg-white rounded-2xl p-10 border border-[var(--cafe-border)] text-center">
+          <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round">
+              <path d="M20 6L9 17l-5-5" />
+            </svg>
+          </div>
+          <p className="font-body text-[var(--cafe-primary)]" style={{ fontSize: 16, fontWeight: 600 }}>Tất cả nhân viên đã có tài khoản!</p>
+          <p className="font-body text-[var(--cafe-primary)]/50 mt-1" style={{ fontSize: 13 }}>Không còn nhân viên nào cần tạo tài khoản.</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-[var(--cafe-border)] overflow-x-auto">
+          <div className="px-6 py-4 border-b border-[var(--cafe-bg)] flex items-center justify-between">
+            <p className="font-body text-[var(--cafe-primary)]/60" style={{ fontSize: 13 }}>
+              {employees.length} nhân viên chưa có tài khoản
+            </p>
+          </div>
+          <table className="w-full min-w-[600px]">
+            <thead>
+              <tr className="border-b border-[var(--cafe-bg)]">
+                {["Họ tên", "Mã NV", "Vị trí", "Loại", "Trạng thái", ""].map((h) => (
+                  <th key={h} className="font-body text-left px-4 py-3 text-[var(--cafe-primary)]/60" style={{ fontSize: 12, fontWeight: 600 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {employees.map((emp) => (
+                <tr key={emp.employeeId} className="border-b border-[var(--cafe-bg)] last:border-0">
+                  <td className="px-4 py-3">
+                    <span className="font-body text-[var(--cafe-primary)]" style={{ fontSize: 13, fontWeight: 600 }}>{emp.fullName}</span>
+                  </td>
+                  <td className="font-body px-4 py-3 text-[var(--cafe-primary)]/50" style={{ fontSize: 12 }}>{emp.employeeId}</td>
+                  <td className="px-4 py-3">
+                    <span className="font-body px-2 py-0.5 rounded-full bg-[var(--cafe-bg)] text-[var(--cafe-primary)]" style={{ fontSize: 11, fontWeight: 600 }}>
+                      {POSITION_LABELS[emp.position] ?? emp.position}
+                    </span>
+                  </td>
+                  <td className="font-body px-4 py-3 text-[var(--cafe-primary)]/60" style={{ fontSize: 12 }}>
+                    {emp.employeeType === "FULL_TIME" ? "Toàn thời gian" : "Bán thời gian"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="font-body px-2 py-0.5 rounded-full" style={{ fontSize: 11, fontWeight: 600, background: emp.status === "ACTIVE" ? "#dcfce7" : "#f3f4f6", color: emp.status === "ACTIVE" ? "#16a34a" : "#6b7280" }}>
+                      {emp.status === "ACTIVE" ? "Đang làm" : "Nghỉ"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => openModal(emp)}
+                      className="font-body px-3 py-1.5 bg-[var(--cafe-primary)] text-white rounded-lg hover:opacity-90"
+                      style={{ fontSize: 12, fontWeight: 600 }}
+                    >
+                      + Tạo tài khoản
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Modal tạo tài khoản cho nhân viên */}
+      {selectedEmp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={closeModal}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+            {createdInfo ? (
+              /* ── Thành công ── */
+              <>
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center shrink-0">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5" /></svg>
+                  </div>
+                  <div>
+                    <p className="font-heading text-[var(--cafe-primary)]" style={{ fontSize: 18, fontWeight: 700 }}>Tạo thành công!</p>
+                    <p className="font-body text-[var(--cafe-primary)]/50" style={{ fontSize: 12 }}>Tài khoản đã được liên kết với nhân viên</p>
+                  </div>
+                </div>
+                <div className="rounded-xl p-4 mb-5 border-2" style={{ backgroundColor: "#f0fdf4", borderColor: "#86efac" }}>
+                  <p className="font-body text-green-700 mb-3" style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5 }}>THÔNG TIN ĐĂNG NHẬP</p>
+                  {[
+                    { label: "Tên đăng nhập", value: createdInfo.username },
+                    { label: "Mật khẩu", value: createdInfo.password, mono: true },
+                  ].map((row) => (
+                    <div key={row.label} className="flex justify-between items-center mb-1">
+                      <span className="font-body text-green-700/70" style={{ fontSize: 12 }}>{row.label}</span>
+                      <span className="font-body text-green-800 select-all" style={{ fontSize: row.mono ? 16 : 14, fontWeight: 700 }}>{row.value}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-3">
+                  <button type="button" onClick={closeModal} className="font-body flex-1 py-2.5 border border-[var(--cafe-border)] rounded-xl hover:bg-[var(--cafe-bg)]" style={{ fontSize: 14, fontWeight: 500 }}>Đóng</button>
+                  <button type="button" onClick={() => { closeModal(); onCreated(); }} className="font-body flex-1 py-2.5 bg-[var(--cafe-primary)] text-white rounded-xl hover:opacity-90" style={{ fontSize: 14, fontWeight: 600 }}>Xem danh sách tài khoản</button>
+                </div>
+              </>
+            ) : (
+              /* ── Form ── */
+              <>
+                <h2 className="font-heading text-[var(--cafe-primary)] mb-1" style={{ fontSize: 20, fontWeight: 700 }}>Tạo tài khoản cho nhân viên</h2>
+                <div className="flex items-center gap-2 mb-5 px-3 py-2 bg-[var(--cafe-bg)] rounded-lg">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--cafe-primary)" strokeWidth="2" strokeLinecap="round" className="shrink-0 opacity-60">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                  </svg>
+                  <div>
+                    <span className="font-body text-[var(--cafe-primary)]" style={{ fontSize: 13, fontWeight: 600 }}>{selectedEmp.fullName}</span>
+                    <span className="font-body text-[var(--cafe-primary)]/50 ml-2" style={{ fontSize: 12 }}>
+                      {POSITION_LABELS[selectedEmp.position] ?? selectedEmp.position} · {selectedEmp.employeeType === "FULL_TIME" ? "Full-time" : "Part-time"}
+                    </span>
+                  </div>
+                </div>
+                {formError && <p className="font-body text-[var(--cafe-red)] mb-3 text-sm">{formError}</p>}
+                <div className="space-y-4 mb-6">
+                  <div>
+                    <label className="font-body text-[var(--cafe-primary)] block mb-1" style={{ fontSize: 13, fontWeight: 500 }}>Email <span style={{ opacity: 0.4, fontWeight: 400 }}>(tuỳ chọn)</span></label>
+                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nhanvien@coffea.vn" className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)]" style={{ fontSize: 14 }} />
+                  </div>
+                  <div>
+                    <label className="font-body text-[var(--cafe-primary)] block mb-1" style={{ fontSize: 13, fontWeight: 500 }}>Số điện thoại <span style={{ opacity: 0.4, fontWeight: 400 }}>(tuỳ chọn)</span></label>
+                    <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0901234567" className="font-body w-full px-4 py-2.5 border border-[var(--cafe-border)] rounded-lg focus:outline-none focus:border-[var(--cafe-gold)]" style={{ fontSize: 14 }} />
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <button type="button" onClick={closeModal} className="font-body flex-1 py-2.5 border border-[var(--cafe-border)] rounded-xl hover:bg-[var(--cafe-bg)]" style={{ fontSize: 14, fontWeight: 500 }}>Hủy</button>
+                  <button type="button" onClick={handleCreate} disabled={submitting} className="font-body flex-1 py-2.5 bg-[var(--cafe-primary)] text-white rounded-xl hover:opacity-90 disabled:opacity-50" style={{ fontSize: 14, fontWeight: 600 }}>
+                    {submitting ? "Đang tạo..." : "Tạo & Liên kết"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

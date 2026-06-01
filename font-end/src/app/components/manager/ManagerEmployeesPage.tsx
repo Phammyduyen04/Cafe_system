@@ -20,6 +20,11 @@ function ToastContainer({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss:
 }
 
 const POSITIONS = ["BARISTA", "CASHIER", "WAITER", "KITCHEN_STAFF", "MANAGER", "CLEANER", "OTHER"];
+const POSITION_LABELS: Record<string, string> = {
+  BARISTA: "Barista", CASHIER: "Thu ngân", WAITER: "Phục vụ",
+  KITCHEN_STAFF: "Bếp", MANAGER: "Quản lý", CLEANER: "Vệ sinh", OTHER: "Khác",
+};
+const EMP_TYPE_LABELS: Record<string, string> = { FULL_TIME: "Toàn thời gian", PART_TIME: "Bán thời gian" };
 const EMP_TYPES = ["FULL_TIME", "PART_TIME"];
 const DAY_LABELS: Record<string, string> = { MON: "T2", TUE: "T3", WED: "T4", THU: "T5", FRI: "T6", SAT: "T7", SUN: "CN" };
 
@@ -47,6 +52,7 @@ export default function ManagerEmployeesPage() {
   const [formPosition, setFormPosition] = useState("BARISTA");
   const [formType, setFormType] = useState("FULL_TIME");
   const [formHours, setFormHours] = useState("");
+  const [formAccountId, setFormAccountId] = useState("");
   const [formSaving, setFormSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -89,13 +95,14 @@ export default function ManagerEmployeesPage() {
 
   const openCreate = () => {
     setEditingId(null); setFormName(""); setFormPosition("BARISTA");
-    setFormType("FULL_TIME"); setFormHours(""); setFormError(""); setFormOpen(true);
+    setFormType("FULL_TIME"); setFormHours(""); setFormAccountId(""); setFormError(""); setFormOpen(true);
   };
 
   const openEdit = (emp: Employee) => {
     setEditingId(emp.employeeId); setFormName(emp.fullName);
     setFormPosition(emp.position); setFormType(emp.employeeType);
     setFormHours(emp.maxWorkingHours != null ? String(emp.maxWorkingHours) : "");
+    setFormAccountId(emp.accountId || "");
     setFormError(""); setFormOpen(true);
   };
 
@@ -108,7 +115,8 @@ export default function ManagerEmployeesPage() {
           fullName: formName, position: formPosition,
           employeeType: formType as any,
           maxWorkingHours: formHours ? parseInt(formHours) : null,
-        });
+          accountId: formAccountId.trim() || null,
+        } as any);
         showSuccess("Cập nhật nhân viên thành công!");
       } else {
         await staffService.createEmployee({
@@ -158,7 +166,7 @@ export default function ManagerEmployeesPage() {
     return (
       <span className="font-body inline-block px-2 py-0.5 rounded-full"
         style={{ fontSize: 11, fontWeight: 600, backgroundColor: active ? "#dcfce7" : "#fef2f2", color: active ? "#16a34a" : "#dc2626" }}>
-        {status}
+        {active ? "Đang làm" : "Nghỉ việc"}
       </span>
     );
   };
@@ -182,12 +190,12 @@ export default function ManagerEmployeesPage() {
       <div className="flex flex-wrap gap-3 mb-6">
         <select value={filterPosition} onChange={(e) => { setFilterPosition(e.target.value); setPage(1); }} className={selectCls} style={{ fontSize: 13, width: "auto" }}>
           <option value="">Tất cả vị trí</option>
-          {POSITIONS.map((p) => <option key={p} value={p}>{p}</option>)}
+          {POSITIONS.map((p) => <option key={p} value={p}>{POSITION_LABELS[p] ?? p}</option>)}
         </select>
         <select value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }} className={selectCls} style={{ fontSize: 13, width: "auto" }}>
           <option value="">Tất cả trạng thái</option>
-          <option value="ACTIVE">ACTIVE</option>
-          <option value="INACTIVE">INACTIVE</option>
+          <option value="ACTIVE">Đang làm</option>
+          <option value="INACTIVE">Nghỉ việc</option>
         </select>
         <select value={filterHasAccount} onChange={(e) => { setFilterHasAccount(e.target.value); setPage(1); }} className={selectCls} style={{ fontSize: 13, width: "auto" }}>
           <option value="">Tất cả tài khoản</option>
@@ -230,14 +238,14 @@ export default function ManagerEmployeesPage() {
                       <p className="font-body text-red-400 mt-0.5" style={{ fontSize: 11 }}>Lý do: {emp.inactiveReason}</p>
                     )}
                   </td>
-                  <td className="font-body px-4 py-3 text-[var(--cafe-primary)]/70" style={{ fontSize: 13 }}>{emp.position}</td>
+                  <td className="font-body px-4 py-3 text-[var(--cafe-primary)]/70" style={{ fontSize: 13 }}>{POSITION_LABELS[emp.position] ?? emp.position}</td>
                   <td className="px-4 py-3">
                     <span className="font-body px-2 py-0.5 rounded-full" style={{
                       fontSize: 11, fontWeight: 600,
                       backgroundColor: emp.employeeType === "FULL_TIME" ? "#dbeafe" : "#fef9c3",
                       color: emp.employeeType === "FULL_TIME" ? "#2563eb" : "#ca8a04",
                     }}>
-                      {emp.employeeType}
+                      {EMP_TYPE_LABELS[emp.employeeType] ?? emp.employeeType}
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -297,19 +305,32 @@ export default function ManagerEmployeesPage() {
               <div>
                 <label className={labelCls} style={{ fontSize: 13, fontWeight: 500 }}>Vị trí</label>
                 <select value={formPosition} onChange={(e) => setFormPosition(e.target.value)} className={selectCls} style={{ fontSize: 14 }}>
-                  {POSITIONS.map((p) => <option key={p} value={p}>{p}</option>)}
+                  {POSITIONS.map((p) => <option key={p} value={p}>{POSITION_LABELS[p] ?? p}</option>)}
                 </select>
               </div>
               <div>
-                <label className={labelCls} style={{ fontSize: 13, fontWeight: 500 }}>Loại nhân viên</label>
+                <label className={labelCls} style={{ fontSize: 13, fontWeight: 500 }}>Loại hợp đồng</label>
                 <select value={formType} onChange={(e) => setFormType(e.target.value)} className={selectCls} style={{ fontSize: 14 }}>
-                  {EMP_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  {EMP_TYPES.map((t) => <option key={t} value={t}>{EMP_TYPE_LABELS[t] ?? t}</option>)}
                 </select>
               </div>
               {formType === "FULL_TIME" && (
                 <div>
                   <label className={labelCls} style={{ fontSize: 13, fontWeight: 500 }}>Giờ làm tối đa / tuần</label>
                   <input type="number" value={formHours} onChange={(e) => setFormHours(e.target.value)} placeholder="VD: 40" className={inputCls} style={{ fontSize: 14 }} />
+                </div>
+              )}
+              {editingId && (
+                <div>
+                  <label className={labelCls} style={{ fontSize: 13, fontWeight: 500 }}>Account ID <span style={{ fontWeight: 400, opacity: 0.5 }}>(để liên kết tài khoản đăng nhập)</span></label>
+                  <input
+                    type="text"
+                    value={formAccountId}
+                    onChange={(e) => setFormAccountId(e.target.value)}
+                    placeholder="UUID của tài khoản (lấy từ trang Admin)"
+                    className={inputCls}
+                    style={{ fontSize: 13 }}
+                  />
                 </div>
               )}
             </div>
