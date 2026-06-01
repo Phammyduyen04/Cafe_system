@@ -224,30 +224,36 @@ const assignEmployee = async (shiftId, employeeId, user) => {
       }
     }
   } else {
-    // PART_TIME: kiểm tra availability (ngày + giờ)
+    // PART_TIME: bắt buộc phải đăng ký lịch rảnh trước khi được gán ca
     const availability = await availabilityRepo.findByEmployeeId(employeeId);
-    if (availability) {
-      if (availability.availableDays && availability.availableDays.length > 0) {
-        const dayOfWeek = getDayOfWeek(shift.workingDate);
-        if (!availability.availableDays.includes(dayOfWeek)) {
-          throw new AppError(
-            `Nhân viên không rảnh vào ${dayOfWeek} (ngày làm: ${shift.workingDate})`,
-            400
-          );
-        }
-      }
-      if (availability.availableTimeRanges && availability.availableTimeRanges.length > 0) {
-        const shiftStart = toMinutes(shift.startTime);
-        const shiftEnd = toMinutes(shift.endTime);
-        const covered = availability.availableTimeRanges.some(
-          (range) => toMinutes(range.start) <= shiftStart && toMinutes(range.end) >= shiftEnd
+    if (!availability || !availability.availableDays || availability.availableDays.length === 0) {
+      throw new AppError(
+        'Nhân viên bán thời gian chưa đăng ký lịch rảnh. Vui lòng yêu cầu nhân viên cập nhật lịch rảnh trước.',
+        400
+      );
+    }
+
+    // Kiểm tra ngày rảnh
+    const dayOfWeek = getDayOfWeek(shift.workingDate);
+    if (!availability.availableDays.includes(dayOfWeek)) {
+      throw new AppError(
+        `Nhân viên không rảnh vào ${dayOfWeek} (ngày làm: ${shift.workingDate})`,
+        400
+      );
+    }
+
+    // Kiểm tra khung giờ rảnh
+    if (availability.availableTimeRanges && availability.availableTimeRanges.length > 0) {
+      const shiftStart = toMinutes(shift.startTime);
+      const shiftEnd = toMinutes(shift.endTime);
+      const covered = availability.availableTimeRanges.some(
+        (range) => toMinutes(range.start) <= shiftStart && toMinutes(range.end) >= shiftEnd
+      );
+      if (!covered) {
+        throw new AppError(
+          `Thời gian ca (${shift.startTime}-${shift.endTime}) nằm ngoài khung giờ rảnh của nhân viên`,
+          400
         );
-        if (!covered) {
-          throw new AppError(
-            `Thời gian ca (${shift.startTime}-${shift.endTime}) nằm ngoài khung giờ rảnh của nhân viên`,
-            400
-          );
-        }
       }
     }
   }

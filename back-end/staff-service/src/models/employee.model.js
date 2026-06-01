@@ -20,8 +20,11 @@ const employeeSchema = new mongoose.Schema(
   }
 );
 
-// sparse: chỉ enforce unique với giá trị khác null
-// nhiều nhân viên có thể đồng thời có accountId: null (chưa được gắn tài khoản)
-employeeSchema.index({ accountId: 1 }, { unique: true, sparse: true });
+// partialFilterExpression: chỉ index khi accountId là string thực sự (khác null)
+// → nhiều nhân viên có thể đồng thời có accountId: null
+employeeSchema.index(
+  { accountId: 1 },
+  { unique: true, partialFilterExpression: { accountId: { $type: 'string' } } }
+);
 
 module.exports = mongoose.model('Employee', employeeSchema);
