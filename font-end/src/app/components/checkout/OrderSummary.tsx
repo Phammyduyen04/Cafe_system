@@ -4,14 +4,24 @@ import { useCart } from "../../../contexts/CartContext";
 const formatVND = (n: number) =>
   n.toLocaleString("vi-VN", { style: "currency", currency: "VND" });
 
+interface RewardItem {
+  productId: string;
+  quantity: number;
+  name: string;
+  image?: string;
+}
+
 interface OrderSummaryProps {
   shippingFee?: number;
   shipOption?: string;
+  discountAmount?: number;
+  couponCode?: string;
+  rewardProducts?: RewardItem[];
   ahamoveFee?: number | null;
   ahamoveLoading?: boolean;
 }
 
-export default function OrderSummary({ shippingFee, shipOption, ahamoveFee, ahamoveLoading }: OrderSummaryProps = {}) {
+export default function OrderSummary({ shippingFee, shipOption, discountAmount, couponCode, rewardProducts, ahamoveFee, ahamoveLoading }: OrderSummaryProps = {}) {
   const { items } = useCart();
 
   if (items.length === 0) {
@@ -30,7 +40,8 @@ export default function OrderSummary({ shippingFee, shipOption, ahamoveFee, aham
   const isPartner = shipOption === "partner";
   const isDynamic = isPartner && ahamoveFee == null && !ahamoveLoading;
   const fee = shippingFee ?? 0;
-  const total = isDynamic ? subtotal : subtotal + fee;
+  const discount = discountAmount ?? 0;
+  const total = isDynamic ? subtotal - discount : subtotal + fee - discount;
 
   return (
     <div className="font-body border border-[#d9d9d9] bg-white">
@@ -77,6 +88,32 @@ export default function OrderSummary({ shippingFee, shipOption, ahamoveFee, aham
         ))}
       </div>
 
+      {rewardProducts && rewardProducts.length > 0 && (
+        <div className="border-t border-[#c8e6c9]">
+          <div className="px-6 py-2 bg-[#f1f8f1]">
+            <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "2px", textTransform: "uppercase", color: "#5a8a5a" }}>Tặng kèm</span>
+          </div>
+          {rewardProducts.map((rp) => (
+            <div key={rp.productId} className="flex gap-4 px-6 py-3 items-center bg-[#f9fcf9]">
+              <div className="shrink-0 w-[60px] h-[60px] border border-[#c8e6c9] overflow-hidden bg-white flex items-center justify-center">
+                {rp.image ? (
+                  <img src={rp.image} alt={rp.name} className="w-full h-full object-cover" />
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a5c8a5" strokeWidth="1.5">
+                    <path d="M20 12v10H4V12M22 7H2v5h20V7zM12 22V7M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/>
+                  </svg>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p style={{ fontSize: 12, fontWeight: 600, color: "#3a6a3a", lineHeight: 1.4 }}>{rp.name}</p>
+                <p style={{ fontSize: 11, color: "#5a8a5a", marginTop: 2 }}>Miễn phí · số lượng {rp.quantity}</p>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#5a8a5a", background: "#c8e6c9", padding: "2px 8px" }}>TẶNG</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="px-6 pt-4 pb-5 flex flex-col gap-2 border-t border-cafe-accent">
         <div className="flex justify-between">
           <span style={{ fontSize: 12, color: "rgba(48,38,28,0.65)" }}>Tạm tính</span>
@@ -101,6 +138,12 @@ export default function OrderSummary({ shippingFee, shipOption, ahamoveFee, aham
             <span className="text-cafe-primary" style={{ fontSize: 12, fontWeight: 600 }}>+{formatVND(fee)}</span>
           )}
         </div>
+        {discount > 0 && (
+          <div className="flex justify-between">
+            <span style={{ fontSize: 12, color: "#5a8a5a" }}>Giảm giá{couponCode ? ` (${couponCode})` : ""}</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#5a8a5a" }}>−{formatVND(discount)}</span>
+          </div>
+        )}
         <div className="h-px bg-cafe-accent my-2" />
         <div className="flex justify-between items-center">
           <span className="text-cafe-primary" style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.5px" }}>Tổng cộng</span>

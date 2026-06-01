@@ -206,6 +206,7 @@ export default function ManagerDiscountsPage() {
           description: formDesc,
           couponCode: formCoupon || undefined,
           maxUsage: maxUsageNum,
+          startDate: formStart,
           endDate: formEnd,
           image: imageUrl,
         } as any);

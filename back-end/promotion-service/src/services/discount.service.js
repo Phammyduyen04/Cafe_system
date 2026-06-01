@@ -206,7 +206,9 @@ const checkApplicableDiscounts = async ({ orderAmount = 0, productIds = [], cate
         !categoryIds.some((c) => condition.applicableCategoryIds.includes(c))) passes = false;
 
     if (condition.timeFrames?.length > 0) {
-      const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      // Dùng UTC+7 (giờ Việt Nam) thay vì giờ server
+      const vnHours = (now.getUTCHours() + 7) % 24;
+      const currentTime = `${String(vnHours).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}`;
       const inFrame = condition.timeFrames.some((tf) => currentTime >= tf.from && currentTime <= tf.to);
       if (!inFrame) passes = false;
     }
