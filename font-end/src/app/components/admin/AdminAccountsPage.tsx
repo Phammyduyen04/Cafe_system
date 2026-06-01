@@ -9,12 +9,12 @@ import { staffService } from "../../../services/staff.service";
 /* ── Constants ───────────────────────────────────────────── */
 
 const POSITIONS = [
-  { value: "STAFF", label: "Nhân viên phục vụ", role: "STAFF" },
   { value: "BARISTA", label: "Barista", role: "STAFF" },
   { value: "CASHIER", label: "Thu ngân", role: "STAFF" },
-  { value: "KITCHEN", label: "Bếp", role: "STAFF" },
+  { value: "WAITER", label: "Phục vụ", role: "STAFF" },
+  { value: "KITCHEN_STAFF", label: "Bếp", role: "STAFF" },
   { value: "CLEANER", label: "Vệ sinh", role: "STAFF" },
-  { value: "SUPERVISOR", label: "Giám sát", role: "MANAGER" },
+  { value: "OTHER", label: "Khác", role: "STAFF" },
   { value: "MANAGER", label: "Quản lý", role: "MANAGER" },
 ];
 
@@ -38,7 +38,7 @@ const fmt = (v: string | null | undefined) => v || "—";
 ══════════════════════════════════════════════════════════ */
 
 export default function AdminAccountsPage() {
-  const [tab, setTab] = useState<"employees" | "list" | "create">("employees");
+  const [tab, setTab] = useState<"employees" | "list">("employees");
 
   return (
     <div>
@@ -63,11 +63,6 @@ export default function AdminAccountsPage() {
               label: "Danh sách tài khoản",
               icon: "M4 6h16M4 10h16M4 14h16M4 18h16",
             },
-            {
-              key: "create",
-              label: "Tạo tài khoản thủ công",
-              icon: "M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z",
-            },
           ] as const
         ).map((t) => (
           <button
@@ -91,7 +86,6 @@ export default function AdminAccountsPage() {
 
       {tab === "employees" && <EmployeesWithoutAccountTab onCreated={() => setTab("list")} />}
       {tab === "list"      && <AccountListTab />}
-      {tab === "create"    && <CreateAccountTab onCreated={() => setTab("list")} />}
     </div>
   );
 }
@@ -578,7 +572,7 @@ function CreateAccountTab({ onCreated }: { onCreated: () => void }) {
     fullName: "",
     phoneNumber: "",
     email: "",
-    position: "STAFF",
+    position: "BARISTA",
     employeeType: "FULL_TIME",
     startDate: new Date().toISOString().split("T")[0],
   });
@@ -646,7 +640,7 @@ function CreateAccountTab({ onCreated }: { onCreated: () => void }) {
       fullName: "",
       phoneNumber: "",
       email: "",
-      position: "STAFF",
+      position: "BARISTA",
       employeeType: "FULL_TIME",
       startDate: new Date().toISOString().split("T")[0],
     });
@@ -655,7 +649,6 @@ function CreateAccountTab({ onCreated }: { onCreated: () => void }) {
     setErrorMsg("");
   };
 
-  const selectedPos = POSITIONS.find((p) => p.value === form.position);
 
   /* ── Step: validating ── */
   if (step === "validating") {
@@ -949,15 +942,6 @@ const POSITION_LABELS: Record<string, string> = {
   KITCHEN_STAFF: "Bếp", MANAGER: "Quản lý", CLEANER: "Vệ sinh", OTHER: "Khác",
 };
 
-// Map position từ staff-service → auth-service (VALID_POSITIONS của auth)
-const mapPositionToAuth = (pos: string): string => {
-  const MAP: Record<string, string> = {
-    WAITER: "STAFF",
-    KITCHEN_STAFF: "KITCHEN",
-    OTHER: "STAFF",
-  };
-  return MAP[pos.toUpperCase()] ?? pos.toUpperCase();
-};
 
 function EmployeesWithoutAccountTab({ onCreated }: { onCreated: () => void }) {
   const [employees, setEmployees] = useState<EmployeeItem[]>([]);
@@ -1004,7 +988,7 @@ function EmployeesWithoutAccountTab({ onCreated }: { onCreated: () => void }) {
           fullName: selectedEmp.fullName,
           phoneNumber: phone.trim(),
           email: email.trim(),
-          position: mapPositionToAuth(selectedEmp.position),
+          position: selectedEmp.position,
           startDate: undefined,
         });
       } catch (createErr: any) {
