@@ -1,0 +1,74 @@
+﻿%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    participant MoMo as MoMo API
+    participant GW as API Gateway
+    participant Payment as Payment Service
+    participant PaymentDB as Payment DB
+    participant MQ as RabbitMQ
+    participant Order as Order Service
+    participant OrderDB as Order DB
+
+    Note over MoMo,GW: KH thanh toan tren app MoMo xong<br/>MoMo gui IPN den endpoint public - khong can auth
+    MoMo->>GW: POST /api/payments/momo/ipn
+    Note over MoMo,GW: orderId, requestId, amount<br/>resultCode, signature, transId
+
+    GW->>Payment: Forward request - no auth required
+
+    Payment->>Payment: Xac minh HMAC signature
+    Note over Payment: HMAC-SHA256 voi secretKey<br/>rawSignature = accessKey + amount + extraData + ...
+
+    alt Signature khong hop le
+        Payment-->>MoMo: 400 - signature invalid
+    else resultCode != 0 - Thanh toan that bai
+        Payment->>PaymentDB: payment.findByProviderOrderId(orderId)
+        Payment->>PaymentDB: payment.update - status=FAILED
+        Payment-->>MoMo: 200 - nhan biet that bai
+    else Signature hop le va resultCode = 0
+        Payment->>PaymentDB: payment.findByProviderOrderId(orderId)
+        PaymentDB-->>Payment: payment record - status=PENDING
+
+        alt Payment da COMPLETED truoc do - tranh xu ly 2 lan
+            Payment-->>MoMo: 200 - da xu ly
+        else Payment chua xu ly
+            Payment->>PaymentDB: paymentSession.create
+            Note over Payment,PaymentDB: sessionType=MOMO_IPN<br/>transId, momoOrderId
+            Payment->>PaymentDB: paymentTransaction.create
+            Note over Payment,PaymentDB: amount, method=MOMO<br/>status=SUCCESS, transId
+            Payment->>PaymentDB: payment.update - status=COMPLETED
+            PaymentDB-->>Payment: payment da cap nhat
+
+            Payment->>MQ: Publish payment_exchange / payment.completed
+            Note over Payment,MQ: orderId, paymentId<br/>totalAmount, method=MOMO
+
+            Payment-->>MoMo: 200 - xu ly thanh cong
+        end
+    end
+
+    Note over MQ,OrderDB: Xu ly bat dong bo - Order Service consume
+
+    MQ->>Order: Consume payment_exchange / payment.completed
+    Order->>OrderDB: order.findByOrderId(orderId)
+    Order->>OrderDB: order.update - status PENDING_PAYMENT -> PAID
+

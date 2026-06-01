@@ -1,0 +1,70 @@
+﻿%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor NV as Nhan vien
+    participant GW as API Gateway
+    participant Order as Order Service
+    participant OrderDB as Order DB
+    participant MQ as RabbitMQ
+    participant Customer as Customer Service
+    participant CustomerDB as Customer DB
+
+    NV->>GW: PUT /api/orders/:orderId/status
+    Note over NV,GW: newStatus=COMPLETED
+    GW->>Order: Forward request - yeu cau auth STAFF
+
+    Order->>OrderDB: order.findById(orderId)
+    OrderDB-->>Order: order record - status=READY
+
+    Order->>Order: validateStatusTransition - READY -> COMPLETED
+    Order->>OrderDB: order.update - status=COMPLETED
+    Order->>OrderDB: statusLog.create - changed_by=staffId
+    OrderDB-->>Order: order da cap nhat
+
+    alt Don hang co customerId
+        Order->>MQ: Publish order_exchange / order.completed
+        Note over Order,MQ: customerId, orderId<br/>totalAmount, orderCode
+    end
+
+    Order-->>GW: 200 OK - status=COMPLETED
+    GW-->>NV: Don hang hoan thanh
+
+    Note over MQ,CustomerDB: Xu ly bat dong bo - Customer Service consume
+
+    MQ->>Customer: Consume order_exchange / order.completed
+    Customer->>CustomerDB: customer.findByAccountId(customerId)
+    CustomerDB-->>Customer: customer record
+
+    alt Khach hang ton tai
+        Customer->>Customer: pointsEarned = floor(totalAmount / 10000)
+        Customer->>CustomerDB: customer.update - loyaltyPoints += pointsEarned
+        Customer->>CustomerDB: pointLog.create
+        Note over Customer,CustomerDB: points, reason=ORDER_COMPLETED<br/>orderId, totalAmount
+
+        alt loyaltyPoints >= 200 va tier = REGULAR
+            Customer->>CustomerDB: customer.update - tier=VIP
+            Note over Customer: Tu dong nang cap len VIP
+        end
+    end
+

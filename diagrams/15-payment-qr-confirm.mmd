@@ -1,0 +1,70 @@
+﻿%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor NV as Nhan vien
+    participant GW as API Gateway
+    participant Payment as Payment Service
+    participant PaymentDB as Payment DB
+    participant MQ as RabbitMQ
+    participant Order as Order Service
+    participant OrderDB as Order DB
+
+    NV->>GW: POST /api/payments/:paymentId/qr-confirm
+    Note over NV,GW: transactionRef tuy chon, note tuy chon
+    GW->>Payment: Forward request - yeu cau auth STAFF
+
+    Payment->>PaymentDB: payment.findById(paymentId)
+    PaymentDB-->>Payment: payment record
+
+    alt Payment khong ton tai
+        Payment-->>GW: 404 Not Found
+        GW-->>NV: Thanh toan khong ton tai
+    else Payment da hoan thanh hoac bi huy
+        Payment-->>GW: 400 Bad Request
+        GW-->>NV: Thanh toan da duoc xu ly truoc do
+    else Phuong thuc khong phai QR
+        Payment-->>GW: 400 Bad Request
+        GW-->>NV: Phuong thuc thanh toan khong hop le
+    else Hop le
+        Payment->>PaymentDB: paymentSession.create
+        Note over Payment,PaymentDB: staffId, sessionType=QR<br/>transactionRef, note
+        Payment->>PaymentDB: paymentTransaction.create
+        Note over Payment,PaymentDB: amount=totalAmount, method=BANK_TRANSFER<br/>status=SUCCESS, transactionRef
+        Payment->>PaymentDB: payment.update - status=COMPLETED
+        PaymentDB-->>Payment: payment da cap nhat
+
+        Payment->>MQ: Publish payment_exchange / payment.completed
+        Note over Payment,MQ: orderId, paymentId<br/>totalAmount, method=QR
+
+        Payment-->>GW: 200 OK
+        Note over Payment,GW: paymentId, status=COMPLETED<br/>transactionRef
+        GW-->>NV: Xac nhan chuyen khoan QR thanh cong
+    end
+
+    Note over MQ,OrderDB: Xu ly bat dong bo - Order Service consume
+
+    MQ->>Order: Consume payment_exchange / payment.completed
+    Order->>OrderDB: order.findByOrderId(orderId)
+    Order->>OrderDB: order.update - status PENDING_PAYMENT -> PAID
+

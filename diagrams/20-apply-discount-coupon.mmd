@@ -1,0 +1,73 @@
+﻿%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor KH as Khach hang
+    participant GW as API Gateway
+    participant Promotion as Promotion Service
+    participant PromotionDB as Promotion DB
+
+    KH->>GW: GET /api/promotions/discounts/coupon/:code
+    Note over KH,GW: code - ma coupon can tra cuu
+    GW->>Promotion: Forward request - yeu cau auth
+
+    Promotion->>PromotionDB: discount.findByCode(code)
+    PromotionDB-->>Promotion: discount record hoac null
+
+    alt Ma coupon khong ton tai
+        Promotion-->>GW: 404 Not Found
+        GW-->>KH: Ma giam gia khong hop le
+    else Coupon het han hoac chua bat dau
+        Promotion-->>GW: 400 Bad Request
+        GW-->>KH: Ma giam gia het han hoac chua ap dung duoc
+    else Coupon hop le
+        Promotion-->>GW: 200 OK
+        Note over Promotion,GW: discountId, code, discountType<br/>discountValue, minOrderAmount<br/>startDate, endDate
+        GW-->>KH: Thong tin ma giam gia
+    end
+
+    KH->>GW: GET /api/promotions/discounts/check
+    Note over KH,GW: discountId, customerId, totalAmount
+    GW->>Promotion: Forward request - yeu cau auth
+
+    Promotion->>PromotionDB: discount.findById(discountId)
+    PromotionDB-->>Promotion: discount record
+    Promotion->>PromotionDB: usage.countByCustomer(discountId, customerId)
+    PromotionDB-->>Promotion: so lan da dung
+
+    alt Tong don hang chua dat minOrderAmount
+        Promotion-->>GW: 400 Bad Request
+        GW-->>KH: Don hang chua dat gia tri toi thieu
+    else Khach hang da dung qua so lan cho phep
+        Promotion-->>GW: 400 Bad Request
+        GW-->>KH: Ma giam gia da het luot su dung
+    else Co the ap dung
+        Promotion->>Promotion: Tinh discountAmount theo discountType
+        Note over Promotion: PERCENTAGE - totalAmount * value / 100<br/>FIXED_AMOUNT - tru thang gia tri
+        Promotion-->>GW: 200 OK
+        Note over Promotion,GW: discountId, applicable=true<br/>discountAmount
+        GW-->>KH: Ma giam gia hop le - da tinh so tien giam
+    end
+
+    Note over KH,GW: KH gui discountId kem khi checkout<br/>Order Service ap dung vao don hang
+

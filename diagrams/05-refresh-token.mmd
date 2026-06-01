@@ -1,0 +1,72 @@
+﻿%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor User as Nguoi dung
+    participant GW as API Gateway
+    participant Auth as Auth Service
+    participant AuthDB as Auth DB
+
+    User->>GW: POST /api/auth/refresh-token
+    Note over Client,GW: refreshToken
+    GW->>Auth: Forward request
+
+    activate Auth
+    Auth->>AuthDB: refreshToken.findByToken(token)
+    AuthDB-->>Auth: token record hoac null
+
+    alt Token khong ton tai
+        Auth-->>GW: 401 Unauthorized
+        GW-->>User: Refresh token khong hop le
+    else Token da bi thu hoi
+        Auth-->>GW: 401 Unauthorized
+        GW-->>User: Refresh token da bi thu hoi
+    else Token da het han
+        Auth-->>GW: 401 Unauthorized
+        GW-->>User: Refresh token da het han
+    else Token hop le
+        Auth->>AuthDB: account.findById(accountId)
+        AuthDB-->>Auth: account record
+
+        alt Tai khoan khong ton tai hoac bi vo hieu hoa
+            Auth-->>GW: 401 Unauthorized
+            GW-->>User: Tai khoan khong hop le
+        else Tai khoan ACTIVE
+            Auth->>AuthDB: getAccountRoles(accountId)
+            AuthDB-->>Auth: danh sach roles
+
+            Auth->>Auth: jwt.sign - accessToken moi 15m
+
+            Note over Auth: Rotate refresh token
+            Auth->>AuthDB: refreshToken.revoke(tokenId)
+            Auth->>Auth: crypto.randomBytes(64) - refreshToken moi
+            Auth->>AuthDB: refreshToken.create - het han 7d
+
+            Auth-->>GW: 200 OK
+            Note over Auth,GW: accessToken moi, refreshToken moi
+            GW-->>User: Tokens da duoc cap lai
+        end
+    end
+
+    deactivate Auth
+

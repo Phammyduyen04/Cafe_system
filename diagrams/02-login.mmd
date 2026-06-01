@@ -1,0 +1,73 @@
+﻿%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor User as Nguoi dung
+    participant GW as API Gateway
+    participant Auth as Auth Service
+    participant AuthDB as Auth DB
+
+    User->>GW: POST /api/auth/login
+    Note over User,GW: username hoac email, password
+    GW->>Auth: Forward request
+
+    activate Auth
+
+    Auth->>AuthDB: findByUsername(username)
+    AuthDB-->>Auth: account hoac null
+
+    alt Khong tim thay theo username
+        Auth->>AuthDB: findByEmail(username)
+        AuthDB-->>Auth: account hoac null
+    end
+
+    alt Tai khoan khong ton tai
+        Auth-->>GW: 401 Unauthorized
+        GW-->>User: Ten dang nhap hoac mat khau khong dung
+    else Tai khoan bi vo hieu hoa
+        Auth-->>GW: 403 Forbidden
+        GW-->>User: Tai khoan da bi vo hieu hoa
+    else Tai khoan hop le
+        Auth->>Auth: bcrypt.compare(password, hash)
+
+        alt Sai mat khau
+            Auth-->>GW: 401 Unauthorized
+            GW-->>User: Ten dang nhap hoac mat khau khong dung
+        else Dung mat khau
+            Auth->>AuthDB: getAccountRoles(accountId)
+            AuthDB-->>Auth: danh sach roles
+
+            Auth->>Auth: jwt.sign - accessToken het han 15m
+            Auth->>Auth: crypto.randomBytes(64) - refreshToken het han 7d
+
+            Auth->>AuthDB: refreshToken.create(token, expiresAt)
+            Auth->>AuthDB: updateLastLogin(accountId)
+
+            Auth-->>GW: 200 OK
+            Note over Auth,GW: accessToken, refreshToken<br/>accountId, username, roles
+            GW-->>User: Dang nhap thanh cong
+        end
+    end
+
+    deactivate Auth
+

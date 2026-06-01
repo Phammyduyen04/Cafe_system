@@ -1,0 +1,75 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#e2d9c8",
+    "actorTextColor": "#1a1a1a",
+    "actorBorderColor": "#c4a35a",
+    "noteBkgColor": "#e2d9c8",
+    "noteTextColor": "#1a1a1a",
+    "noteBorderColor": "#c4a35a",
+    "activationBkgColor": "#e2d9c8",
+    "activationBorderColor": "#c4a35a",
+    "sequenceNumberColor": "#1a1a1a",
+    "labelBoxBkgColor": "#e2d9c8",
+    "labelTextColor": "#1a1a1a",
+    "loopTextColor": "#1a1a1a",
+    "lineColor": "#4a2c0a",
+    "textColor": "#1a1a1a",
+    "signalColor": "#4a2c0a",
+    "signalTextColor": "#1a1a1a",
+    "background": "#ffffff"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor MG as Manager
+    participant GW as API Gateway
+    participant Promotion as Promotion Service
+    participant PromotionDB as Promotion DB - MongoDB
+
+    MG->>GW: POST /api/promotions/discounts
+    Note over MG,GW: discountName, discountType, discountValue<br/>startDate, endDate<br/>couponCode tuy chon, maxUsage tuy chon
+    GW->>Promotion: Forward request - yeu cau auth MANAGER
+
+    alt Thieu discountName, discountType hoac discountValue
+        Promotion-->>GW: 400 Bad Request
+        GW-->>MG: Ten, loai va gia tri giam gia la bat buoc
+    else Thieu startDate hoac endDate
+        Promotion-->>GW: 400 Bad Request
+        GW-->>MG: Ngay bat dau va ket thuc la bat buoc
+    else startDate la ngay trong qua khu
+        Promotion-->>GW: 400 Bad Request
+        GW-->>MG: Ngay bat dau khong duoc la ngay trong qua khu
+    else endDate truoc startDate
+        Promotion-->>GW: 400 Bad Request
+        GW-->>MG: Ngay ket thuc phai sau hoac bang ngay bat dau
+    else discountValue khong hop le
+        Note over Promotion: PERCENT - phai tu 1 den 100<br/>FIXED - phai lon hon 0
+        Promotion-->>GW: 400 Bad Request
+        GW-->>MG: Gia tri giam gia khong hop le
+    else couponCode bi trung
+        Promotion->>PromotionDB: discount.findByCouponCode(couponCode)
+        PromotionDB-->>Promotion: discount da ton tai
+        Promotion-->>GW: 409 Conflict
+        GW-->>MG: Ma coupon nay da duoc su dung
+    else Hop le
+        Promotion->>PromotionDB: discount.findAll - dem de sinh discountId
+        PromotionDB-->>Promotion: danh sach discountId hien co
+        Promotion->>Promotion: generateNextDiscountId - DISC_001, DISC_002...
+
+        Promotion->>Promotion: computeStatus - tinh trang thai tu ngay
+        Note over Promotion: startDate > hom nay -> PLANNED<br/>endDate < hom nay -> EXPIRED<br/>con lai -> ACTIVE
+
+        Promotion->>PromotionDB: discount.create
+        Note over Promotion,PromotionDB: discountId, discountName<br/>discountType - PERCENT hoac FIXED<br/>discountValue, couponCode UPPERCASE<br/>usageCount=0, status, createdBy
+        PromotionDB-->>Promotion: discount record
+
+        Promotion->>PromotionDB: discountCondition.createOrUpdate
+        Note over Promotion,PromotionDB: Tao condition rong gan voi discountId<br/>minimumOrderAmount, applicableProductIds<br/>applicableCustomerTypes, timeFrames se cap nhat sau
+
+        Promotion-->>GW: 201 Created
+        Note over Promotion,GW: discountId, discountName<br/>discountType, discountValue<br/>status, couponCode
+        GW-->>MG: Tao ma giam gia thanh cong
+    end
+
+    Note over MG,PromotionDB: Buoc tiep theo - cap nhat dieu kien<br/>PUT /api/promotions/discounts/:id/conditions<br/>minimumOrderAmount, applicableProductIds<br/>applicableCustomerTypes, timeFrames
