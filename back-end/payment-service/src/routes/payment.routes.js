@@ -30,6 +30,7 @@ router.post('/initiate', paymentController.initiatePayment);
 // =============================================
 router.get('/', authorizeMiddleware('ADMIN', 'MANAGER', 'STAFF', 'EMPLOYEE'), paymentController.getAllPayments);
 router.get('/order/:orderId', paymentController.getPaymentByOrderId);
+router.post('/order/:orderId/retry', paymentController.retryPayment);
 router.get('/:id', paymentController.getPaymentById);
 
 // =============================================

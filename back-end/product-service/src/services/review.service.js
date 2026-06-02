@@ -4,8 +4,11 @@ const crypto = require('crypto');
 
 const createReview = async (data) => {
   const { customerName, rating, comment, customerRole, avatar, productId, orderId } = data;
-  if (!customerName || !rating || !comment) {
-    throw new AppError('customerName, rating và comment là bắt buộc', 400);
+  if (!customerName || !rating) {
+    throw new AppError('customerName và rating là bắt buộc', 400);
+  }
+  if (Number(rating) < 1 || Number(rating) > 5) {
+    throw new AppError('rating phải từ 1 đến 5', 400);
   }
   return await reviewRepo.create({
     reviewId: crypto.randomUUID(),
@@ -13,7 +16,7 @@ const createReview = async (data) => {
     customerRole: customerRole || '',
     avatar: avatar || '',
     rating: Number(rating),
-    comment,
+    comment: comment || '',
     productId: productId || null,
     orderId: orderId || null,
   });

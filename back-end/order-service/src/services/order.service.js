@@ -128,6 +128,7 @@ const createOrder = async (data, user, authToken) => {
     order_code: generateOrderCode(),
     order_type: orderType,
     order_channel: orderChannel,
+    status: initialStatus,
     payment_method: paymentMethod.toUpperCase(),
     subtotal_amount: subtotalAmount,
     discount_amount: discountAmount,
@@ -358,6 +359,31 @@ const getOrderStatusLogs = async (orderId) => {
   return await orderRepo.getStatusLogs(orderId);
 };
 
+/**
+ * Tự động hủy các đơn PENDING_PAYMENT quá thời gian thanh toán (mặc định 20 phút).
+ * Được gọi định kỳ bởi server.js để dọn đơn bị bỏ ngang.
+ */
+const expireAbandonedOrders = async (timeoutMinutes = 20) => {
+  const cutoff = new Date(Date.now() - timeoutMinutes * 60 * 1000);
+  const expired = await orderRepo.findExpiredPendingOrders(cutoff);
+
+  for (const order of expired) {
+    try {
+      await orderRepo.updateStatus(order.order_id, 'CANCELLED', {
+        old_status: 'PENDING_PAYMENT',
+        new_status: 'CANCELLED',
+        changed_by: 'system',
+        note: 'Tự động hủy do hết thời gian thanh toán',
+      });
+      console.log(`[order-service] Auto-cancelled expired order: ${order.order_code}`);
+    } catch (err) {
+      console.error(`[order-service] Failed to auto-cancel ${order.order_code}: ${err.message}`);
+    }
+  }
+
+  return expired.length;
+};
+
 module.exports = {
   createOrder,
   createOrderFromCart,
@@ -368,4 +394,5 @@ module.exports = {
   cancelMyOrder,
   paymentConfirmed,
   getOrderStatusLogs,
+  expireAbandonedOrders,
 };

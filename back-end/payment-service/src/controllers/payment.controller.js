@@ -78,6 +78,19 @@ const initiatePayment = async (req, res, next) => {
 };
 
 // =============================================
+// RETRY: Khách hàng tạo lại link thanh toán
+// =============================================
+
+const retryPayment = async (req, res, next) => {
+  try {
+    const result = await paymentService.retryPayment(req.params.orderId);
+    return responseHelper.success(res, result, 'Payment URL created');
+  } catch (error) {
+    next(error);
+  }
+};
+
+// =============================================
 // CASH: Nhân viên xác nhận thu tiền mặt
 // =============================================
 
@@ -190,6 +203,7 @@ module.exports = {
   getPaymentMethods,
   createPaymentMethod,
   initiatePayment,
+  retryPayment,
   confirmCashPayment,
   confirmQRPayment,
   handleVnpayIPN,
