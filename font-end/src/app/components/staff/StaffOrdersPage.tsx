@@ -26,37 +26,54 @@ type PayMethod = "CASH" | "BANK_TRANSFER" | "MOMO";
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ";
 
 const ORDER_STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  PENDING: { bg: "#fef9c3", text: "#854d0e" },
-  CONFIRMED: { bg: "#dbeafe", text: "#1e40af" },
-  PREPARING: { bg: "#ede9fe", text: "#6d28d9" },
-  READY: { bg: "#dcfce7", text: "#166534" },
-  COMPLETED: { bg: "#f3f4f6", text: "#4b5563" },
-  CANCELLED: { bg: "#fef2f2", text: "#dc2626" },
-  DELIVERING: { bg: "#ffedd5", text: "#9a3412" },
+  PENDING_PAYMENT: { bg: "#fff7ed", text: "#c2410c" },
+  PENDING:         { bg: "#fef9c3", text: "#854d0e" },
+  PAID:            { bg: "#dcfce7", text: "#166534" },
+  CONFIRMED:       { bg: "#dbeafe", text: "#1e40af" },
+  PREPARING:       { bg: "#ede9fe", text: "#6d28d9" },
+  READY:           { bg: "#dcfce7", text: "#166534" },
+  COMPLETED:       { bg: "#f3f4f6", text: "#4b5563" },
+  CANCELLED:       { bg: "#fef2f2", text: "#dc2626" },
+  DELIVERING:      { bg: "#ffedd5", text: "#9a3412" },
 };
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
-  PENDING: "Chờ xác nhận",
-  CONFIRMED: "Đã xác nhận",
-  PREPARING: "Đang pha chế",
-  READY: "Sẵn sàng",
-  COMPLETED: "Hoàn thành",
-  CANCELLED: "Đã hủy",
-  DELIVERING: "Đang giao",
+  PENDING_PAYMENT: "Chờ thanh toán",
+  PENDING:         "Chờ xác nhận",
+  PAID:            "Đã thanh toán",
+  CONFIRMED:       "Đã xác nhận",
+  PREPARING:       "Đang pha chế",
+  READY:           "Sẵn sàng",
+  COMPLETED:       "Hoàn thành",
+  CANCELLED:       "Đã hủy",
+  DELIVERING:      "Đang giao",
 };
 
+// Online paid (VNPAY/MoMo): PAID → CONFIRMED
+// Cash pending: PENDING_PAYMENT → PAID (thu tiền)
+// Normal flow: PENDING → CONFIRMED → PREPARING → READY → COMPLETED
 const NEXT_STATUS: Record<string, string> = {
-  PENDING: "CONFIRMED",
+  PAID:      "CONFIRMED",
+  PENDING:   "CONFIRMED",
   CONFIRMED: "PREPARING",
   PREPARING: "READY",
-  READY: "COMPLETED",
+  READY:     "COMPLETED",
 };
 
 const NEXT_LABEL: Record<string, string> = {
-  PENDING: "Xác nhận đơn",
+  PAID:      "Xác nhận & pha chế",
+  PENDING:   "Xác nhận đơn",
   CONFIRMED: "Bắt đầu pha chế",
   PREPARING: "Đã sẵn sàng",
-  READY: "Hoàn tất",
+  READY:     "Hoàn tất",
+};
+
+const PAYMENT_METHOD_LABELS: Record<string, { label: string; color: string }> = {
+  CASH:          { label: "Tiền mặt",    color: "#d97706" },
+  VNPAY:         { label: "VNPay",       color: "#005baa" },
+  MOMO:          { label: "MoMo",        color: "#a50064" },
+  QR:            { label: "QR Code",     color: "#16a34a" },
+  BANK_TRANSFER: { label: "Chuyển khoản",color: "#0369a1" },
 };
 
 /* ─── Main component ─────────────────────────────────────── */
@@ -198,12 +215,13 @@ function OrdersTab() {
   };
 
   const statusFilters = [
-    { value: "", label: "Tất cả" },
-    { value: "PENDING", label: "Chờ xác nhận" },
-    { value: "CONFIRMED", label: "Đã xác nhận" },
-    { value: "PREPARING", label: "Đang pha chế" },
-    { value: "READY", label: "Sẵn sàng" },
-    { value: "COMPLETED", label: "Hoàn thành" },
+    { value: "",          label: "Tất cả" },
+    { value: "PENDING",   label: "Chờ xác nhận" },
+    { value: "PAID",            label: "Đã thanh toán" },
+    { value: "CONFIRMED",       label: "Đã xác nhận" },
+    { value: "PREPARING",       label: "Đang pha chế" },
+    { value: "READY",           label: "Sẵn sàng" },
+    { value: "COMPLETED",       label: "Hoàn thành" },
   ];
 
   return (
@@ -247,15 +265,17 @@ function OrdersTab() {
         <div className="grid gap-3">
           {orders.map((order) => {
             const oid = orderId(order);
-            const sc = ORDER_STATUS_COLORS[order.status] || ORDER_STATUS_COLORS.PENDING;
+            const sc = ORDER_STATUS_COLORS[order.status] ?? ORDER_STATUS_COLORS.PENDING;
             const items = orderItems(order);
             const shippingFee = orderShippingFee(order);
             const total = order.total_amount ?? order.total ?? 0;
+            const payMethod = (order.payment_method ?? order.paymentMethod ?? "").toUpperCase();
+            const pmInfo = PAYMENT_METHOD_LABELS[payMethod];
+            const isOnlinePayment = payMethod === "VNPAY" || payMethod === "MOMO";
+            const isCashPending = order.status === "PENDING_PAYMENT" && payMethod === "CASH";
             const nextStatus = NEXT_STATUS[order.status];
-            const canCancel = order.status === "PENDING" || order.status === "CONFIRMED";
+            const canCancel = ["PENDING_PAYMENT", "PENDING", "PAID", "CONFIRMED"].includes(order.status);
             const isExpanded = expandedId === oid;
-            const payStatus = order.payment_status ?? order.paymentStatus;
-            const payInfo = payStatus ? PAYMENT_STATUS_MAP[payStatus] : null;
 
             return (
               <div
@@ -273,12 +293,26 @@ function OrdersTab() {
                         <span className="font-body text-[var(--cafe-primary)]" style={{ fontSize: 13, fontWeight: 600 }}>
                           #{order.order_code ?? oid.slice(-8).toUpperCase()}
                         </span>
+                        {/* Order status */}
                         <span className="font-body px-2 py-0.5 rounded-full" style={{ fontSize: 11, fontWeight: 600, backgroundColor: sc.bg, color: sc.text }}>
-                          {ORDER_STATUS_LABELS[order.status] || order.status}
+                          {ORDER_STATUS_LABELS[order.status] ?? order.status}
                         </span>
-                        {payInfo && (
-                          <span className="font-body px-2 py-0.5 rounded-full border" style={{ fontSize: 10, fontWeight: 600, color: payInfo.color, borderColor: payInfo.color + "40", backgroundColor: payInfo.color + "12" }}>
-                            {payInfo.label}
+                        {/* Payment method badge */}
+                        {pmInfo && (
+                          <span className="font-body px-2 py-0.5 rounded-full border" style={{ fontSize: 10, fontWeight: 600, color: pmInfo.color, borderColor: pmInfo.color + "40", backgroundColor: pmInfo.color + "12" }}>
+                            {pmInfo.label}
+                          </span>
+                        )}
+                        {/* Cash pending indicator */}
+                        {isCashPending && (
+                          <span className="font-body px-2 py-0.5 rounded-full" style={{ fontSize: 10, fontWeight: 600, color: "#92400e", backgroundColor: "#fef3c7", border: "1px dashed #d97706" }}>
+                            Chưa thu tiền
+                          </span>
+                        )}
+                        {/* Online paid indicator */}
+                        {order.status === "PAID" && isOnlinePayment && (
+                          <span className="font-body px-2 py-0.5 rounded-full" style={{ fontSize: 10, fontWeight: 600, color: "#166534", backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+                            Thanh toán online ✓
                           </span>
                         )}
                       </div>
@@ -295,7 +329,19 @@ function OrdersTab() {
                         {fmt(total)}
                       </p>
                       <div className="flex gap-1.5 justify-end mt-1 flex-wrap">
-                        {nextStatus && (
+                        {/* Cash pending: thu tiền trước khi xử lý */}
+                        {isCashPending && (
+                          <button
+                            onClick={(e) => handleUpdateStatus(order, "PAID", e)}
+                            disabled={updating === oid + "PAID"}
+                            className="font-body px-3 py-1 rounded-lg text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+                            style={{ fontSize: 11, fontWeight: 600, backgroundColor: "#d97706" }}
+                          >
+                            {updating === oid + "PAID" ? "..." : "Thu tiền mặt"}
+                          </button>
+                        )}
+                        {/* Normal next-step button (skip for cash pending — must collect first) */}
+                        {nextStatus && !isCashPending && (
                           <button
                             onClick={(e) => handleUpdateStatus(order, nextStatus, e)}
                             disabled={updating === oid + nextStatus}
@@ -371,13 +417,27 @@ function OrdersTab() {
                     </div>
 
                     {/* Payment & delivery info */}
-                    <div className="mt-3 pt-3 border-t border-[var(--cafe-bg)] flex flex-wrap gap-3">
-                      {(order.payment_method ?? order.paymentMethod) && (
+                    <div className="mt-3 pt-3 border-t border-[var(--cafe-bg)] flex flex-wrap gap-4">
+                      {payMethod && (
                         <div>
-                          <p className="font-body" style={{ fontSize: 10, color: "rgba(48,38,28,0.4)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Thanh toán</p>
-                          <p className="font-body" style={{ fontSize: 12, color: "var(--cafe-primary)", fontWeight: 600 }}>{order.payment_method ?? order.paymentMethod}</p>
+                          <p className="font-body" style={{ fontSize: 10, color: "rgba(48,38,28,0.4)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Phương thức</p>
+                          <p className="font-body" style={{ fontSize: 12, fontWeight: 600, color: pmInfo?.color ?? "var(--cafe-primary)" }}>
+                            {pmInfo?.label ?? payMethod}
+                          </p>
                         </div>
                       )}
+                      <div>
+                        <p className="font-body" style={{ fontSize: 10, color: "rgba(48,38,28,0.4)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Trạng thái TT</p>
+                        <p className="font-body" style={{ fontSize: 12, fontWeight: 600, color: isCashPending ? "#d97706" : isOnlinePayment && order.status === "PAID" ? "#16a34a" : "var(--cafe-primary)" }}>
+                          {isCashPending
+                            ? "Chưa thu tiền"
+                            : isOnlinePayment && order.status === "PAID"
+                              ? "Đã thanh toán online"
+                              : order.status === "PAID" || ["CONFIRMED","PREPARING","READY","COMPLETED"].includes(order.status)
+                                ? "Đã thanh toán"
+                                : "Chờ thanh toán"}
+                        </p>
+                      </div>
                       {(order.order_type ?? order.delivery_type) && (
                         <div>
                           <p className="font-body" style={{ fontSize: 10, color: "rgba(48,38,28,0.4)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Loại đơn</p>
@@ -425,6 +485,8 @@ function PosTab() {
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [payError, setPayError] = useState("");
+  // Track auto-created order for digital methods (for cancellation on "Quay lại")
+  const [autoOrderId, setAutoOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -506,39 +568,36 @@ function PosTab() {
         : [...prev, t]
     );
 
-  /* Checkout */
-  const handleCheckout = async () => {
+  /* Checkout — accepts explicit method to avoid stale closure */
+  const handleCheckout = async (method: PayMethod = payMethod) => {
     if (cart.length === 0) return;
     setPayError("");
     setPaying(true);
     try {
-      const payload = {
-        customerInfo: {
-          fullName: customerName || "Khách tại quầy",
-          email: "counter@coffea.vn",
-          phone: "0000000000",
-          address: "Tại quầy",
-          city: "HCM",
-          region: "HCM",
-          country: "VN",
-        },
-        shippingMethod: "pickup",
-        paymentMethod: payMethod,
-        note: "Đơn tại quầy",
-        items: cart.map((c) => ({
-          productId: c.product._id,
-          name: c.product.name,
-          size: c.size,
-          quantity: c.quantity,
-          price: c.sizePrice,
-          toppings: c.toppings.map((t) => t.name),
-        })),
-      };
       const res = await api.post<{
         order: Order;
         paymentInfo?: PaymentInfo;
         message: string;
-      }>("/api/orders/checkout", payload);
+      }>("/api/orders", {
+        orderType: "DINE_IN",
+        orderChannel: "IN_STORE",
+        paymentMethod: method === "BANK_TRANSFER" ? "VNPAY" : method,
+        note: customerName ? `Khách: ${customerName}` : "Đơn tại quầy",
+        items: cart.map((c) => ({
+          productId: c.product._id,
+          productName: c.product.name,
+          size: c.size || null,
+          unitPrice: c.sizePrice,
+          quantity: c.quantity,
+          toppings: c.toppings.map((t) => ({
+            toppingName: t.name,
+            toppingPrice: t.price ?? 0,
+            quantity: 1,
+          })),
+        })),
+      });
+      const oid = (res as any)?.order_id ?? (res as any)?.order?.order_id ?? null;
+      setAutoOrderId(oid);
       setPaymentInfo(res.paymentInfo ?? null);
       setOrderSuccess(true);
     } catch (err: any) {
@@ -546,6 +605,22 @@ function PosTab() {
     } finally {
       setPaying(false);
     }
+  };
+
+  /* Switch digital payment method — cancel previous auto-order then re-generate */
+  const handleSelectDigitalMethod = async (method: PayMethod) => {
+    if (paying) return;
+    // Cancel the previously auto-created order (if any)
+    if (autoOrderId) {
+      api.put(`/api/orders/${autoOrderId}/status`, { status: "CANCELLED" }).catch(() => {});
+    }
+    setAutoOrderId(null);
+    setPaymentInfo(null);
+    setOrderSuccess(false);
+    setPayError("");
+    setPayMethod(method);
+    // Auto-generate real QR immediately
+    await handleCheckout(method);
   };
 
   const resetOrder = () => {
@@ -556,6 +631,20 @@ function PosTab() {
     setPaymentInfo(null);
     setPayError("");
     setCashReceived("");
+    setPayMethod("CASH");
+    setAutoOrderId(null);
+  };
+
+  /* Quay lại — huỷ đơn đã auto-tạo nếu là digital payment */
+  const handleBack = () => {
+    if (autoOrderId) {
+      api.put(`/api/orders/${autoOrderId}/status`, { status: "CANCELLED" }).catch(() => {});
+      setAutoOrderId(null);
+    }
+    setPaymentInfo(null);
+    setOrderSuccess(false);
+    setPayError("");
+    setShowPayment(false);
     setPayMethod("CASH");
   };
 
@@ -994,53 +1083,97 @@ function PosTab() {
             {orderSuccess ? (
               /* Success screen */
               <div className="text-center p-6 py-8">
-                <div
-                  className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4"
-                >
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round">
-                    <path d="M20 6L9 17l-5-5" />
-                  </svg>
-                </div>
-                <h2
-                  className="font-heading text-[var(--cafe-primary)] mb-2"
-                  style={{ fontSize: 22, fontWeight: 700 }}
-                >
-                  Thanh toán thành công!
-                </h2>
-                <p
-                  className="font-body text-[var(--cafe-primary)]/60 mb-2"
-                  style={{ fontSize: 14 }}
-                >
-                  Đơn hàng đã được tạo
-                </p>
-                <p
-                  className="font-heading text-[var(--cafe-gold)] mb-6"
-                  style={{ fontSize: 24, fontWeight: 700 }}
-                >
-                  {fmt(cartTotal)}
-                </p>
-                {payMethod === "CASH" && cashReceived && Number(cashReceived.replace(/\D/g, "")) > cartTotal && (
-                  <div className="mb-4 p-3 bg-green-50 rounded-xl border border-green-200">
-                    <p className="font-body text-green-700" style={{ fontSize: 14 }}>
-                      Tiền thối:{" "}
-                      <strong>
-                        {fmt(Number(cashReceived.replace(/\D/g, "")) - cartTotal)}
-                      </strong>
+                {/* VNPAY QR (BANK_TRANSFER) */}
+                {payMethod === "BANK_TRANSFER" && paymentInfo?.payUrl && (
+                  <>
+                    <h2 className="font-heading text-[var(--cafe-primary)] mb-1" style={{ fontSize: 20, fontWeight: 700 }}>
+                      Chờ khách thanh toán
+                    </h2>
+                    <p className="font-body text-[var(--cafe-primary)]/60 mb-3" style={{ fontSize: 13 }}>
+                      Cho khách quét mã QR qua app ngân hàng
                     </p>
-                  </div>
+                    <p className="font-heading mb-4" style={{ fontSize: 22, fontWeight: 700, color: "var(--cafe-gold)" }}>
+                      {fmt(cartTotal)}
+                    </p>
+                    <div
+                      className="rounded-2xl p-4 mb-4 flex flex-col items-center gap-3 mx-auto"
+                      style={{ background: "linear-gradient(135deg, #005baa 0%, #0079cf 100%)", maxWidth: 260 }}
+                    >
+                      <span className="font-heading text-white" style={{ fontSize: 16, fontWeight: 900, letterSpacing: 1 }}>VNPay</span>
+                      <div className="bg-white rounded-xl p-2">
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(paymentInfo.payUrl)}`}
+                          alt="QR VNPAY"
+                          className="w-44 h-44 rounded-lg"
+                        />
+                      </div>
+                      <p className="font-body text-white/80" style={{ fontSize: 11 }}>Quét bằng app ngân hàng bất kỳ</p>
+                    </div>
+                  </>
                 )}
-                {paymentInfo?.qrUrl && (
-                  <div className="mb-4">
-                    <img
-                      src={paymentInfo.qrUrl}
-                      alt="QR"
-                      className="w-48 h-48 mx-auto rounded-xl border border-[var(--cafe-border)]"
-                    />
-                  </div>
+
+                {/* MoMo QR */}
+                {payMethod === "MOMO" && (paymentInfo?.qrCodeUrl || paymentInfo?.payUrl) && (
+                  <>
+                    <h2 className="font-heading text-[var(--cafe-primary)] mb-1" style={{ fontSize: 20, fontWeight: 700 }}>
+                      Chờ khách thanh toán
+                    </h2>
+                    <p className="font-body text-[var(--cafe-primary)]/60 mb-3" style={{ fontSize: 13 }}>
+                      Cho khách quét mã QR qua ứng dụng MoMo
+                    </p>
+                    <p className="font-heading mb-4" style={{ fontSize: 22, fontWeight: 700, color: "var(--cafe-gold)" }}>
+                      {fmt(cartTotal)}
+                    </p>
+                    <div
+                      className="rounded-2xl p-4 mb-4 flex flex-col items-center gap-3 mx-auto"
+                      style={{ background: "linear-gradient(135deg, #a50064 0%, #d82d8b 100%)", maxWidth: 260 }}
+                    >
+                      <span className="font-heading text-white" style={{ fontSize: 16, fontWeight: 900, letterSpacing: 1 }}>MoMo</span>
+                      <div className="bg-white rounded-xl p-2">
+                        {/* qrCodeUrl là momo:// deep link — encode thành QR image để MoMo app quét trực tiếp */}
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
+                            paymentInfo.qrCodeUrl ?? paymentInfo.payUrl!
+                          )}`}
+                          alt="QR MoMo"
+                          className="w-44 h-44 rounded-lg"
+                        />
+                      </div>
+                      <p className="font-body text-white/80" style={{ fontSize: 11 }}>Quét bằng ứng dụng MoMo</p>
+                    </div>
+                  </>
                 )}
+
+                {/* CASH success */}
+                {payMethod === "CASH" && (
+                  <>
+                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round">
+                        <path d="M20 6L9 17l-5-5" />
+                      </svg>
+                    </div>
+                    <h2 className="font-heading text-[var(--cafe-primary)] mb-2" style={{ fontSize: 22, fontWeight: 700 }}>
+                      Thanh toán thành công!
+                    </h2>
+                    <p className="font-body text-[var(--cafe-primary)]/60 mb-2" style={{ fontSize: 14 }}>
+                      Đơn hàng đã được tạo
+                    </p>
+                    <p className="font-heading text-[var(--cafe-gold)] mb-4" style={{ fontSize: 24, fontWeight: 700 }}>
+                      {fmt(cartTotal)}
+                    </p>
+                    {cashReceived && Number(cashReceived.replace(/\D/g, "")) > cartTotal && (
+                      <div className="mb-4 p-3 bg-green-50 rounded-xl border border-green-200">
+                        <p className="font-body text-green-700" style={{ fontSize: 14 }}>
+                          Tiền thối: <strong>{fmt(Number(cashReceived.replace(/\D/g, "")) - cartTotal)}</strong>
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+
                 <button
                   onClick={resetOrder}
-                  className="font-body w-full py-3 bg-[var(--cafe-primary)] text-white rounded-xl hover:opacity-90"
+                  className="font-body w-full py-3 bg-[var(--cafe-primary)] text-white rounded-xl hover:opacity-90 mt-2"
                   style={{ fontSize: 14, fontWeight: 600 }}
                 >
                   Tạo đơn mới
@@ -1102,8 +1235,13 @@ function PosTab() {
                         <button
                           key={m.key}
                           type="button"
-                          onClick={() => setPayMethod(m.key)}
-                          className="flex flex-col items-center gap-1 p-2.5 rounded-xl border-2 transition-all"
+                          onClick={() =>
+                            m.key === "CASH"
+                              ? setPayMethod("CASH")
+                              : handleSelectDigitalMethod(m.key)
+                          }
+                          disabled={paying}
+                          className="flex flex-col items-center gap-1 p-2.5 rounded-xl border-2 transition-all disabled:opacity-50"
                           style={{
                             borderColor: active ? "var(--cafe-primary)" : "var(--cafe-border)",
                             backgroundColor: active ? "var(--cafe-primary)" : "white",
@@ -1183,147 +1321,131 @@ function PosTab() {
                     </div>
                   )}
 
-                  {/* BANK TRANSFER */}
+                  {/* BANK TRANSFER → VNPAY: show real QR immediately */}
                   {payMethod === "BANK_TRANSFER" && (
-                    <div>
-                      <p className="font-body text-[var(--cafe-primary)]/60 mb-3" style={{ fontSize: 12 }}>
-                        Cho khách quét mã QR hoặc chuyển khoản theo thông tin bên dưới
-                      </p>
-                      {/* VietQR — public API, no auth needed */}
-                      <div className="flex flex-col items-center mb-4">
-                        <img
-                          src={`https://img.vietqr.io/image/vietcombank-1234567890-compact2.png?amount=${cartTotal}&addInfo=COFFEA${Date.now().toString().slice(-6)}&accountName=COFFEA%20SHOP`}
-                          alt="QR chuyển khoản"
-                          className="w-48 h-48 rounded-xl border border-[var(--cafe-border)] object-contain bg-white"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = "none";
-                          }}
-                        />
-                        <p className="font-body text-[var(--cafe-primary)]/40 mt-1" style={{ fontSize: 10 }}>
-                          Quét bằng app ngân hàng bất kỳ
-                        </p>
-                      </div>
-                      {/* Bank info rows */}
-                      <div className="bg-[var(--cafe-bg)] rounded-xl overflow-hidden">
-                        {[
-                          { label: "Ngân hàng", value: "Vietcombank" },
-                          { label: "Số tài khoản", value: "1234 5678 9012" },
-                          { label: "Chủ tài khoản", value: "COFFEA SHOP" },
-                          { label: "Số tiền", value: fmt(cartTotal), highlight: true },
-                          { label: "Nội dung CK", value: `COFFEA ${Date.now().toString().slice(-6)}` },
-                        ].map((row, i) => (
+                    <div className="text-center">
+                      {paying ? (
+                        <div className="flex flex-col items-center gap-3 py-8">
+                          <div className="w-8 h-8 border-4 border-[#005baa] border-t-transparent rounded-full animate-spin" />
+                          <p className="font-body text-[var(--cafe-primary)]/60" style={{ fontSize: 13 }}>Đang tạo mã QR VNPAY...</p>
+                        </div>
+                      ) : paymentInfo?.payUrl ? (
+                        <>
+                          <p className="font-body text-[var(--cafe-primary)]/60 mb-3" style={{ fontSize: 12 }}>
+                            Cho khách quét mã QR qua app ngân hàng
+                          </p>
                           <div
-                            key={row.label}
-                            className="flex justify-between items-center px-4 py-2.5"
-                            style={{ borderTop: i > 0 ? "1px solid var(--cafe-border)" : "none" }}
+                            className="rounded-2xl p-4 mb-3 flex flex-col items-center gap-3 mx-auto"
+                            style={{ background: "linear-gradient(135deg, #005baa 0%, #0079cf 100%)", maxWidth: 260 }}
                           >
-                            <span className="font-body text-[var(--cafe-primary)]/60" style={{ fontSize: 12 }}>
-                              {row.label}
-                            </span>
-                            <span
-                              className="font-body"
-                              style={{
-                                fontSize: row.highlight ? 15 : 13,
-                                fontWeight: row.highlight ? 700 : 600,
-                                color: row.highlight ? "var(--cafe-primary)" : "var(--cafe-primary)",
-                              }}
-                            >
-                              {row.value}
-                            </span>
+                            <span className="font-heading text-white" style={{ fontSize: 16, fontWeight: 900, letterSpacing: 1 }}>VNPay</span>
+                            <div className="bg-white rounded-xl p-2">
+                              <img
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(paymentInfo.payUrl)}`}
+                                alt="QR VNPAY"
+                                className="w-44 h-44 rounded-lg"
+                              />
+                            </div>
+                            <p className="font-heading text-white" style={{ fontSize: 18, fontWeight: 700 }}>{fmt(cartTotal)}</p>
+                            <p className="font-body text-white/80" style={{ fontSize: 11 }}>Quét bằng app ngân hàng bất kỳ</p>
                           </div>
-                        ))}
-                      </div>
-                      <p className="font-body text-[var(--cafe-primary)]/40 mt-2 text-center" style={{ fontSize: 11 }}>
-                        Nhấn "Xác nhận thanh toán" sau khi khách chuyển khoản thành công
-                      </p>
+                        </>
+                      ) : payError ? (
+                        <div className="py-6">
+                          <p className="font-body text-red-500 mb-3" style={{ fontSize: 13 }}>{payError}</p>
+                          <button
+                            onClick={() => handleSelectDigitalMethod("BANK_TRANSFER")}
+                            className="font-body px-4 py-2 border border-[var(--cafe-primary)] text-[var(--cafe-primary)] rounded-lg"
+                            style={{ fontSize: 12 }}
+                          >Thử lại</button>
+                        </div>
+                      ) : null}
                     </div>
                   )}
 
-                  {/* MOMO / QR Wallet */}
+                  {/* MOMO: show real QR immediately */}
                   {payMethod === "MOMO" && (
                     <div className="text-center">
-                      <p className="font-body text-[var(--cafe-primary)]/60 mb-3" style={{ fontSize: 12 }}>
-                        Nhấn "Xác nhận thanh toán" để tạo đơn và lấy mã QR từ hệ thống
-                      </p>
-                      {/* MoMo brand card with real QR */}
-                      <div
-                        className="rounded-2xl p-5 mb-4 flex flex-col items-center gap-3"
-                        style={{ background: "linear-gradient(135deg, #a50064 0%, #d82d8b 100%)" }}
-                      >
-                        <span className="font-heading text-white" style={{ fontSize: 22, fontWeight: 900, letterSpacing: 1 }}>
-                          MoMo
-                        </span>
-                        <div className="bg-white rounded-xl p-2">
-                          <img
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`2|99|0987654321|COFFEA SHOP||0|0|${cartTotal}|COFFEA ${Date.now().toString().slice(-6)}`)}`}
-                            alt="MoMo QR"
-                            className="w-36 h-36 rounded-lg"
-                          />
+                      {paying ? (
+                        <div className="flex flex-col items-center gap-3 py-8">
+                          <div className="w-8 h-8 border-4 border-[#a50064] border-t-transparent rounded-full animate-spin" />
+                          <p className="font-body text-[var(--cafe-primary)]/60" style={{ fontSize: 13 }}>Đang tạo mã QR MoMo...</p>
                         </div>
-                        <p className="font-heading text-white" style={{ fontSize: 20, fontWeight: 700 }}>
-                          {fmt(cartTotal)}
-                        </p>
-                        <p className="font-body text-white/80" style={{ fontSize: 12 }}>
-                          Quét mã qua ứng dụng MoMo
-                        </p>
-                      </div>
-                      {/* MoMo account info */}
-                      <div className="bg-[var(--cafe-bg)] rounded-xl overflow-hidden text-left">
-                        {[
-                          { label: "Số điện thoại MoMo", value: "0987 654 321" },
-                          { label: "Tên tài khoản", value: "COFFEA SHOP" },
-                          { label: "Số tiền", value: fmt(cartTotal) },
-                        ].map((row, i) => (
+                      ) : (paymentInfo?.qrCodeUrl || paymentInfo?.payUrl) ? (
+                        <>
+                          <p className="font-body text-[var(--cafe-primary)]/60 mb-3" style={{ fontSize: 12 }}>
+                            Cho khách quét mã QR qua ứng dụng MoMo
+                          </p>
                           <div
-                            key={row.label}
-                            className="flex justify-between items-center px-4 py-2.5"
-                            style={{ borderTop: i > 0 ? "1px solid var(--cafe-border)" : "none" }}
+                            className="rounded-2xl p-4 mb-3 flex flex-col items-center gap-3 mx-auto"
+                            style={{ background: "linear-gradient(135deg, #a50064 0%, #d82d8b 100%)", maxWidth: 260 }}
                           >
-                            <span className="font-body text-[var(--cafe-primary)]/60" style={{ fontSize: 12 }}>
-                              {row.label}
-                            </span>
-                            <span className="font-body text-[var(--cafe-primary)]" style={{ fontSize: 13, fontWeight: 600 }}>
-                              {row.value}
-                            </span>
+                            <span className="font-heading text-white" style={{ fontSize: 16, fontWeight: 900, letterSpacing: 1 }}>MoMo</span>
+                            <div className="bg-white rounded-xl p-2">
+                              <img
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
+                                  paymentInfo.qrCodeUrl ?? paymentInfo.payUrl!
+                                )}`}
+                                alt="QR MoMo"
+                                className="w-44 h-44 rounded-lg"
+                              />
+                            </div>
+                            <p className="font-heading text-white" style={{ fontSize: 18, fontWeight: 700 }}>{fmt(cartTotal)}</p>
+                            <p className="font-body text-white/80" style={{ fontSize: 11 }}>Quét bằng ứng dụng MoMo</p>
                           </div>
-                        ))}
-                      </div>
+                        </>
+                      ) : payError ? (
+                        <div className="py-6">
+                          <p className="font-body text-red-500 mb-3" style={{ fontSize: 13 }}>{payError}</p>
+                          <button
+                            onClick={() => handleSelectDigitalMethod("MOMO")}
+                            className="font-body px-4 py-2 border border-[var(--cafe-primary)] text-[var(--cafe-primary)] rounded-lg"
+                            style={{ fontSize: 12 }}
+                          >Thử lại</button>
+                        </div>
+                      ) : null}
                     </div>
                   )}
 
                 </div>
 
-                {/* ── Fixed footer: error + action buttons ── */}
+                {/* ── Fixed footer ── */}
                 <div className="px-6 py-4 border-t border-[var(--cafe-bg)]">
-                  {payError && (
-                    <p className="font-body text-[var(--cafe-red)] mb-3" style={{ fontSize: 13 }}>
-                      {payError}
-                    </p>
-                  )}
                   <div className="flex gap-3">
                     <button
                       type="button"
-                      onClick={() => setShowPayment(false)}
+                      onClick={handleBack}
                       className="font-body flex-1 py-3 border border-[var(--cafe-border)] rounded-xl hover:bg-[var(--cafe-bg)]"
                       style={{ fontSize: 14, fontWeight: 500 }}
                     >
                       Quay lại
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleCheckout}
-                      disabled={
-                        paying ||
-                        (payMethod === "CASH" &&
-                          cashReceived !== "" &&
-                          cashChange !== null &&
-                          cashChange < 0)
-                      }
-                      className="font-body flex-1 py-3 bg-[var(--cafe-primary)] text-white rounded-xl hover:opacity-90 disabled:opacity-50 transition-opacity"
-                      style={{ fontSize: 14, fontWeight: 600 }}
-                    >
-                      {paying ? "Đang xử lý..." : "Xác nhận thanh toán"}
-                    </button>
+                    {/* Chỉ CASH cần nút Xác nhận — digital đã tự tạo đơn */}
+                    {payMethod === "CASH" && (
+                      <button
+                        type="button"
+                        onClick={() => handleCheckout("CASH")}
+                        disabled={
+                          paying ||
+                          (cashReceived !== "" && cashChange !== null && cashChange < 0)
+                        }
+                        className="font-body flex-1 py-3 bg-[var(--cafe-primary)] text-white rounded-xl hover:opacity-90 disabled:opacity-50 transition-opacity"
+                        style={{ fontSize: 14, fontWeight: 600 }}
+                      >
+                        {paying ? "Đang xử lý..." : "Xác nhận thanh toán"}
+                      </button>
+                    )}
+                    {/* Digital: nút Tạo đơn mới khi QR đã hiển thị */}
+                    {(payMethod === "BANK_TRANSFER" || payMethod === "MOMO") && orderSuccess && (
+                      <button
+                        type="button"
+                        onClick={resetOrder}
+                        className="font-body flex-1 py-3 bg-[var(--cafe-primary)] text-white rounded-xl hover:opacity-90"
+                        style={{ fontSize: 14, fontWeight: 600 }}
+                      >
+                        Tạo đơn mới
+                      </button>
+                    )}
                   </div>
                 </div>
               </>

@@ -85,7 +85,23 @@ function ReviewModal({
   onClose: () => void;
   onSubmitted: (orderId: string) => void;
 }) {
-  const items: OrderItem[] = order.items ?? [];
+  // order_details (Prisma) dùng snake_case; order.items dùng camelCase
+  const items: OrderItem[] = (() => {
+    if (order.items?.length) return order.items;
+    if ((order as any).order_items?.length) return (order as any).order_items;
+    return ((order as any).order_details ?? [])
+      .map((d: any) => ({
+        productId: d.product_id ?? "",
+        name: d.product_name ?? "Sản phẩm",
+        size: d.size ?? "",
+        quantity: d.quantity ?? 1,
+        price: Number(d.unit_price ?? 0),
+        image: d.image ?? undefined,
+        toppings: (d.toppings ?? []).map((t: any) => t.topping_name ?? t.name ?? ""),
+      }))
+      .filter((it: OrderItem) => it.productId);
+  })();
+
   const [reviews, setReviews] = useState<Record<string, ReviewState>>(() => {
     const init: Record<string, ReviewState> = {};
     items.forEach(it => { init[it.productId] = { rating: 5, comment: "", done: false }; });
@@ -97,8 +113,13 @@ function ReviewModal({
 
   const oid = order._id ?? order.order_id ?? "";
 
+  const RATING_LABELS = ["", "Rất tệ", "Tệ", "Bình thường", "Tốt", "Xuất sắc"];
+
   const handleSubmit = async () => {
     setError("");
+    // Validate: mỗi sản phẩm phải có rating
+    const missing = items.find(it => !reviews[it.productId]?.rating);
+    if (missing) { setError("Vui lòng chọn số sao cho tất cả sản phẩm."); return; }
     setSubmitting(true);
     try {
       const pending = items.filter(it => !reviews[it.productId]?.done);
@@ -116,8 +137,8 @@ function ReviewModal({
       markLocalReviewed(oid);
       setSuccess(true);
       setTimeout(() => { onSubmitted(oid); onClose(); }, 1800);
-    } catch {
-      setError("Có lỗi xảy ra khi gửi đánh giá. Vui lòng thử lại.");
+    } catch (e: any) {
+      setError(e?.message || "Có lỗi xảy ra khi gửi đánh giá. Vui lòng thử lại.");
     } finally {
       setSubmitting(false);
     }
@@ -166,7 +187,9 @@ function ReviewModal({
                 <p className="font-body text-center" style={{ fontSize: 13, color: "rgba(48,38,28,0.5)" }}>
                   Không có sản phẩm để đánh giá.
                 </p>
-              ) : items.map(it => (
+              ) : items.map(it => {
+                const r = reviews[it.productId];
+                return (
                 <div key={it.productId} className="flex flex-col gap-3 pb-5 border-b border-[#f0ece5] last:border-0 last:pb-0">
                   {/* Product info */}
                   <div className="flex items-center gap-3">
@@ -181,25 +204,38 @@ function ReviewModal({
                     )}
                     <div>
                       <p className="font-body text-cafe-primary" style={{ fontSize: 13, fontWeight: 600 }}>{it.name}</p>
-                      <p className="font-body" style={{ fontSize: 11, color: "rgba(48,38,28,0.5)" }}>Size {it.size}</p>
+                      {it.size && <p className="font-body" style={{ fontSize: 11, color: "rgba(48,38,28,0.5)" }}>Size {it.size}</p>}
                     </div>
                   </div>
-                  {/* Star rating */}
-                  <StarRating
-                    value={reviews[it.productId]?.rating ?? 5}
-                    onChange={v => setReviews(prev => ({ ...prev, [it.productId]: { ...prev[it.productId], rating: v } }))}
-                  />
+                  {/* Star rating + label */}
+                  <div className="flex items-center gap-3">
+                    <StarRating
+                      value={r?.rating ?? 0}
+                      onChange={v => setReviews(prev => ({ ...prev, [it.productId]: { ...prev[it.productId], rating: v } }))}
+                    />
+                    {(r?.rating ?? 0) > 0 && (
+                      <span className="font-body" style={{ fontSize: 12, color: "var(--cafe-primary)", fontWeight: 600 }}>
+                        {RATING_LABELS[r?.rating ?? 0]}
+                      </span>
+                    )}
+                  </div>
                   {/* Comment */}
                   <textarea
-                    value={reviews[it.productId]?.comment ?? ""}
+                    value={r?.comment ?? ""}
                     onChange={e => setReviews(prev => ({ ...prev, [it.productId]: { ...prev[it.productId], comment: e.target.value } }))}
-                    placeholder="Chia sẻ cảm nhận của bạn về sản phẩm..."
+                    placeholder="Chia sẻ cảm nhận của bạn (không bắt buộc)..."
                     rows={2}
+                    maxLength={500}
                     className="font-body w-full border border-[#d9d9d9] px-3 py-2 resize-none outline-none focus:border-cafe-primary transition-colors"
                     style={{ fontSize: 13, color: "#30261c" }}
                   />
+                  {(r?.comment?.length ?? 0) > 0 && (
+                    <p className="font-body text-right" style={{ fontSize: 10, color: "rgba(48,38,28,0.35)" }}>
+                      {r?.comment?.length ?? 0}/500
+                    </p>
+                  )}
                 </div>
-              ))}
+              );})}
 
               {error && (
                 <p className="font-body text-red-500" style={{ fontSize: 12 }}>{error}</p>
@@ -239,6 +275,7 @@ export default function MyOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState<string | null>(null);
   const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(getLocalReviewedOrders);
   const [reviewingOrder, setReviewingOrder] = useState<Order | null>(null);
   const [page, setPage] = useState(1);
@@ -246,6 +283,7 @@ export default function MyOrdersPage() {
 
   useEffect(() => {
     if (!isLoggedIn) { navigate("/login"); return; }
+
     orderService.getMyOrders()
       .then(async res => {
         const list: Order[] = Array.isArray(res) ? res : ((res as any)?.data ?? []);
@@ -261,7 +299,7 @@ export default function MyOrdersPage() {
           );
           const serverReviewed = new Set<string>();
           checks.forEach((result, i) => {
-            if (result.status === "fulfilled" && result.value) {
+            if (result.status === "fulfilled" && result.value === true) {
               serverReviewed.add(completedIds[i]);
             }
           });
@@ -284,6 +322,22 @@ export default function MyOrdersPage() {
       alert("Không thể hủy đơn hàng. Vui lòng thử lại.");
     } finally {
       setCancelling(null);
+    }
+  };
+
+  const handleRetryPayment = async (oid: string, paymentMethod: string) => {
+    setRetrying(oid);
+    try {
+      const res = await orderService.retryPayment(oid);
+      const payUrl: string = (res as any)?.payUrl ?? (res as any)?.data?.payUrl ?? "";
+      if (!payUrl) { alert("Không thể lấy link thanh toán. Vui lòng thử lại."); return; }
+      const storageKey = paymentMethod === "MOMO" ? "pendingMomoOrderId" : "pendingVnpayOrderId";
+      localStorage.setItem(storageKey, oid);
+      window.location.href = payUrl;
+    } catch {
+      alert("Không thể tạo lại thanh toán. Vui lòng thử lại.");
+    } finally {
+      setRetrying(null);
     }
   };
 
@@ -337,6 +391,9 @@ export default function MyOrdersPage() {
             const total = order.total ?? order.total_amount ?? 0;
             const date = order.createdAt ? new Date(order.createdAt).toLocaleDateString("vi-VN") : "";
             const canCancel = status === "PENDING" || status === "PENDING_PAYMENT";
+            const canRetry = status === "PENDING_PAYMENT";
+            const paymentMethod: string = (order as any).payment_method ?? "";
+            const isRetryable = canRetry && (paymentMethod === "MOMO" || paymentMethod === "VNPAY");
             const isCompleted = status === "COMPLETED";
             const needsReview = isCompleted && !reviewedOrders.has(oid);
 
@@ -373,15 +430,29 @@ export default function MyOrdersPage() {
                     </span>
                   </div>
 
-                  {canCancel && (
-                    <button
-                      onClick={() => handleCancel(oid)}
-                      disabled={cancelling === oid}
-                      className="font-body self-end px-4 py-2 border border-red-300 text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50"
-                      style={{ fontSize: 11, fontWeight: 600, letterSpacing: "1px" }}
-                    >
-                      {cancelling === oid ? "ĐANG HỦY..." : "HỦY ĐƠN"}
-                    </button>
+                  {(isRetryable || canCancel) && (
+                    <div className="flex gap-2 self-end">
+                      {isRetryable && (
+                        <button
+                          onClick={() => handleRetryPayment(oid, paymentMethod)}
+                          disabled={retrying === oid}
+                          className="font-body px-4 py-2 bg-cafe-primary text-white transition-opacity hover:opacity-80 disabled:opacity-50"
+                          style={{ fontSize: 11, fontWeight: 600, letterSpacing: "1px" }}
+                        >
+                          {retrying === oid ? "ĐANG XỬ LÝ..." : "THANH TOÁN LẠI"}
+                        </button>
+                      )}
+                      {canCancel && (
+                        <button
+                          onClick={() => handleCancel(oid)}
+                          disabled={cancelling === oid}
+                          className="font-body px-4 py-2 border border-red-300 text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50"
+                          style={{ fontSize: 11, fontWeight: 600, letterSpacing: "1px" }}
+                        >
+                          {cancelling === oid ? "ĐANG HỦY..." : "HỦY ĐƠN"}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
 

@@ -3,9 +3,9 @@ import { Link, useNavigate } from "react-router";
 import { useCart } from "../../contexts/CartContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { orderService } from "../../services/order.service";
-import type { PaymentMethod, PaymentInfo } from "../../services/order.service";
+import type { PaymentMethod, PaymentInfo, CheckoutDiscount, CheckoutPromotion } from "../../services/order.service";
 import { promotionService } from "../../services/promotion.service";
-import type { CalculateResult } from "../../services/promotion.service";
+import type { CalculateResult, Discount, Promotion } from "../../services/promotion.service";
 import { productService } from "../../services/product.service";
 import { estimateAhamoveFee } from "../../services/ahamove.service";
 
@@ -87,6 +87,7 @@ export default function CheckoutPage() {
 
   // Ahamove estimated fee
   const [ahamoveFee, setAhamoveFee] = useState<number | null>(null);
+  const [ahamoveFeeSource, setAhamoveFeeSource] = useState<"ahamove" | "estimate" | null>(null);
   const [ahamoveLoading, setAhamoveLoading] = useState(false);
   const [ahamoveError, setAhamoveError] = useState("");
   const ahamoveAbortRef = useRef<AbortController | null>(null);
@@ -112,14 +113,16 @@ export default function CheckoutPage() {
     setAhamoveLoading(true);
     setAhamoveError("");
     setAhamoveFee(null);
+    setAhamoveFeeSource(null);
 
     estimateAhamoveFee(coords[0], coords[1], address, ctrl.signal)
       .then(result => {
         setAhamoveFee(result.totalPrice);
+        setAhamoveFeeSource(result.source ?? "ahamove");
       })
       .catch(err => {
         if ((err as Error).name === "AbortError") return;
-        setAhamoveError("Không thể tính phí");
+        setAhamoveError(err.message || "Không thể tính phí ship");
       })
       .finally(() => setAhamoveLoading(false));
 
@@ -256,6 +259,31 @@ export default function CheckoutPage() {
     // Final step: submit order
     setSubmitting(true);
     try {
+      // Build discounts/promotions arrays from applied coupon
+      let checkoutDiscounts: CheckoutDiscount[] = [];
+      let checkoutPromotions: CheckoutPromotion[] = [];
+      if (appliedCoupon && couponResult && couponResult.discountAmount > 0) {
+        if (appliedCoupon.type === "DISCOUNT") {
+          const prog = couponResult.program as Discount;
+          checkoutDiscounts = [{
+            discountId: prog.discountId,
+            discountName: prog.discountName,
+            discountType: prog.discountType,
+            discountValue: prog.discountValue,
+            appliedAmount: couponResult.discountAmount,
+          }];
+        } else {
+          const prog = couponResult.program as Promotion;
+          checkoutPromotions = [{
+            promotionId: prog.promotionId,
+            promotionName: prog.promotionName,
+            benefitType: prog.benefitType,
+            benefitValue: 0,
+            appliedAmount: couponResult.discountAmount,
+          }];
+        }
+      }
+
       const res = await orderService.checkout({
         customerInfo: {
           fullName: fullName || user?.username || "Khách",
@@ -270,6 +298,8 @@ export default function CheckoutPage() {
         shippingFee: shippingFee,
         // QR trong DB cũng dùng VNPay redirect
         paymentMethod: selectedPayMethod === "QR" ? "VNPAY" : selectedPayMethod,
+        discounts: checkoutDiscounts,
+        promotions: checkoutPromotions,
       });
       const order = (res as any)?.order ?? res;
       const pInfo = (res as any)?.paymentInfo ?? null;
@@ -443,9 +473,11 @@ export default function CheckoutPage() {
                             {ahamoveLoading && shipMethod === "partner" ? (
                               <span className="w-3 h-3 border border-cafe-primary border-t-transparent rounded-full animate-spin inline-block" />
                             ) : ahamoveFee !== null ? (
-                              <span style={{ fontWeight: 600, color: "#30261c" }}>+{ahamoveFee.toLocaleString("vi-VN")}₫</span>
+                              <span style={{ fontWeight: 600, color: "#30261c" }}>
+                                +{ahamoveFee.toLocaleString("vi-VN")}₫
+                              </span>
                             ) : ahamoveError ? (
-                              <span style={{ color: "#e74c3c", fontSize: 11 }}>{ahamoveError}</span>
+                              <span style={{ color: "rgba(48,38,28,0.5)", fontSize: 11, fontStyle: "italic" }}>Chưa chọn địa chỉ</span>
                             ) : (
                               <span style={{ color: "rgba(48,38,28,0.45)", fontStyle: "italic" }}>{opt.feeLabel}</span>
                             )}

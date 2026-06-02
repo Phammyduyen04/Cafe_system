@@ -2,8 +2,9 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
 export interface AhamoveFeeResult {
   totalPrice: number;
-  distance: number; // metres
-  duration: number; // seconds
+  distance: number;  // metres
+  duration: number;  // seconds
+  source?: "ahamove" | "estimate"; // "estimate" = Haversine fallback
 }
 
 /**

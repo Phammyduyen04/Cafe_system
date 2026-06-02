@@ -10,8 +10,10 @@ function detectProvider(params: URLSearchParams): Provider {
 
 function isSuccess(provider: Provider, params: URLSearchParams): boolean {
   if (provider === "vnpay") return params.get("vnp_ResponseCode") === "00";
+  // MoMo: success only when resultCode is explicitly "0"
+  // Missing or any other code (user closed app, error, cancel) = failure
   const code = params.get("resultCode") ?? params.get("errorCode");
-  return code === "0";
+  return code !== null && code === "0";
 }
 
 function getTransactionId(provider: Provider, params: URLSearchParams): string {
@@ -59,6 +61,9 @@ export default function PaymentResultPage() {
       }
     } else {
       setStatus("failed");
+      if (internalOrderId) {
+        localStorage.removeItem(orderKey);
+      }
     }
   }, []);
 

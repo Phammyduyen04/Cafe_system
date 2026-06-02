@@ -10,6 +10,22 @@ export interface OrderItem {
   toppings?: string[];
 }
 
+export interface CheckoutDiscount {
+  discountId: string;
+  discountName: string;
+  discountType: string;
+  discountValue: number;
+  appliedAmount: number;
+}
+
+export interface CheckoutPromotion {
+  promotionId: string;
+  promotionName: string;
+  benefitType: string;
+  benefitValue: number;
+  appliedAmount: number;
+}
+
 export interface CheckoutPayload {
   customerInfo: {
     fullName: string;
@@ -24,6 +40,8 @@ export interface CheckoutPayload {
   shippingFee?: number;
   paymentMethod?: string;
   note?: string;
+  discounts?: CheckoutDiscount[];
+  promotions?: CheckoutPromotion[];
 }
 
 export interface OrderDetail {
@@ -94,4 +112,7 @@ export const orderService = {
 
   getOrderById: (id: string) =>
     api.get<Order>(`/api/orders/${id}`),
+
+  retryPayment: (orderId: string) =>
+    api.post<{ payUrl: string; qrCodeUrl?: string }>(`/api/payments/order/${orderId}/retry`, {}),
 };

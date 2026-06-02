@@ -26,7 +26,8 @@ const createMomoPayment = async ({ momoOrderId, amount, orderInfo, requestId }) 
   const secretKey = MOMO_SECRET_KEY;
   const redirectUrl = MOMO_REDIRECT_URL;
   const ipnUrl = MOMO_IPN_URL;
-  const requestType = 'payWithMethod';
+  // captureWallet: MoMo trả về qrCodeUrl (ảnh QR của MoMo) + deeplink
+  const requestType = 'captureWallet';
   const extraData = '';
   const lang = 'vi';
 

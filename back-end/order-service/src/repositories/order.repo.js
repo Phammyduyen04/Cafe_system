@@ -61,4 +61,14 @@ const getStatusLogs = async (orderId) => {
   });
 };
 
-module.exports = { create, findMany, count, findById, updateStatus, getStatusLogs };
+const findExpiredPendingOrders = async (cutoffDate) => {
+  return await prisma.order.findMany({
+    where: {
+      status: 'PENDING_PAYMENT',
+      created_at: { lt: cutoffDate },
+    },
+    select: { order_id: true, order_code: true },
+  });
+};
+
+module.exports = { create, findMany, count, findById, updateStatus, getStatusLogs, findExpiredPendingOrders };

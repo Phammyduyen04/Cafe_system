@@ -38,4 +38,5 @@ const setupEventSubscribers = async () => {
 app.listen(PORT, () => {
   console.log(`Order Service is running on port ${PORT}`);
   setupEventSubscribers();
+
 });

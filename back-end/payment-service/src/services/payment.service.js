@@ -419,6 +419,53 @@ const handleMockBankWebhook = async ({ orderId, amount, transactionId }) => {
 };
 
 // =============================================
+// RETRY: Tạo lại URL thanh toán cho đơn PENDING_PAYMENT
+// =============================================
+
+/**
+ * Tạo lại payment URL cho đơn hàng bị bỏ ngang (VNPAY hoặc MoMo).
+ * VNPAY: dùng lại orderCode cũ.
+ * MoMo: sinh momoOrderId mới (MoMo không cho tái sử dụng orderId).
+ */
+const retryPayment = async (orderId) => {
+  const payment = await paymentRepo.findByOrderId(orderId);
+  if (!payment) throw new AppError('Payment not found', 404);
+  if (payment.payment_status === 'COMPLETED') throw new AppError('Payment already completed', 400);
+
+  const method = payment.payment_method;
+
+  if (method === 'VNPAY') {
+    const payUrl = vnpayService.createPaymentUrl({
+      amount:    Math.round(Number(payment.total_amount)),
+      orderCode: payment.provider_order_id,
+      orderInfo: `Thanh toan don hang ${payment.provider_order_id}`,
+    });
+    await paymentRepo.updatePayment(payment.payment_id, { payment_url: payUrl });
+    return { payUrl };
+  }
+
+  if (method === 'MOMO') {
+    const newMomoOrderId = generateCode('MOMO');
+    const momoResult = await momoService.createMomoPayment({
+      momoOrderId: newMomoOrderId,
+      amount:      Math.round(Number(payment.total_amount)),
+      orderInfo:   `Thanh toan don hang ${newMomoOrderId}`,
+      requestId:   newMomoOrderId,
+    });
+    if (momoResult.resultCode !== 0) {
+      throw new AppError(`MoMo: ${momoResult.message}`, 400);
+    }
+    await paymentRepo.updatePayment(payment.payment_id, {
+      payment_url:       momoResult.payUrl,
+      provider_order_id: newMomoOrderId,
+    });
+    return { payUrl: momoResult.payUrl, qrCodeUrl: momoResult.qrCodeUrl || null };
+  }
+
+  throw new AppError(`Không hỗ trợ thanh toán lại cho phương thức ${method}`, 400);
+};
+
+// =============================================
 // QUERIES
 // =============================================
 
@@ -467,6 +514,7 @@ const createPaymentMethod = async (data) => {
 module.exports = {
   initiatePayment,
   createPaymentFromOrder,
+  retryPayment,
   confirmCashPayment,
   confirmQRPayment,
   handleVnpayIPN,
